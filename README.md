@@ -1,34 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# treatment-plus-fe
 
-## Getting Started
+Tedavi Planı Platformu BFF. Next.js 16 App Router, hexagonal (ports & adapters), SOLID.
 
-First, run the development server:
+Faz 0 kabuğu: health yeşil, backend `readyz` bağlanır, iş ekranı yok. Kimlik Faz 1’de gelir.
+
+## Çalıştırma
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+cp .env.example .env.local
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- BFF: `http://localhost:3000`
+- Proses: `http://localhost:3000/healthz`
+- Hazır: `http://localhost:3000/readyz` (Go API + Postgres + Redis)
+- Klinik kabuğu: `http://localhost:3000/app`
+- Hasta kabuğu: `http://localhost:3000/p/demo`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Backend `treatment-plus-be` `http://localhost:8080` üzerinde olmalı. Tarayıcı o porta gitmez.
 
-## Learn More
+```bash
+pnpm test        # arch + typecheck + lint
+pnpm arch        # import kuralı
+pnpm typecheck
+pnpm lint
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Mimari
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Bağımlılık tek yön: `domain ← application ← adapters`. Adapter başka adapter import etmez.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Cookie Next origin’de kalır. Sunucu `Authorization` ile Go’ya gider.
 
-## Deploy on Vercel
+Sekiz bounded context backend ile aynıdır. Domain paketi `fetch`, `next/headers` veya cookie görmez.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Ayrıntı: [docs/architecture.md](docs/architecture.md).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Env
+
+Zorunlu: `API_URL`.
+
+Sonra: `SESSION_COOKIE`, `SESSION_SECURE`. Sırlar client bundle’a girmez; `server-only` client.
+
+## Sıra (bozulmaz)
+
+0 kabuk → 1 kimlik + cookie → 2 marka → 3 katalog → 4 plan → 5–6 hasta web + link → 7 medya/PDF → 8 AI
+
+Yasak başlangıç: AI, PDF, Stripe.
