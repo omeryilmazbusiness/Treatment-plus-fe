@@ -1,6 +1,8 @@
 import "server-only";
 
+import { CatalogHttpGateway } from "@/modules/catalog/adapters/http/gateway";
 import { ClinicHttpGateway } from "@/modules/clinic/adapters/http/gateway";
+import { PlanHttpGateway } from "@/modules/plan/adapters/http/gateway";
 import { loadConfig, type Config } from "@/platform/config/env";
 import { BackendClient } from "@/platform/http/client";
 import type { BackendGateway } from "@/platform/http/types";
@@ -14,6 +16,8 @@ export type AppRuntime = {
   config: Config;
   backend: BackendGateway;
   clinic: ClinicHttpGateway;
+  catalog: CatalogHttpGateway;
+  plan: PlanHttpGateway;
   log: Logger;
 };
 
@@ -27,6 +31,8 @@ export function getRuntime(): AppRuntime {
     config,
     backend,
     clinic: new ClinicHttpGateway(backend),
+    catalog: new CatalogHttpGateway(backend),
+    plan: new PlanHttpGateway(backend),
     log: createLogger(config.app.name),
   };
   return runtime;

@@ -1,57 +1,72 @@
 import type { ID } from "@/shared/id";
-import type { Money } from "@/shared/money";
+import type { Currency } from "@/shared/money";
 
 export const PlanStatus = {
   Draft: "draft",
   Ready: "ready",
-  Sent: "sent",
-  Viewed: "viewed",
-  Accepted: "accepted",
-  Expired: "expired",
-  Revoked: "revoked",
 } as const;
 
 export type PlanStatus = (typeof PlanStatus)[keyof typeof PlanStatus];
 
 export type Patient = {
   id: ID;
-  clinicId: ID;
+  workspaceId?: ID;
   name: string;
+  contact: string;
+  createdAt?: string;
 };
 
 export type PlanItem = {
-  id: ID;
-  treatmentId: ID;
+  id?: ID;
+  planId?: ID;
+  visitId?: ID;
+  treatmentId?: ID;
+  treatmentName: string;
+  toothNumber?: string;
   quantity: number;
-  unitPrice: Money;
-  inPackage: boolean;
+  unitPrice: number; // minor units (kuruş)
+  isPackage: boolean;
+  orderNum?: number;
 };
 
 export type Visit = {
   id: ID;
-  ordinal: number;
+  planId?: ID;
+  orderNum: number;
   title: string;
-  waitNote: string;
-  items: PlanItem[];
 };
 
 export type Discount = {
+  id?: ID;
+  planId?: ID;
   label: string;
-  amount: Money;
+  amount: number; // minor units (kuruş)
+  orderNum?: number;
 };
 
 export type Totals = {
-  subtotal: Money;
-  discount: Money;
-  grand: Money;
+  subtotal: number; // minor units (kuruş)
+  discount: number; // minor units (kuruş)
+  grand: number; // minor units (kuruş)
 };
 
 export type Plan = {
   id: ID;
-  clinicId: ID;
+  workspaceId?: ID;
   patientId: ID;
+  title: string;
+  kind: "classic";
   status: PlanStatus;
-  visits: Visit[];
-  discounts: Discount[];
-  totals: Totals;
+  currency: Currency;
+  diagnoses: string[];
+  totalsSubtotal: number;
+  totalsDiscount: number;
+  totalsGrand: number;
+  snapshotJson?: unknown;
+  createdAt?: string;
+  updatedAt?: string;
+  patient?: Patient;
+  visits?: Visit[];
+  items?: PlanItem[];
+  discounts?: Discount[];
 };

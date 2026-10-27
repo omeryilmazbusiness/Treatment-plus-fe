@@ -12,12 +12,7 @@ export type ActionResult<T> = {
   error?: string;
 };
 
-async function ensureSession(): Promise<Session> {
-  const runtime = getRuntime();
-  const current = await readSession(runtime.config);
-  if (current) return current;
-
-  // If no session exists in browser yet, authenticate as demo clinic
+async function forceLogin(runtime: ReturnType<typeof getRuntime>): Promise<Session> {
   const loginRes = await runtime.backend.request<{
     user: { id: string; email: string; role: string };
     workspace: { id: string; name: string };
@@ -41,6 +36,14 @@ async function ensureSession(): Promise<Session> {
   return session;
 }
 
+async function ensureSession(): Promise<Session> {
+  const runtime = getRuntime();
+  const current = await readSession(runtime.config);
+  if (current) return current;
+
+  return forceLogin(runtime);
+}
+
 export async function fetchInitialDataAction(): Promise<
   ActionResult<{
     products: WorkspaceProducts;
@@ -50,12 +53,26 @@ export async function fetchInitialDataAction(): Promise<
 > {
   try {
     const runtime = getRuntime();
-    const session = await ensureSession();
+    let session = await ensureSession();
 
-    const [products, settings] = await Promise.all([
-      runtime.clinic.getWorkspaceProducts(session.accessToken),
-      runtime.clinic.getSettings(session.accessToken),
-    ]);
+    let products: WorkspaceProducts;
+    let settings: ClinicSettings;
+    try {
+      [products, settings] = await Promise.all([
+        runtime.clinic.getWorkspaceProducts(session.accessToken),
+        runtime.clinic.getSettings(session.accessToken),
+      ]);
+    } catch (apiErr: unknown) {
+      if (apiErr instanceof Error && apiErr.message.includes("unauthenticated")) {
+        session = await forceLogin(runtime);
+        [products, settings] = await Promise.all([
+          runtime.clinic.getWorkspaceProducts(session.accessToken),
+          runtime.clinic.getSettings(session.accessToken),
+        ]);
+      } else {
+        throw apiErr;
+      }
+    }
 
     return {
       success: true,

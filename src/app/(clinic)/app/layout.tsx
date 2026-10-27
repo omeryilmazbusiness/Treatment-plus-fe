@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 
 import { getRuntime } from "@/bootstrap";
@@ -8,9 +9,7 @@ import { Mark } from "@/ui/mark";
 
 const nav = [
   { href: "/app", label: "Özet", phase: "0" },
-  { href: "/app", label: "Hastalar", phase: "4" },
-  { href: "/app", label: "Planlar", phase: "4" },
-  { href: "/app", label: "Katalog", phase: "3" },
+  { href: "/app/plans", label: "Planlar", phase: "4" },
   { href: "/app", label: "Klinik", phase: "2" },
 ] as const;
 
@@ -49,10 +48,8 @@ export default function ClinicLayout({ children }: { children: ReactNode }) {
 }
 
 async function SessionChip() {
+  await connection();
   const { config } = getRuntime();
   const session = await readSession(config);
-  if (!session) {
-    return <Badge tone="wait">oturum yok · faz 1</Badge>;
-  }
-  return <Badge tone="ok">{session.role}</Badge>;
+  return <Badge tone="ok">{(session?.role ?? "owner").toUpperCase()}</Badge>;
 }

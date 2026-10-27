@@ -1,7 +1,11 @@
+import { connection } from "next/server";
+import { Suspense } from "react";
+
 import { fetchInitialDataAction } from "./actions";
 import { ClinicSettingsClient } from "./clinic-settings-client";
 
-export default async function ClinicHomePage() {
+async function ClinicHomeContent() {
+  await connection();
   const result = await fetchInitialDataAction();
 
   if (!result.success || !result.data) {
@@ -23,5 +27,19 @@ export default async function ClinicHomePage() {
       initialSettings={result.data.settings}
       userEmail={result.data.userEmail}
     />
+  );
+}
+
+export default function ClinicHomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center text-sm text-ink-soft">
+          Klinik verileri yükleniyor...
+        </div>
+      }
+    >
+      <ClinicHomeContent />
+    </Suspense>
   );
 }

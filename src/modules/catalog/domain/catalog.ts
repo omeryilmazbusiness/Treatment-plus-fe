@@ -1,33 +1,30 @@
 import type { ID } from "@/shared/id";
-import type { Money } from "@/shared/money";
 
 export type Diagnosis = {
   id: ID;
   code: string;
   name: string;
+  isActive?: boolean;
 };
 
 export type Treatment = {
   id: ID;
   code: string;
   name: string;
-  needsTooth: boolean;
-  draftCopy: string;
+  isActive?: boolean;
 };
 
 export type PriceItem = {
+  id?: ID;
   treatmentId: ID;
-  unitPrice: Money;
+  amount: number; // minor units (kuruş)
 };
 
 export type PriceList = {
   id: ID;
   name: string;
-  items: PriceItem[];
-};
-
-export type CatalogPackage = {
-  id: ID;
-  name: string;
-  itemIds: ID[];
+  currency: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+  items?: PriceItem[];
 };
