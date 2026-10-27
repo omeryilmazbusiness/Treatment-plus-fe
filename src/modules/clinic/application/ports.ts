@@ -1,9 +1,13 @@
-import type { ClinicSettings } from "../domain/clinic";
+import type { ClinicSettings, WorkspaceProducts } from "../domain/clinic";
 
 export interface ClinicReader {
-  getSettings(): Promise<ClinicSettings>;
+  getSettings(accessToken?: string): Promise<ClinicSettings>;
+  getWorkspaceProducts(accessToken?: string): Promise<WorkspaceProducts>;
 }
 
 export interface ClinicWriter {
-  updateSettings(patch: Partial<ClinicSettings>): Promise<ClinicSettings>;
+  updateSettings(
+    patch: Partial<ClinicSettings>,
+    accessToken?: string
+  ): Promise<ClinicSettings>;
 }
