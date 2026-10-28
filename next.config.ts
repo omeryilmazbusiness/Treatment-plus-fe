@@ -20,6 +20,15 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:8080";
+    return [
+      {
+        source: "/v1/viz/:path*",
+        destination: `${backendUrl}/v1/viz/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: security },

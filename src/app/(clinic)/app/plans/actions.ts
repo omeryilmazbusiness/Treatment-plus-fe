@@ -6,112 +6,55 @@ import { getRuntime } from "@/bootstrap";
 import type { Diagnosis, PriceList, Treatment } from "@/modules/catalog/domain/catalog";
 import type { ClinicSettings } from "@/modules/clinic/domain/clinic";
 import type { Patient, Plan } from "@/modules/plan/domain/plan";
-import { readSession, writeSession, type Session } from "@/platform/auth/session";
+import { resolveActiveSession } from "@/platform/auth/session";
 import type { ID } from "@/shared/id";
 
 export type ActionResult<T> = {
   success: boolean;
   data?: T;
   error?: string;
+  unauthenticated?: boolean;
 };
 
-async function forceLogin(runtime: ReturnType<typeof getRuntime>): Promise<Session> {
-  try {
-    const loginRes = await runtime.backend.request<{
-      user: { id: string; email: string; role: string };
-      workspace: { id: string; name: string };
-      tokens: { access_token: string };
-    }>({
-      path: "/v1/auth/login",
-      method: "POST",
-      body: {
-        email: "demo@dentistplus.com",
-        password: "password123456",
-      },
-    });
-
-    const session: Session = {
-      accessToken: loginRes.tokens.access_token,
-      userId: loginRes.user.id,
-      clinicId: loginRes.workspace.id,
-      role: "owner",
-    };
-    await writeSession(runtime.config, session);
-    return session;
-  } catch {
-    // If login failed, register demo clinic
-    const regRes = await runtime.backend.request<{
-      user: { id: string; email: string; role: string };
-      workspace: { id: string; name: string };
-      tokens: { access_token: string };
-    }>({
-      path: "/v1/auth/register",
-      method: "POST",
-      body: {
-        name: "Örnek Diş Kliniği",
-        email: "demo@dentistplus.com",
-        password: "password123456",
-        role: "clinic",
-      },
-    });
-
-    const session: Session = {
-      accessToken: regRes.tokens.access_token,
-      userId: regRes.user.id,
-      clinicId: regRes.workspace.id,
-      role: "owner",
-    };
-    await writeSession(runtime.config, session);
-    return session;
-  }
-}
-
-async function ensureSession(): Promise<Session> {
-  const runtime = getRuntime();
-  const current = await readSession(runtime.config);
-  if (current) return current;
-
-  return forceLogin(runtime);
-}
-
 export async function fetchPlansListAction(): Promise<
-  ActionResult<{ plans: Plan[]; patients: Patient[] }>
+  ActionResult<{ workspaceId: string; plans: Plan[]; patients: Patient[] }>
 > {
   try {
     const runtime = getRuntime();
-    let session = await ensureSession();
-
-    let plans: Plan[];
-    let patients: Patient[];
-    try {
-      [plans, patients] = await Promise.all([
-        runtime.plan.listPlans(session.accessToken),
-        runtime.plan.list(session.accessToken),
-      ]);
-    } catch (apiErr: unknown) {
-      if (apiErr instanceof Error && apiErr.message.includes("unauthenticated")) {
-        session = await forceLogin(runtime);
-        [plans, patients] = await Promise.all([
-          runtime.plan.listPlans(session.accessToken),
-          runtime.plan.list(session.accessToken),
-        ]);
-      } else {
-        throw apiErr;
-      }
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum bulunamadı. Lütfen giriş yapın.",
+      };
     }
+
+    const [plans, patients] = await Promise.all([
+      runtime.plan.listPlans(session.accessToken),
+      runtime.plan.list(session.accessToken),
+    ]);
 
     return {
       success: true,
-      data: { plans, patients },
+      data: { workspaceId: session.clinicId, plans, patients },
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Planlar yüklenemedi";
+    if (msg.includes("unauthenticated")) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
     return { success: false, error: msg };
   }
 }
 
 export async function fetchPlanDetailAction(planId: string): Promise<
   ActionResult<{
+    workspaceId: string;
     plan: Plan;
     patients: Patient[];
     diagnoses: Diagnosis[];
@@ -122,56 +65,77 @@ export async function fetchPlanDetailAction(planId: string): Promise<
 > {
   try {
     const runtime = getRuntime();
-    let session = await ensureSession();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum bulunamadı. Lütfen giriş yapın.",
+      };
+    }
 
-    const loadData = async (tok: string) => {
-      let [diagnoses, treatments, priceLists] = await Promise.all([
+    const tok = session.accessToken;
+    let [diagnoses, treatments, priceLists] = await Promise.all([
+      runtime.catalog.listDiagnoses(tok),
+      runtime.catalog.listTreatments(tok),
+      runtime.catalog.listPriceLists(tok),
+    ]);
+
+    if (treatments.length === 0) {
+      await seedDefaultCatalog(tok);
+      [diagnoses, treatments, priceLists] = await Promise.all([
         runtime.catalog.listDiagnoses(tok),
         runtime.catalog.listTreatments(tok),
         runtime.catalog.listPriceLists(tok),
       ]);
+    }
 
-      if (treatments.length === 0) {
-        await seedDefaultCatalog(tok);
-        [diagnoses, treatments, priceLists] = await Promise.all([
-          runtime.catalog.listDiagnoses(tok),
-          runtime.catalog.listTreatments(tok),
-          runtime.catalog.listPriceLists(tok),
-        ]);
-      }
-
-      const [plan, patients, clinicSettings] = await Promise.all([
-        runtime.plan.getById(planId as ID, tok),
-        runtime.plan.list(tok),
-        runtime.clinic.getSettings(tok),
-      ]);
-
-      return { plan, patients, diagnoses, treatments, priceLists, clinicSettings };
-    };
-
-    let data;
-    try {
-      data = await loadData(session.accessToken);
-    } catch (apiErr: unknown) {
-      if (apiErr instanceof Error && apiErr.message.includes("unauthenticated")) {
-        session = await forceLogin(runtime);
-        data = await loadData(session.accessToken);
-      } else {
-        throw apiErr;
+    // Load items for default price list so treatment prices populate per workspace
+    const defaultPl = priceLists.find((pl) => pl.isDefault) || priceLists[0];
+    if (defaultPl) {
+      try {
+        const detail = await runtime.catalog.getPriceList(defaultPl.id, tok);
+        priceLists = priceLists.map((pl) =>
+          pl.id === defaultPl.id ? { ...pl, items: detail.items } : pl
+        );
+      } catch {
+        // Ignore if price list detail fails
       }
     }
 
+    const [plan, patients, clinicSettings] = await Promise.all([
+      runtime.plan.getById(planId as ID, tok),
+      runtime.plan.list(tok),
+      runtime.clinic.getSettings(tok),
+    ]);
+
     return {
       success: true,
-      data,
+      data: {
+        workspaceId: session.clinicId,
+        plan,
+        patients,
+        diagnoses,
+        treatments,
+        priceLists,
+        clinicSettings,
+      },
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Plan detayı yüklenemedi";
+    if (msg.includes("unauthenticated")) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
     return { success: false, error: msg };
   }
 }
 
 export type SavePlanPayload = {
+  workspaceId?: string;
   title: string;
   diagnoses: string[];
   visits: {
@@ -204,7 +168,22 @@ export async function savePlanDetailsAction(
 ): Promise<ActionResult<Plan>> {
   try {
     const runtime = getRuntime();
-    const session = await ensureSession();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    if (payload.workspaceId && payload.workspaceId !== session.clinicId) {
+      return {
+        success: false,
+        error:
+          "Aktif oturum başka bir hesaba ait. Diğer hesabı etkilememek için işlem engellendi.",
+      };
+    }
 
     // 1. Update Header
     await runtime.plan.updatePlanHeader(
@@ -247,11 +226,27 @@ export async function savePlanDetailsAction(
 export async function createPlanAction(
   patientId: string,
   title: string,
-  diagnoses: string[]
+  diagnoses: string[],
+  expectedWorkspaceId?: string
 ): Promise<ActionResult<Plan>> {
   try {
     const runtime = getRuntime();
-    const session = await ensureSession();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    if (expectedWorkspaceId && expectedWorkspaceId !== session.clinicId) {
+      return {
+        success: false,
+        error:
+          "Aktif oturum başka bir hesaba ait. Diğer hesabı etkilememek için işlem engellendi.",
+      };
+    }
 
     // 1. Create plan
     const newPlan = await runtime.plan.createPlan(
@@ -283,11 +278,27 @@ export async function createPlanAction(
 }
 
 export async function readyPlanAction(
-  planId: string
+  planId: string,
+  expectedWorkspaceId?: string
 ): Promise<ActionResult<Plan>> {
   try {
     const runtime = getRuntime();
-    const session = await ensureSession();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    if (expectedWorkspaceId && expectedWorkspaceId !== session.clinicId) {
+      return {
+        success: false,
+        error:
+          "Aktif oturum başka bir hesaba ait. Diğer hesabı etkilememek için işlem engellendi.",
+      };
+    }
 
     const readyPlan = await runtime.plan.markReady(
       planId as ID,
@@ -305,11 +316,27 @@ export async function readyPlanAction(
 
 export async function createPatientAction(
   name: string,
-  contact: string
+  contact: string,
+  expectedWorkspaceId?: string
 ): Promise<ActionResult<Patient>> {
   try {
     const runtime = getRuntime();
-    const session = await ensureSession();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    if (expectedWorkspaceId && expectedWorkspaceId !== session.clinicId) {
+      return {
+        success: false,
+        error:
+          "Aktif oturum başka bir hesaba ait. Diğer hesabı etkilememek için işlem engellendi.",
+      };
+    }
 
     const patient = await runtime.plan.createPatient(
       { name, contact },

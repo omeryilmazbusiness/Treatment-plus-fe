@@ -10,11 +10,16 @@ import { Badge } from "@/ui/badge";
 import { createPatientAction, createPlanAction } from "./actions";
 
 interface Props {
+  workspaceId: string;
   initialPlans: Plan[];
   initialPatients: Patient[];
 }
 
-export function PlansListClient({ initialPlans, initialPatients }: Props) {
+export function PlansListClient({
+  workspaceId,
+  initialPlans,
+  initialPatients,
+}: Props) {
   const router = useRouter();
   const [createdPlans, setCreatedPlans] = useState<Plan[]>([]);
   const [createdPatients, setCreatedPatients] = useState<Patient[]>([]);
@@ -62,7 +67,8 @@ export function PlansListClient({ initialPlans, initialPatients }: Props) {
         }
         const patRes = await createPatientAction(
           newPatientName.trim(),
-          newPatientContact.trim()
+          newPatientContact.trim(),
+          workspaceId
         );
         if (!patRes.success || !patRes.data) {
           setFormError(patRes.error || "Hasta eklenemedi.");
@@ -80,7 +86,8 @@ export function PlansListClient({ initialPlans, initialPatients }: Props) {
       const planRes = await createPlanAction(
         patientId,
         planTitle.trim() || "Tedavi Planı (Classic)",
-        ["Dentin Çürüğü"]
+        ["Dentin Çürüğü"],
+        workspaceId
       );
 
       if (!planRes.success || !planRes.data) {

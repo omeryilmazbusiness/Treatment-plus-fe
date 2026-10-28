@@ -2,8 +2,9 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 
+import { logoutClinicAction } from "@/app/login/actions";
 import { getRuntime } from "@/bootstrap";
-import { readSession } from "@/platform/auth/session";
+import { resolveActiveSession } from "@/platform/auth/session";
 import { Badge } from "@/ui/badge";
 import { Mark } from "@/ui/mark";
 
@@ -49,7 +50,26 @@ export default function ClinicLayout({ children }: { children: ReactNode }) {
 
 async function SessionChip() {
   await connection();
-  const { config } = getRuntime();
-  const session = await readSession(config);
-  return <Badge tone="ok">{(session?.role ?? "owner").toUpperCase()}</Badge>;
+  const { config, backend } = getRuntime();
+  const session = await resolveActiveSession(config, backend);
+  return (
+    <div className="flex items-center gap-3">
+      {session?.userEmail && (
+        <span className="hidden text-xs font-medium text-ink-soft sm:inline">
+          {session.userEmail}
+        </span>
+      )}
+      <Badge tone="ok">{(session?.role ?? "owner").toUpperCase()}</Badge>
+      {session && (
+        <form action={logoutClinicAction}>
+          <button
+            type="submit"
+            className="cursor-pointer rounded-lg border border-line bg-paper-2 px-3 py-1 text-xs font-medium text-ink-soft transition hover:border-danger/40 hover:text-danger"
+          >
+            Çıkış Yap
+          </button>
+        </form>
+      )}
+    </div>
+  );
 }

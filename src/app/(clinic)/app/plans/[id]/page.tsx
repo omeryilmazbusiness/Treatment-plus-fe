@@ -1,5 +1,5 @@
+import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { fetchPlanDetailAction } from "../actions";
@@ -14,12 +14,18 @@ async function PlanDetailContent({ params }: PageProps) {
   const { id } = await params;
   const result = await fetchPlanDetailAction(id);
 
+  if (result.unauthenticated) {
+    redirect("/login");
+  }
+
   if (!result.success || !result.data) {
     notFound();
   }
 
   return (
     <ClassicPlanClient
+      key={`${result.data.workspaceId}-${result.data.plan.id}`}
+      workspaceId={result.data.workspaceId}
       initialPlan={result.data.plan}
       patients={result.data.patients}
       diagnosesCatalog={result.data.diagnoses}

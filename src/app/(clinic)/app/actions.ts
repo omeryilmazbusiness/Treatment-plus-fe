@@ -4,45 +4,14 @@ import { revalidatePath } from "next/cache";
 
 import { getRuntime } from "@/bootstrap";
 import type { ClinicSettings, WorkspaceProducts } from "@/modules/clinic/domain/clinic";
-import { readSession, writeSession, type Session } from "@/platform/auth/session";
+import { resolveActiveSession } from "@/platform/auth/session";
 
 export type ActionResult<T> = {
   success: boolean;
   data?: T;
   error?: string;
+  unauthenticated?: boolean;
 };
-
-async function forceLogin(runtime: ReturnType<typeof getRuntime>): Promise<Session> {
-  const loginRes = await runtime.backend.request<{
-    user: { id: string; email: string; role: string };
-    workspace: { id: string; name: string };
-    tokens: { access_token: string };
-  }>({
-    path: "/v1/auth/login",
-    method: "POST",
-    body: {
-      email: "demo@dentistplus.com",
-      password: "password123456",
-    },
-  });
-
-  const session: Session = {
-    accessToken: loginRes.tokens.access_token,
-    userId: loginRes.user.id,
-    clinicId: loginRes.workspace.id,
-    role: "owner",
-  };
-  await writeSession(runtime.config, session);
-  return session;
-}
-
-async function ensureSession(): Promise<Session> {
-  const runtime = getRuntime();
-  const current = await readSession(runtime.config);
-  if (current) return current;
-
-  return forceLogin(runtime);
-}
 
 export async function fetchInitialDataAction(): Promise<
   ActionResult<{
@@ -53,25 +22,34 @@ export async function fetchInitialDataAction(): Promise<
 > {
   try {
     const runtime = getRuntime();
-    let session = await ensureSession();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum bulunamadı. Lütfen giriş yapın.",
+      };
+    }
 
-    let products: WorkspaceProducts;
-    let settings: ClinicSettings;
+    const [products, settings] = await Promise.all([
+      runtime.clinic.getWorkspaceProducts(session.accessToken),
+      runtime.clinic.getSettings(session.accessToken),
+    ]);
+
+    let userEmail = session.userEmail || settings.name || "klinik@treatment.health";
     try {
-      [products, settings] = await Promise.all([
-        runtime.clinic.getWorkspaceProducts(session.accessToken),
-        runtime.clinic.getSettings(session.accessToken),
-      ]);
-    } catch (apiErr: unknown) {
-      if (apiErr instanceof Error && apiErr.message.includes("unauthenticated")) {
-        session = await forceLogin(runtime);
-        [products, settings] = await Promise.all([
-          runtime.clinic.getWorkspaceProducts(session.accessToken),
-          runtime.clinic.getSettings(session.accessToken),
-        ]);
-      } else {
-        throw apiErr;
+      const me = await runtime.backend.request<{
+        user: { email: string };
+      }>({
+        path: "/v1/auth/me",
+        method: "GET",
+        accessToken: session.accessToken,
+      });
+      if (me?.user?.email) {
+        userEmail = me.user.email;
       }
+    } catch {
+      // Fallback to session email or clinic name if /v1/auth/me is unavailable
     }
 
     return {
@@ -79,11 +57,18 @@ export async function fetchInitialDataAction(): Promise<
       data: {
         products,
         settings,
-        userEmail: "demo@dentistplus.com",
+        userEmail,
       },
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Veri yüklenemedi";
+    if (msg.includes("unauthenticated")) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
     return { success: false, error: msg };
   }
 }
@@ -93,7 +78,22 @@ export async function updateClinicSettingsAction(
 ): Promise<ActionResult<ClinicSettings>> {
   try {
     const runtime = getRuntime();
-    const session = await ensureSession();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    if (patch.workspaceId && patch.workspaceId !== session.clinicId) {
+      return {
+        success: false,
+        error:
+          "Aktif oturum başka bir hesaba ait. Diğer hesabı etkilememek için değişiklik kaydedilmedi. Lütfen sayfayı yenileyin.",
+      };
+    }
 
     const updated = await runtime.clinic.updateSettings(
       patch,

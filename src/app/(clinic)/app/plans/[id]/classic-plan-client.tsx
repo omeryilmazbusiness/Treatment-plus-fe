@@ -13,6 +13,7 @@ import { PriceInput } from "@/ui/price-input";
 import { readyPlanAction, savePlanDetailsAction } from "../actions";
 
 interface Props {
+  workspaceId: string;
   initialPlan: Plan;
   patients: Patient[];
   diagnosesCatalog: Diagnosis[];
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function ClassicPlanClient({
+  workspaceId,
   initialPlan,
   diagnosesCatalog,
   treatmentsCatalog,
@@ -207,6 +209,7 @@ export function ClassicPlanClient({
 
     startTransition(async () => {
       const res = await savePlanDetailsAction(String(plan.id), {
+        workspaceId,
         title: title.trim(),
         diagnoses,
         visits: visits.map((v, i) => ({
@@ -254,6 +257,7 @@ export function ClassicPlanClient({
     startTransition(async () => {
       // First save current inputs
       await savePlanDetailsAction(String(plan.id), {
+        workspaceId,
         title: title.trim(),
         diagnoses,
         visits: visits.map((v, i) => ({
@@ -281,7 +285,7 @@ export function ClassicPlanClient({
       });
 
       // Now set ready
-      const res = await readyPlanAction(String(plan.id));
+      const res = await readyPlanAction(String(plan.id), workspaceId);
       if (!res.success || !res.data) {
         setMessage({ text: res.error || "Plan kilitlenemedi", type: "err" });
         return;

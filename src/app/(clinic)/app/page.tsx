@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
@@ -7,6 +8,10 @@ import { ClinicSettingsClient } from "./clinic-settings-client";
 async function ClinicHomeContent() {
   await connection();
   const result = await fetchInitialDataAction();
+
+  if (result.unauthenticated) {
+    redirect("/login");
+  }
 
   if (!result.success || !result.data) {
     return (
@@ -23,6 +28,7 @@ async function ClinicHomeContent() {
 
   return (
     <ClinicSettingsClient
+      key={result.data.settings.workspaceId}
       initialProducts={result.data.products}
       initialSettings={result.data.settings}
       userEmail={result.data.userEmail}

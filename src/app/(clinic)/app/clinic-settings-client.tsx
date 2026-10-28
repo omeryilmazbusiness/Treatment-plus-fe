@@ -103,6 +103,7 @@ export function ClinicSettingsClient({
     setSaveStatus("idle");
     startTransition(async () => {
       const res = await updateClinicSettingsAction({
+        workspaceId: settings.workspaceId,
         name: settings.name,
         locale: settings.locale,
         currency: settings.currency,

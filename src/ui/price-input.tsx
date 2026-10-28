@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export interface PriceInputProps {
   value: number; // minor units (kuruş)
@@ -97,12 +97,7 @@ export function PriceInput({
   const [text, setText] = useState(() => formatMinorUnitsToDisplay(value));
   const [isFocused, setIsFocused] = useState(false);
 
-  // Sync external changes when input is not actively focused
-  useEffect(() => {
-    if (!isFocused) {
-      setText(formatMinorUnitsToDisplay(value));
-    }
-  }, [value, isFocused]);
+  const displayedText = isFocused ? text : formatMinorUnitsToDisplay(value);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -112,9 +107,11 @@ export function PriceInput({
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    const formatted = formatMinorUnitsToDisplay(value);
+    setText(formatted);
     setIsFocused(true);
     // If current value is 0, auto-select so user can immediately type desired amount
-    if (value === 0 || text === "0") {
+    if (value === 0 || formatted === "0") {
       e.target.select();
     }
   };
@@ -152,7 +149,7 @@ export function PriceInput({
       inputMode="decimal"
       disabled={disabled}
       placeholder={placeholder}
-      value={text}
+      value={displayedText}
       onChange={handleChange}
       onFocus={handleFocus}
       onBlur={handleBlur}

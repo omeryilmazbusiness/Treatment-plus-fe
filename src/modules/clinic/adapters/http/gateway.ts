@@ -66,6 +66,7 @@ function toDomain(raw: RawClinicSettings): ClinicSettings {
 
 function toBackendBody(patch: Partial<ClinicSettings>): Record<string, unknown> {
   const body: Record<string, unknown> = {};
+  if (patch.workspaceId !== undefined) body.workspace_id = patch.workspaceId;
   if (patch.name !== undefined) body.name = patch.name;
   if (patch.locale !== undefined) body.locale = patch.locale;
   if (patch.currency !== undefined) body.currency = patch.currency;

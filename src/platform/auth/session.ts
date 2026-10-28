@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { connection } from "next/server";
 
 import type { Config } from "@/platform/config/env";
+import type { BackendGateway } from "@/platform/http/types";
 
 export type SessionRole = "owner" | "doctor" | "assistant";
 
@@ -13,8 +14,10 @@ export type SessionRole = "owner" | "doctor" | "assistant";
  */
 export type Session = {
   accessToken: string;
+  refreshToken?: string;
   userId: string;
   clinicId: string;
+  userEmail?: string;
   role: SessionRole;
 };
 
@@ -35,16 +38,73 @@ export function isTokenExpired(token?: string | null): boolean {
   }
 }
 
-export async function readSession(cfg: Config): Promise<Session | null> {
+export async function readRawSession(cfg: Config): Promise<Session | null> {
   await connection();
   const jar = await cookies();
   const raw = jar.get(cfg.session.cookie)?.value;
   if (!raw) return null;
-  const session = decode(raw);
+  return decode(raw);
+}
+
+export async function readSession(cfg: Config): Promise<Session | null> {
+  const session = await readRawSession(cfg);
   if (!session || isTokenExpired(session.accessToken)) {
     return null;
   }
   return session;
+}
+
+/**
+ * Resolves the active session for the current account only.
+ * If the access token is expired and a refresh token exists for this session,
+ * refreshes the token for the same workspace/user. Never falls back to another account.
+ */
+export async function resolveActiveSession(
+  cfg: Config,
+  backend: BackendGateway
+): Promise<Session | null> {
+  const rawSession = await readRawSession(cfg);
+  if (!rawSession) return null;
+
+  if (!isTokenExpired(rawSession.accessToken)) {
+    return rawSession;
+  }
+
+  if (!rawSession.refreshToken) {
+    return null;
+  }
+
+  try {
+    const refreshed = await backend.request<{
+      user: { id: string; email: string; role: string };
+      workspace: { id: string; name: string };
+      tokens: { access_token: string; refresh_token?: string };
+    }>({
+      path: "/v1/auth/refresh",
+      method: "POST",
+      body: { refresh_token: rawSession.refreshToken },
+    });
+
+    if (
+      refreshed.workspace.id !== rawSession.clinicId ||
+      refreshed.user.id !== rawSession.userId
+    ) {
+      return null;
+    }
+
+    const nextSession: Session = {
+      accessToken: refreshed.tokens.access_token,
+      refreshToken: refreshed.tokens.refresh_token ?? rawSession.refreshToken,
+      userId: refreshed.user.id,
+      clinicId: refreshed.workspace.id,
+      userEmail: refreshed.user.email || rawSession.userEmail,
+      role: rawSession.role,
+    };
+    await writeSession(cfg, nextSession);
+    return nextSession;
+  } catch {
+    return null;
+  }
 }
 
 export async function writeSession(cfg: Config, session: Session): Promise<void> {

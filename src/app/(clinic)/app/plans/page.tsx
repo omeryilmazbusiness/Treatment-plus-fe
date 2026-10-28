@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
@@ -7,6 +8,10 @@ import { PlansListClient } from "./plans-list-client";
 async function PlansListContent() {
   await connection();
   const result = await fetchPlansListAction();
+
+  if (result.unauthenticated) {
+    redirect("/login");
+  }
 
   if (!result.success || !result.data) {
     return (
@@ -23,6 +28,8 @@ async function PlansListContent() {
 
   return (
     <PlansListClient
+      key={result.data.workspaceId}
+      workspaceId={result.data.workspaceId}
       initialPlans={result.data.plans}
       initialPatients={result.data.patients}
     />
