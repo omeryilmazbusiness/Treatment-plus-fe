@@ -8,6 +8,19 @@ export const PlanStatus = {
 
 export type PlanStatus = (typeof PlanStatus)[keyof typeof PlanStatus];
 
+export type ToothFinding = {
+  tooth: string;
+  status: "intact" | "missing" | "filled" | "crown";
+  note?: string;
+};
+
+export type Situation = {
+  xrayKey?: string;
+  chartTeeth?: string[];
+  toothFindings?: ToothFinding[];
+  generalDiagnoses?: string[];
+};
+
 export type Patient = {
   id: ID;
   workspaceId?: ID;
@@ -22,7 +35,10 @@ export type PlanItem = {
   visitId?: ID;
   treatmentId?: ID;
   treatmentName: string;
+  animationCode?: string;
   toothNumber?: string;
+  teeth?: string[];
+  description?: string;
   quantity: number;
   unitPrice: number; // minor units (kuruş)
   isPackage: boolean;
@@ -34,6 +50,9 @@ export type Visit = {
   planId?: ID;
   orderNum: number;
   title: string;
+  phaseLabel?: string;
+  healingNote?: string;
+  chartTeeth?: string[];
 };
 
 export type Discount = {
@@ -58,7 +77,10 @@ export type Plan = {
   kind: "classic";
   status: PlanStatus;
   currency: Currency;
+  palette?: "navy" | "forest" | "rose" | "slate";
+  locale?: "tr" | "en";
   diagnoses: string[];
+  situation?: Situation;
   totalsSubtotal: number;
   totalsDiscount: number;
   totalsGrand: number;

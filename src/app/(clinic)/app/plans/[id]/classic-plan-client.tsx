@@ -2,15 +2,29 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useState, useTransition } from "react";
+import React, { useMemo, useState, useTransition } from "react";
+import {
+  ArrowLeft,
+  Building2,
+  CalendarPlus,
+  CheckCircle2,
+  Clock,
+  Download,
+  Info,
+  Lock,
+  Phone,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import type { Diagnosis, PriceList, Treatment } from "@/modules/catalog/domain/catalog";
 import type { ClinicSettings } from "@/modules/clinic/domain/clinic";
 import type { Patient, Plan } from "@/modules/plan/domain/plan";
-import { formatMoney, money } from "@/shared/money";
-import { Badge } from "@/ui/badge";
+import { formatMoney, money, type Currency } from "@/shared/money";
 import { PriceInput } from "@/ui/price-input";
-import { readyPlanAction, savePlanDetailsAction } from "../actions";
+import { generatePdfAction, readyPlanAction, savePlanDetailsAction } from "../actions";
 
 interface Props {
   workspaceId: string;
@@ -20,6 +34,27 @@ interface Props {
   treatmentsCatalog: Treatment[];
   priceLists: PriceList[];
   clinicSettings: ClinicSettings;
+}
+
+const PALETTE_OPTIONS: { id: "navy" | "forest" | "rose" | "slate"; label: string; color: string }[] = [
+  { id: "navy", label: "Gece Mavisi (Klasik)", color: "bg-slate-900" },
+  { id: "forest", label: "Zümrüt Yeşili", color: "bg-emerald-800" },
+  { id: "rose", label: "Gül Kurusu", color: "bg-rose-900" },
+  { id: "slate", label: "Antrasit Gri", color: "bg-slate-700" },
+];
+
+const QUICK_TEETH = {
+  upper: ["18", "17", "16", "15", "14", "13", "12", "11", "21", "22", "23", "24", "25", "26", "27", "28"],
+  lower: ["48", "47", "46", "45", "44", "43", "42", "41", "31", "32", "33", "34", "35", "36", "37", "38"],
+};
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  if (!first) return "H";
+  if (parts.length === 1 || !last) return first.slice(0, 2).toUpperCase();
+  return (first.charAt(0) + last.charAt(0)).toUpperCase();
 }
 
 export function ClassicPlanClient({
@@ -34,26 +69,44 @@ export function ClassicPlanClient({
   const [plan, setPlan] = useState<Plan>(initialPlan);
   const isLocked = plan.status === "ready";
 
-  const [title, setTitle] = useState(plan.title);
+  // Plan presentation & header states
+  const [title, setTitle] = useState(plan.title || "Tedavi Planı");
+  const [palette, setPalette] = useState<"navy" | "forest" | "rose" | "slate">(
+    plan.palette || "navy"
+  );
+  const [locale, setLocale] = useState<"tr" | "en">(plan.locale || "tr");
+  const [currency, setCurrency] = useState<Currency>(plan.currency || "TRY");
   const [diagnoses, setDiagnoses] = useState<string[]>(plan.diagnoses ?? []);
 
-  // Visits
+  // Visits state
   const [visits, setVisits] = useState(
-    (plan.visits ?? []).map((v, i) => ({
+    (plan.visits && plan.visits.length > 0
+      ? plan.visits
+      : [
+          { id: "v-temp-1", orderNum: 1, title: "1. Seans: Muayene & Hazırlık", phaseLabel: "1. Aşama", healingNote: "", chartTeeth: [] as string[] },
+          { id: "v-temp-2", orderNum: 2, title: "2. Seans: Tedavi & Simantasyon", phaseLabel: "2. Aşama", healingNote: "", chartTeeth: [] as string[] },
+        ]
+    ).map((v, i) => ({
       id: v.id ? String(v.id) : `v-temp-${i + 1}`,
       order_num: v.orderNum || i + 1,
       title: v.title || `${i + 1}. Seans`,
+      phase_label: v.phaseLabel || "",
+      healing_note: v.healingNote || "",
+      chart_teeth: v.chartTeeth || [],
     }))
   );
 
-  // Items
+  // Items state
   const [items, setItems] = useState(
     (plan.items ?? []).map((it, i) => ({
       id: it.id ? String(it.id) : undefined,
       visit_id: it.visitId ? String(it.visitId) : visits[0]?.id,
       treatment_id: it.treatmentId ? String(it.treatmentId) : undefined,
       treatment_name: it.treatmentName || "",
+      animation_code: it.animationCode || "",
       tooth_number: it.toothNumber || "",
+      teeth: it.teeth || (it.toothNumber ? [it.toothNumber] : []),
+      description: it.description || "",
       quantity: it.quantity || 1,
       unit_price: it.unitPrice || 0, // minor units (kuruş)
       is_package: Boolean(it.isPackage),
@@ -61,7 +114,7 @@ export function ClassicPlanClient({
     }))
   );
 
-  // Discounts
+  // Discounts state
   const [discounts, setDiscounts] = useState(
     (plan.discounts ?? []).map((d, i) => ({
       id: d.id ? String(d.id) : undefined,
@@ -71,19 +124,26 @@ export function ClassicPlanClient({
     }))
   );
 
+  // Active tooth picking modal or inline selector state
+  const [activeItemToothIndex, setActiveItemToothIndex] = useState<number | null>(null);
+
   const [isPending, startTransition] = useTransition();
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
   const [showConfirmReady, setShowConfirmReady] = useState(false);
   const [customDiagInput, setCustomDiagInput] = useState("");
 
   // Price map from default price list
   const defaultList = priceLists.find((pl) => pl.isDefault) || priceLists[0];
-  const priceMap = new Map<string, number>();
-  if (defaultList?.items) {
-    for (const pi of defaultList.items) {
-      priceMap.set(String(pi.treatmentId), pi.amount);
+  const priceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (defaultList?.items) {
+      for (const pi of defaultList.items) {
+        map.set(String(pi.treatmentId), pi.amount);
+      }
     }
-  }
+    return map;
+  }, [defaultList]);
 
   // Visit helpers
   const handleAddVisit = () => {
@@ -93,15 +153,28 @@ export function ClassicPlanClient({
       id: `v-temp-${Date.now()}`,
       order_num: nextNum,
       title: `${nextNum}. Seans: Kontrol & İşlem`,
+      phase_label: `${nextNum}. Aşama`,
+      healing_note: "",
+      chart_teeth: [],
     };
     setVisits([...visits, newV]);
   };
 
-  const handleUpdateVisitTitle = (vId: string, newTitle: string) => {
+  const handleUpdateVisitField = (
+    vId: string,
+    field: "title" | "phase_label" | "healing_note",
+    value: string
+  ) => {
     if (isLocked) return;
-    setVisits(
-      visits.map((v) => (v.id === vId ? { ...v, title: newTitle } : v))
-    );
+    setVisits(visits.map((v) => (v.id === vId ? { ...v, [field]: value } : v)));
+  };
+
+  const handleRemoveVisit = (vId: string) => {
+    if (isLocked || visits.length <= 1) return;
+    setVisits(visits.filter((v) => v.id !== vId));
+    // Re-assign items of deleted visit to first visit
+    const remainingFirstId = visits.find((v) => v.id !== vId)?.id;
+    setItems(items.map((it) => (it.visit_id === vId ? { ...it, visit_id: remainingFirstId } : it)));
   };
 
   // Item helpers
@@ -115,7 +188,10 @@ export function ClassicPlanClient({
       visit_id: visitId,
       treatment_id: firstTr ? String(firstTr.id) : undefined,
       treatment_name: firstTr ? firstTr.name : "Yeni Tedavi",
+      animation_code: "",
       tooth_number: "",
+      teeth: [] as string[],
+      description: "",
       quantity: 1,
       unit_price: defaultAmount,
       is_package: false,
@@ -147,7 +223,7 @@ export function ClassicPlanClient({
 
   const handleItemFieldChange = (
     itemIndex: number,
-    field: "tooth_number" | "quantity" | "unit_price" | "is_package",
+    field: "tooth_number" | "quantity" | "unit_price" | "is_package" | "description",
     value: unknown
   ) => {
     if (isLocked) return;
@@ -155,6 +231,24 @@ export function ClassicPlanClient({
       prev.map((it, idx) => {
         if (idx !== itemIndex) return it;
         return { ...it, [field]: value };
+      })
+    );
+  };
+
+  const handleToggleToothForItem = (itemIndex: number, tooth: string) => {
+    if (isLocked) return;
+    setItems((prev) =>
+      prev.map((it, idx) => {
+        if (idx !== itemIndex) return it;
+        const currentTeeth = it.teeth || [];
+        const nextTeeth = currentTeeth.includes(tooth)
+          ? currentTeeth.filter((t) => t !== tooth)
+          : [...currentTeeth, tooth];
+        return {
+          ...it,
+          teeth: nextTeeth,
+          tooth_number: nextTeeth.join(", "),
+        };
       })
     );
   };
@@ -211,18 +305,27 @@ export function ClassicPlanClient({
       const res = await savePlanDetailsAction(String(plan.id), {
         workspaceId,
         title: title.trim(),
+        palette,
+        locale,
+        currency,
         diagnoses,
         visits: visits.map((v, i) => ({
           id: v.id?.startsWith("v-temp-") ? undefined : v.id,
           order_num: i + 1,
           title: v.title,
+          phase_label: v.phase_label,
+          healing_note: v.healing_note,
+          chart_teeth: v.chart_teeth,
         })),
         items: items.map((it, i) => ({
           id: it.id,
           visit_id: it.visit_id?.startsWith("v-temp-") ? undefined : it.visit_id,
           treatment_id: it.treatment_id,
           treatment_name: it.treatment_name,
+          animation_code: it.animation_code,
           tooth_number: it.tooth_number || undefined,
+          teeth: it.teeth,
+          description: it.description,
           quantity: Number(it.quantity) || 1,
           unit_price: Number(it.unit_price) || 0,
           is_package: Boolean(it.is_package),
@@ -242,8 +345,11 @@ export function ClassicPlanClient({
       }
 
       setPlan(res.data);
+      if (res.data.currency) {
+        setCurrency(res.data.currency);
+      }
       setMessage({
-        text: "Plan başarıyla kaydedildi. Genel toplam sunucu tarafından hesaplandı.",
+        text: "Plan başarıyla kaydedildi. Genel toplam ve seanslar güncellendi.",
         type: "ok",
       });
     });
@@ -259,18 +365,27 @@ export function ClassicPlanClient({
       await savePlanDetailsAction(String(plan.id), {
         workspaceId,
         title: title.trim(),
+        palette,
+        locale,
+        currency,
         diagnoses,
         visits: visits.map((v, i) => ({
           id: v.id?.startsWith("v-temp-") ? undefined : v.id,
           order_num: i + 1,
           title: v.title,
+          phase_label: v.phase_label,
+          healing_note: v.healing_note,
+          chart_teeth: v.chart_teeth,
         })),
         items: items.map((it, i) => ({
           id: it.id,
           visit_id: it.visit_id?.startsWith("v-temp-") ? undefined : it.visit_id,
           treatment_id: it.treatment_id,
           treatment_name: it.treatment_name,
+          animation_code: it.animation_code,
           tooth_number: it.tooth_number || undefined,
+          teeth: it.teeth,
+          description: it.description,
           quantity: Number(it.quantity) || 1,
           unit_price: Number(it.unit_price) || 0,
           is_package: Boolean(it.is_package),
@@ -291,108 +406,272 @@ export function ClassicPlanClient({
         return;
       }
 
+      // Trigger background PDF generation
+      await generatePdfAction(String(plan.id));
+
       setPlan(res.data);
+      if (res.data.currency) {
+        setCurrency(res.data.currency);
+      }
       router.refresh();
       setMessage({
-        text: "Plan başarıyla kilitlendi (READY). Snapshot donduruldu, PDF baskı verisi hazır.",
+        text: "Plan başarıyla kilitlendi (READY). 24 sayfalık kurumsal PDF ve sunum hazır.",
         type: "ok",
       });
     });
   };
 
+  const handleDownloadPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      window.open(`/api/plans/${plan.id}/pdf`, "_blank");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const patientName = plan.patient?.name || "Kayıtlı Hasta";
+
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* Top Breadcrumb & Status */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-4">
+    <div className="mx-auto max-w-7xl space-y-6">
+      {/* 1. Üst Başlık & Durum Çubuğu */}
+      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center">
         <div className="flex items-center gap-3">
           <Link
             href="/app/plans"
-            onClick={() => router.refresh()}
-            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-soft hover:text-teal"
+            className="flex size-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900"
           >
-            &larr; Planlara Dön
+            <ArrowLeft className="size-4" />
           </Link>
-          <span className="text-line">/</span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-ink">
-            Classic Form
-          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-400">
+                Tedavi Planları /
+              </span>
+              <span className="text-xs font-semibold text-slate-700">
+                {title || "Plan Düzenle"}
+              </span>
+            </div>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">
+              {title}
+            </h1>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Durum Rozeti */}
           {isLocked ? (
-            <Badge tone="ok">🔒 Hazır (Snapshot Kilitli)</Badge>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-2xs">
+              <CheckCircle2 className="size-4 text-emerald-600" />
+              <span>Hazır & Kilitli (Snapshot Aktif)</span>
+            </span>
           ) : (
-            <Badge tone="wait">✏️ Taslak Düzenleme</Badge>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-2xs">
+              <Clock className="size-4 text-amber-600" />
+              <span>Taslak Düzenleme Modu</span>
+            </span>
           )}
-          <span className="text-xs text-ink-soft">
-            Para birimi: <strong>{plan.currency} (kuruş bazlı tam sayı)</strong>
-          </span>
+
+          {/* Aksiyon Butonları */}
+          {!isLocked ? (
+            <>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleSaveDraft}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50"
+              >
+                <Save className="size-3.5" />
+                <span>{isPending ? "Kaydediliyor..." : "Taslağı Kaydet"}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => setShowConfirmReady(true)}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                <Lock className="size-3.5" />
+                <span>Planı Onayla & Kilitle</span>
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                <Download className="size-3.5" />
+                <span>PDF Görüntüle / İndir</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Alert banner */}
+      {/* Mesaj Bildirimi */}
       {message && (
         <div
-          className={`mt-4 rounded-xl border p-4 text-sm ${
+          className={`flex items-center justify-between rounded-2xl border p-4 text-xs font-medium ${
             message.type === "ok"
-              ? "border-teal/30 bg-teal/10 text-teal-deep"
-              : "border-danger/30 bg-danger/10 text-danger"
+              ? "border-emerald-200 bg-emerald-50/80 text-emerald-900"
+              : "border-rose-200 bg-rose-50/80 text-rose-900"
           }`}
         >
-          {message.text}
+          <div className="flex items-center gap-2.5">
+            {message.type === "ok" ? (
+              <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+            ) : (
+              <X className="size-4 shrink-0 text-rose-600" />
+            )}
+            <span>{message.text}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            className="text-slate-400 hover:text-slate-700"
+          >
+            <X className="size-3.5" />
+          </button>
         </div>
       )}
 
-      {/* Patient Header Card */}
-      <div className="mt-6 rounded-2xl border border-line bg-paper-2 p-6 shadow-xs">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-teal">
-                Hasta Bilgisi
-              </span>
-              <span className="rounded-full bg-teal/10 px-2 py-0.5 text-xs text-teal font-medium">
-                🔒 Şifreli İletişim (AES-256)
-              </span>
+      {/* 2. Hasta & Plan Yapılandırma Kartı */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Hasta Profili */}
+          <div className="lg:col-span-5">
+            <div className="flex items-center gap-3.5">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-sm font-bold text-slate-800">
+                {getInitials(patientName)}
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Hasta Profili
+                </span>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {patientName}
+                </h3>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Phone className="size-3 text-slate-400" />
+                  <span>{plan.patient?.contact || "İletişim bilgisi girilmedi"}</span>
+                </div>
+              </div>
             </div>
-            <h2 className="mt-1 font-serif text-2xl font-medium text-ink">
-              {plan.patient?.name || "Kayıtlı Hasta"}
-            </h2>
-            {plan.patient?.contact && (
-              <p className="mt-0.5 text-sm text-ink-soft">
-                İletişim: {plan.patient.contact}
-              </p>
-            )}
           </div>
 
-          <div className="w-full sm:w-72">
-            <label className="text-xs font-semibold uppercase tracking-wider text-ink-soft">
-              Plan Başlığı
-            </label>
-            <input
-              type="text"
-              disabled={isLocked}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink outline-hidden focus:border-teal disabled:opacity-75"
-            />
+          {/* Plan Başlığı & Sunum Ayarları */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-7">
+            {/* Başlık */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">
+                Plan Başlığı
+              </label>
+              <input
+                type="text"
+                disabled={isLocked}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Örn: İmplant & Zirkonyum Tedavi Planı"
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-50 disabled:text-slate-500"
+              />
+            </div>
+
+            {/* Sunum Paleti & Dili */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">
+                PDF & Sunum Teması
+              </label>
+              <div className="mt-1.5 flex items-center gap-2">
+                {PALETTE_OPTIONS.map((pal) => (
+                  <button
+                    key={pal.id}
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => setPalette(pal.id)}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                      palette === pal.id
+                        ? "border-slate-900 bg-slate-900 text-white shadow-2xs"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                    } disabled:cursor-not-allowed`}
+                    title={pal.label}
+                  >
+                    <span className={`size-2 rounded-full ${pal.color} ring-1 ring-white/50`} />
+                    <span className="capitalize">{pal.id}</span>
+                  </button>
+                ))}
+
+                {/* Dil */}
+                <div className="ml-auto flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs">
+                  <button
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => setLocale("tr")}
+                    className={`cursor-pointer rounded-md px-2 py-1 font-semibold ${
+                      locale === "tr"
+                        ? "bg-white text-slate-900 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    TR
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => setLocale("en")}
+                    className={`cursor-pointer rounded-md px-2 py-1 font-semibold ${
+                      locale === "en"
+                        ? "bg-white text-slate-900 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    EN
+                  </button>
+                </div>
+
+                {/* Para Birimi */}
+                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs">
+                  {(["TRY", "EUR", "USD"] as Currency[]).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => setCurrency(c)}
+                      className={`cursor-pointer rounded-md px-2 py-1 font-semibold ${
+                        currency === c
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-500 hover:text-slate-900"
+                      } disabled:cursor-not-allowed`}
+                    >
+                      {c === "TRY" ? "₺ TRY" : c === "EUR" ? "€ EUR" : "$ USD"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Diagnoses Section */}
-      <div className="mt-6 rounded-2xl border border-line bg-paper-2 p-6 shadow-xs">
-        <div className="flex items-center justify-between">
+      {/* 3. Teşhisler & Hızlı Odontogram Paneli */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+        <div className="flex flex-col justify-between gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center">
           <div>
-            <h3 className="font-serif text-lg font-medium text-ink">
-              Teşhis(ler)
+            <h3 className="text-base font-bold text-slate-900">
+              Teşhis(ler) & Klinik Bulgular
             </h3>
-            <p className="text-xs text-ink-soft">
-              Katalogdan seçin veya hastaya özel teşhis ekleyin.
+            <p className="text-xs text-slate-500">
+              Katalogdan seçim yapın veya hastaya özel klinik teşhis ekleyin.
             </p>
           </div>
+          <span className="text-xs font-semibold text-slate-500">
+            {diagnoses.length} Teşhis Seçildi
+          </span>
         </div>
 
+        {/* Teşhis Hapları */}
         <div className="mt-4 flex flex-wrap gap-2">
           {diagnosesCatalog.map((d) => {
             const isSelected = diagnoses.includes(d.name);
@@ -402,32 +681,42 @@ export function ClassicPlanClient({
                 type="button"
                 disabled={isLocked}
                 onClick={() => toggleDiagnosis(d.name)}
-                className={`rounded-xl px-3.5 py-1.5 text-xs font-medium transition ${
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
                   isSelected
-                    ? "bg-teal text-white shadow-xs"
-                    : "border border-line bg-paper text-ink hover:border-teal"
+                    ? "border-slate-900 bg-slate-900 text-white shadow-2xs"
+                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
                 } disabled:cursor-not-allowed`}
               >
-                {isSelected ? "✓ " : "+ "}
-                {d.name} {d.code ? `(${d.code})` : ""}
+                <span>{isSelected ? "✓" : "+"}</span>
+                <span>{d.name}</span>
+                {d.code && (
+                  <span
+                    className={`text-[10px] ${
+                      isSelected ? "text-slate-300" : "text-slate-400"
+                    }`}
+                  >
+                    ({d.code})
+                  </span>
+                )}
               </button>
             );
           })}
 
-          {/* Any custom diagnoses not in catalog */}
+          {/* Özel Eklenen Teşhisler */}
           {diagnoses
             .filter((d) => !diagnosesCatalog.some((c) => c.name === d))
             .map((customD, idx) => (
               <span
                 key={idx}
-                className="flex items-center gap-1 rounded-xl bg-teal px-3.5 py-1.5 text-xs font-medium text-white"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs"
               >
-                ✓ {customD}
+                <span>✓</span>
+                <span>{customD}</span>
                 {!isLocked && (
                   <button
                     type="button"
                     onClick={() => toggleDiagnosis(customD)}
-                    className="ml-1 text-white/80 hover:text-white"
+                    className="ml-1 text-slate-300 hover:text-white"
                   >
                     ✕
                   </button>
@@ -436,102 +725,160 @@ export function ClassicPlanClient({
             ))}
         </div>
 
+        {/* Özel Teşhis Ekleme Formu */}
         {!isLocked && (
-          <form onSubmit={addCustomDiagnosis} className="mt-4 flex max-w-sm gap-2">
+          <form onSubmit={addCustomDiagnosis} className="mt-4 flex max-w-md items-center gap-2">
             <input
               type="text"
-              placeholder="Özel teşhis yaz..."
+              placeholder="Özel teşhis girin (Örn: Diş Sıkma / Bruksizm)..."
               value={customDiagInput}
               onChange={(e) => setCustomDiagInput(e.target.value)}
-              className="flex-1 rounded-xl border border-line bg-paper px-3 py-1.5 text-xs text-ink outline-hidden focus:border-teal"
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:bg-white focus:outline-hidden"
             />
             <button
               type="submit"
-              className="rounded-xl border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink hover:bg-paper-2"
+              className="cursor-pointer rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-slate-800"
             >
-              Ekle
+              + Teşhis Ekle
             </button>
           </form>
         )}
       </div>
 
-      {/* Main Grid: Visits & Items vs Totals Sidebar */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left 2 Cols: Visits & Items & Discounts */}
-        <div className="space-y-6 lg:col-span-2">
+      {/* 4. Ana Bölüm: Seanslar & Tedavi Kalemleri VS Hesap Özeti (Sidebar) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Sol 8 Kolon: Seanslar, Tedaviler ve İndirimler */}
+        <div className="space-y-6 lg:col-span-8">
           {visits.map((visit) => {
             const visitItems = items.filter((it) => it.visit_id === visit.id);
+            const visitSubtotal = visitItems.reduce((acc, it) => {
+              if (it.is_package) return acc;
+              return acc + (Number(it.quantity) || 1) * (Number(it.unit_price) || 0);
+            }, 0);
+
             return (
               <div
                 key={visit.id}
-                className="overflow-hidden rounded-2xl border border-line bg-paper-2 shadow-xs"
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"
               >
-                {/* Visit Header */}
-                <div className="flex items-center justify-between border-b border-line bg-paper/60 px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-7 items-center justify-center rounded-lg bg-teal text-xs font-bold text-white">
-                      {visit.order_num}
-                    </span>
-                    <input
-                      type="text"
-                      disabled={isLocked}
-                      value={visit.title}
-                      onChange={(e) =>
-                        handleUpdateVisitTitle(visit.id, e.target.value)
-                      }
-                      className="rounded-lg border-0 bg-transparent font-serif text-base font-medium text-ink focus:bg-paper focus:ring-1 focus:ring-teal disabled:opacity-90"
-                    />
+                {/* Seans Başlığı & Aşama Ayarları */}
+                <div className="border-b border-slate-100 bg-slate-50/70 p-5">
+                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-8 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white shadow-2xs">
+                        {visit.order_num}
+                      </span>
+                      <input
+                        type="text"
+                        disabled={isLocked}
+                        value={visit.title}
+                        onChange={(e) =>
+                          handleUpdateVisitField(visit.id, "title", e.target.value)
+                        }
+                        placeholder="Seans Başlığı..."
+                        className="rounded-lg border-0 bg-transparent text-base font-bold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-slate-900 disabled:opacity-90"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {!isLocked && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleAddItem(visit.id)}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-slate-800"
+                          >
+                            <Plus className="size-3.5" />
+                            <span>Tedavi Ekle</span>
+                          </button>
+
+                          {visits.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveVisit(visit.id)}
+                              className="cursor-pointer rounded-xl border border-slate-200 bg-white p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                              title="Seansı Sil"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  {!isLocked && (
-                    <button
-                      type="button"
-                      onClick={() => handleAddItem(visit.id)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-teal/10 px-3 py-1 text-xs font-medium text-teal hover:bg-teal hover:text-white"
-                    >
-                      + Tedavi Ekle
-                    </button>
-                  )}
+
+                  {/* Seans Faz & İyileşme Notu (Wise PDF Altyapısı) */}
+                  <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500">
+                        Aşama / Faz Etiketi (Örn: Cerrahi Aşama)
+                      </label>
+                      <input
+                        type="text"
+                        disabled={isLocked}
+                        value={visit.phase_label}
+                        onChange={(e) =>
+                          handleUpdateVisitField(visit.id, "phase_label", e.target.value)
+                        }
+                        placeholder="Örn: 1. Aşama - Cerrahi"
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500">
+                        İyileşme / Bekleme Notu
+                      </label>
+                      <input
+                        type="text"
+                        disabled={isLocked}
+                        value={visit.healing_note}
+                        onChange={(e) =>
+                          handleUpdateVisitField(visit.id, "healing_note", e.target.value)
+                        }
+                        placeholder="Örn: 8-12 hafta kemik entegrasyonu bekleme süresi"
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-50"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Items in this visit */}
-                <div className="p-4 sm:p-6">
+                {/* Bu Seanstaki Tedavi Kalemleri */}
+                <div className="p-5">
                   {visitItems.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-ink-soft">
-                      Bu seansta henüz satır yok. “+ Tedavi Ekle” butonuna tıklayın.
-                    </p>
+                    <div className="py-8 text-center text-xs text-slate-400">
+                      Bu seansa henüz tedavi kalemi eklenmedi. &ldquo;+ Tedavi Ekle&rdquo; butonuna tıklayın.
+                    </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {visitItems.map((item) => {
                         const originalIndex = items.findIndex((it) => it === item);
                         const lineTotalMinor = item.is_package
                           ? 0
-                          : (Number(item.quantity) || 0) *
-                            (Number(item.unit_price) || 0);
-                        const lineMoney = money(lineTotalMinor, plan.currency);
+                          : (Number(item.quantity) || 1) * (Number(item.unit_price) || 0);
 
                         return (
                           <div
                             key={originalIndex}
-                            className={`rounded-xl border p-4 transition ${
+                            className={`rounded-2xl border p-4 transition ${
                               item.is_package
-                                ? "border-wait/40 bg-wait/5"
-                                : "border-line bg-paper/40"
+                                ? "border-amber-200 bg-amber-50/30"
+                                : "border-slate-200 bg-slate-50/30"
                             }`}
                           >
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-center">
-                              {/* Treatment dropdown */}
+                              {/* Tedavi Seçimi */}
                               <div className="sm:col-span-5">
-                                <label className="text-xs text-ink-soft">Tedavi</label>
+                                <label className="block text-[11px] font-semibold text-slate-500">
+                                  Tedavi
+                                </label>
                                 <select
                                   disabled={isLocked}
                                   value={item.treatment_id ?? ""}
                                   onChange={(e) =>
-                                    handleTreatmentChange(
-                                      originalIndex,
-                                      e.target.value
-                                    )
+                                    handleTreatmentChange(originalIndex, e.target.value)
                                   }
-                                  className="mt-0.5 w-full rounded-lg border border-line bg-paper-2 px-2.5 py-1.5 text-xs text-ink outline-hidden focus:border-teal disabled:opacity-75"
+                                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-100"
                                 >
                                   {treatmentsCatalog.map((t) => (
                                     <option key={t.id} value={t.id}>
@@ -541,28 +888,34 @@ export function ClassicPlanClient({
                                 </select>
                               </div>
 
-                              {/* Diş No */}
+                              {/* Diş No (FDI) & Diş Seçici */}
                               <div className="sm:col-span-2">
-                                <label className="text-xs text-ink-soft">Diş No</label>
-                                <input
-                                  type="text"
-                                  disabled={isLocked}
-                                  placeholder="Örn: 16"
-                                  value={item.tooth_number}
-                                  onChange={(e) =>
-                                    handleItemFieldChange(
-                                      originalIndex,
-                                      "tooth_number",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="mt-0.5 w-full rounded-lg border border-line bg-paper-2 px-2.5 py-1.5 text-xs text-ink outline-hidden focus:border-teal disabled:opacity-75"
-                                />
+                                <label className="block text-[11px] font-semibold text-slate-500">
+                                  Diş No (FDI)
+                                </label>
+                                <div className="relative mt-1">
+                                  <input
+                                    type="text"
+                                    disabled={isLocked}
+                                    placeholder="16, 21..."
+                                    value={item.tooth_number}
+                                    onChange={(e) =>
+                                      handleItemFieldChange(
+                                        originalIndex,
+                                        "tooth_number",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-100"
+                                  />
+                                </div>
                               </div>
 
                               {/* Adet */}
                               <div className="sm:col-span-1">
-                                <label className="text-xs text-ink-soft">Adet</label>
+                                <label className="block text-[11px] font-semibold text-slate-500">
+                                  Adet
+                                </label>
                                 <input
                                   type="number"
                                   min="1"
@@ -581,136 +934,237 @@ export function ClassicPlanClient({
                                       handleItemFieldChange(originalIndex, "quantity", 1);
                                     }
                                   }}
-                                  className="mt-0.5 w-full rounded-lg border border-line bg-paper-2 px-2 py-1.5 text-xs text-ink outline-hidden focus:border-teal disabled:opacity-75"
+                                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-center text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-100"
                                 />
                               </div>
 
-                              {/* Birim Fiyat (TL input converted to kuruş) */}
+                              {/* Birim Fiyat */}
                               <div className="sm:col-span-2">
-                                <label className="text-xs text-ink-soft">
-                                  Birim Fiyat (TL)
+                                <label className="block text-[11px] font-semibold text-slate-500">
+                                  Birim Fiyat
                                 </label>
                                 <PriceInput
                                   disabled={isLocked}
                                   value={item.unit_price}
                                   onChange={(val) =>
-                                    handleItemFieldChange(
-                                      originalIndex,
-                                      "unit_price",
-                                      val
-                                    )
+                                    handleItemFieldChange(originalIndex, "unit_price", val)
                                   }
-                                  className="mt-0.5 w-full rounded-lg border border-line bg-paper-2 px-2.5 py-1.5 text-xs text-ink outline-hidden focus:border-teal disabled:opacity-75"
+                                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-100"
                                 />
                               </div>
 
                               {/* Satır Toplamı & Sil */}
-                              <div className="flex items-center justify-between sm:col-span-2 sm:justify-end sm:gap-2">
+                              <div className="flex items-center justify-between sm:col-span-2 sm:justify-end sm:gap-3">
                                 <div className="text-right">
-                                  <div className="text-xs font-semibold text-ink">
-                                    {formatMoney(lineMoney)}
+                                  <div className="text-xs font-bold text-slate-900">
+                                    {formatMoney(money(lineTotalMinor, currency))}
                                   </div>
                                   {item.is_package && (
-                                    <span className="text-[10px] text-wait font-medium">
-                                      Paket İçi (0 TL)
+                                    <span className="text-[10px] font-semibold text-amber-700">
+                                      Paket İçi (0 {currency === "TRY" ? "TL" : currency})
                                     </span>
                                   )}
                                 </div>
+
                                 {!isLocked && (
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveItem(originalIndex)}
-                                    className="rounded-md p-1 text-ink-soft hover:bg-danger/10 hover:text-danger"
+                                    className="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                                     title="Satırı Sil"
                                   >
-                                    ✕
+                                    <Trash2 className="size-4" />
                                   </button>
                                 )}
                               </div>
                             </div>
 
-                            {/* Paket İçi Toggle */}
-                            <div className="mt-2.5 flex items-center gap-2 border-t border-line/40 pt-2">
-                              <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-soft">
+                            {/* Alt Detay: Hekim Açıklaması & Hızlı Diş Seçici & Paket Toggle */}
+                            <div className="mt-3 flex flex-col justify-between gap-3 border-t border-slate-200/60 pt-2.5 sm:flex-row sm:items-center">
+                              {/* Hekim Notu */}
+                              <div className="flex-1">
                                 <input
-                                  type="checkbox"
+                                  type="text"
                                   disabled={isLocked}
-                                  checked={item.is_package}
+                                  placeholder="Hekim Notu / İmplant markası / Ek detay..."
+                                  value={item.description}
                                   onChange={(e) =>
                                     handleItemFieldChange(
                                       originalIndex,
-                                      "is_package",
-                                      e.target.checked
+                                      "description",
+                                      e.target.value
                                     )
                                   }
-                                  className="rounded text-teal focus:ring-teal"
+                                  className="w-full rounded-lg border border-slate-200/70 bg-white px-2.5 py-1 text-[11px] text-slate-700 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-50"
                                 />
-                                <span>Paket içi mi?</span>
-                              </label>
-                              {item.is_package && (
-                                <span className="rounded bg-wait/15 px-2 py-0.5 text-[11px] font-medium text-wait">
-                                  Paket içi satır toplamı şişirmez
-                                </span>
-                              )}
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                {/* Hızlı Diş Seçici Toggle */}
+                                {!isLocked && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setActiveItemToothIndex(
+                                        activeItemToothIndex === originalIndex ? null : originalIndex
+                                      )
+                                    }
+                                    className="cursor-pointer text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline"
+                                  >
+                                    {activeItemToothIndex === originalIndex
+                                      ? "Diş Şemasını Kapat"
+                                      : "Diş Şemasından Seç"}
+                                  </button>
+                                )}
+
+                                {/* Paket İçi Checkbox */}
+                                <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-600">
+                                  <input
+                                    type="checkbox"
+                                    disabled={isLocked}
+                                    checked={item.is_package}
+                                    onChange={(e) =>
+                                      handleItemFieldChange(
+                                        originalIndex,
+                                        "is_package",
+                                        e.target.checked
+                                      )
+                                    }
+                                    className="size-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                                  />
+                                  <span>Paket İçi (Fiyat Dahil)</span>
+                                </label>
+                              </div>
                             </div>
+
+                            {/* Açılır FDI Diş Şeması Seçicisi */}
+                            {activeItemToothIndex === originalIndex && !isLocked && (
+                              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-2xs">
+                                <div className="text-[11px] font-bold text-slate-700 mb-2">
+                                  FDI Numaralandırma Şeması (Seçilenler otomatik eklenir):
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    <span className="text-[10px] font-bold text-slate-400 w-16">
+                                      Üst Çene:
+                                    </span>
+                                    {QUICK_TEETH.upper.map((tooth) => {
+                                      const isPicked = (item.teeth || []).includes(tooth);
+                                      return (
+                                        <button
+                                          key={tooth}
+                                          type="button"
+                                          onClick={() =>
+                                            handleToggleToothForItem(originalIndex, tooth)
+                                          }
+                                          className={`size-6 rounded-md text-[10px] font-bold transition ${
+                                            isPicked
+                                              ? "bg-slate-900 text-white"
+                                              : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-200"
+                                          }`}
+                                        >
+                                          {tooth}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    <span className="text-[10px] font-bold text-slate-400 w-16">
+                                      Alt Çene:
+                                    </span>
+                                    {QUICK_TEETH.lower.map((tooth) => {
+                                      const isPicked = (item.teeth || []).includes(tooth);
+                                      return (
+                                        <button
+                                          key={tooth}
+                                          type="button"
+                                          onClick={() =>
+                                            handleToggleToothForItem(originalIndex, tooth)
+                                          }
+                                          className={`size-6 rounded-md text-[10px] font-bold transition ${
+                                            isPicked
+                                              ? "bg-slate-900 text-white"
+                                              : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-200"
+                                          }`}
+                                        >
+                                          {tooth}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
                   )}
+
+                  {/* Seans Alt Toplamı */}
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
+                    <span className="font-semibold text-slate-500">
+                      {visit.title} Ara Toplamı:
+                    </span>
+                    <span className="font-bold text-slate-900">
+                      {formatMoney(money(visitSubtotal, currency))}
+                    </span>
+                  </div>
                 </div>
               </div>
             );
           })}
 
-          {/* Add Visit Button */}
+          {/* Yeni Seans Ekle Butonu */}
           {!isLocked && (
             <button
               type="button"
               onClick={handleAddVisit}
-              className="w-full rounded-2xl border-2 border-dashed border-line bg-paper/50 py-4 text-center text-sm font-medium text-ink-soft transition hover:border-teal hover:bg-paper hover:text-teal"
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white py-5 text-xs font-bold text-slate-600 shadow-2xs transition hover:border-slate-900 hover:bg-slate-50 hover:text-slate-900"
             >
-              + Yeni Seans Ekle
+              <CalendarPlus className="size-4" />
+              <span>+ Yeni Tedavi Seansı Ekle</span>
             </button>
           )}
 
-          {/* Discounts Box */}
-          <div className="rounded-2xl border border-line bg-paper-2 p-6 shadow-xs">
-            <div className="flex items-center justify-between border-b border-line pb-3">
+          {/* İndirimler & Kampanyalar Kartı */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <h3 className="font-serif text-lg font-medium text-ink">
-                  İndirimler
+                <h3 className="text-base font-bold text-slate-900">
+                  İndirimler & İskontolar
                 </h3>
-                <p className="text-xs text-ink-soft">
-                  Plan geneline uygulanacak etiketli indirimler (Örn: Nakit indirimi).
+                <p className="text-xs text-slate-500">
+                  Plan geneline uygulanacak özel indirimler (Örn: Peşin ödeme indirimi).
                 </p>
               </div>
               {!isLocked && (
                 <button
                   type="button"
                   onClick={handleAddDiscount}
-                  className="rounded-lg bg-teal/10 px-3 py-1 text-xs font-medium text-teal hover:bg-teal hover:text-white"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
                 >
-                  + İndirim Ekle
+                  <Plus className="size-3.5" />
+                  <span>İndirim Ekle</span>
                 </button>
               )}
             </div>
 
             <div className="mt-4 space-y-3">
               {discounts.length === 0 ? (
-                <p className="py-2 text-xs text-ink-soft">
-                  Henüz indirim eklenmedi.
+                <p className="py-2 text-xs text-slate-400">
+                  Henüz indirim tanımlanmadı.
                 </p>
               ) : (
                 discounts.map((d, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-3 rounded-xl border border-line bg-paper/40 p-3"
+                    className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3"
                   >
                     <input
                       type="text"
                       disabled={isLocked}
-                      placeholder="İndirim Etiketi"
+                      placeholder="İndirim Etiketi (Örn: Nakit İndirimi)"
                       value={d.label}
                       onChange={(e) =>
                         setDiscounts(
@@ -719,12 +1173,12 @@ export function ClassicPlanClient({
                           )
                         )
                       }
-                      className="flex-1 rounded-lg border border-line bg-paper-2 px-3 py-1.5 text-xs text-ink outline-hidden focus:border-teal disabled:opacity-75"
+                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-100"
                     />
-                    <div className="w-32">
+                    <div className="w-36">
                       <PriceInput
                         disabled={isLocked}
-                        placeholder="Tutar (TL)"
+                        placeholder="Tutar"
                         value={d.amount}
                         onChange={(val) =>
                           setDiscounts(
@@ -733,16 +1187,16 @@ export function ClassicPlanClient({
                             )
                           )
                         }
-                        className="w-full rounded-lg border border-line bg-paper-2 px-3 py-1.5 text-xs text-ink outline-hidden focus:border-teal disabled:opacity-75"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden disabled:bg-slate-100"
                       />
                     </div>
                     {!isLocked && (
                       <button
                         type="button"
                         onClick={() => handleRemoveDiscount(idx)}
-                        className="rounded-md p-1 text-ink-soft hover:bg-danger/10 hover:text-danger"
+                        className="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                       >
-                        ✕
+                        <Trash2 className="size-4" />
                       </button>
                     )}
                   </div>
@@ -752,112 +1206,142 @@ export function ClassicPlanClient({
           </div>
         </div>
 
-        {/* Right Col: Server Totals & Actions Sidebar */}
-        <div className="space-y-6">
-          <div className="sticky top-6 rounded-2xl border border-line bg-paper-2 p-6 shadow-sm">
-            <h3 className="font-serif text-lg font-medium text-ink">
-              Hesap Özeti
-            </h3>
-            <p className="text-xs text-ink-soft">
-              Toplamı ekran değil sunucu hesaplar.
-            </p>
+        {/* Sağ 4 Kolon: Fiyatlandırma & Hesap Özeti (Sticky Sidebar) */}
+        <div className="space-y-6 lg:col-span-4">
+          <div className="sticky top-6 space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Fiyatlandırma & Hesap Özeti
+              </h3>
+              <p className="text-xs text-slate-500">
+                Kuruş hassasiyetli sunucu hesaplamalı resmi tutarlar.
+              </p>
+            </div>
 
-            {/* Totals Breakdown */}
-            <div className="mt-5 space-y-3 border-y border-line py-4 text-sm">
-              <div className="flex items-center justify-between text-ink-soft">
+            {/* Tutar Dökümü */}
+            <div className="space-y-3.5 border-y border-slate-100 py-4.5 text-xs">
+              <div className="flex items-center justify-between text-slate-600">
                 <span>Ara Toplam:</span>
-                <span className="font-semibold text-ink">
-                  {formatMoney(money(plan.totalsSubtotal, plan.currency))}
+                <span className="font-bold text-slate-900 text-sm">
+                  {formatMoney(money(plan.totalsSubtotal, currency))}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-ink-soft">
-                <span>İndirim:</span>
-                <span className="font-semibold text-danger">
-                  - {formatMoney(money(plan.totalsDiscount, plan.currency))}
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Toplam İndirim:</span>
+                <span className="font-bold text-rose-600 text-sm">
+                  - {formatMoney(money(plan.totalsDiscount, currency))}
                 </span>
               </div>
-              <div className="flex items-center justify-between border-t border-line/60 pt-3 text-base font-bold text-ink">
+              <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-sm font-bold text-slate-900">
                 <span>Genel Toplam:</span>
-                <span className="text-teal-deep">
-                  {formatMoney(money(plan.totalsGrand, plan.currency))}
+                <span className="text-lg text-slate-900">
+                  {formatMoney(money(plan.totalsGrand, currency))}
                 </span>
               </div>
             </div>
 
-            <div className="mt-4 rounded-xl border border-line/80 bg-paper p-3 text-xs text-ink-soft space-y-1">
-              <div>⚙️ <strong>Server-Authoritative:</strong></div>
-              <div>• Kuruş bazlı para türü kullanılır (float yok).</div>
-              <div>• Paket içi satırlar genel toplamı şişirmez.</div>
+            {/* Bilgilendirme Notu */}
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5 text-xs text-slate-600 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                <Info className="size-3.5 text-slate-500" />
+                <span>Hesaplama Prensipleri:</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                • Paket içi işlemler genel toplamı şişirmez, PDF belgesinde &ldquo;Paket İçi&rdquo; olarak sunulur.
+              </p>
+              <p className="text-[11px] text-slate-500">
+                • Kilitlendiğinde mevcut veriler dondurulur ve 24 sayfalık kurumsal PDF çıktısı oluşturulur.
+              </p>
             </div>
 
-            {/* Action Buttons */}
-            <div className="mt-6 space-y-2">
+            {/* Eylem Butonları */}
+            <div className="space-y-2.5 pt-1">
               {!isLocked ? (
                 <>
                   <button
                     type="button"
                     disabled={isPending}
                     onClick={handleSaveDraft}
-                    className="w-full rounded-xl border border-teal bg-paper px-4 py-2.5 text-sm font-semibold text-teal transition hover:bg-teal hover:text-white disabled:opacity-50"
+                    className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:bg-slate-50 disabled:opacity-50"
                   >
-                    {isPending ? "Kaydediliyor..." : "Taslağı Kaydet & Hesaplat"}
+                    {isPending ? "Kaydediliyor..." : "Taslağı Kaydet"}
                   </button>
 
                   <button
                     type="button"
                     disabled={isPending}
                     onClick={() => setShowConfirmReady(true)}
-                    className="w-full rounded-xl bg-teal px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-deep disabled:opacity-50"
+                    className="w-full cursor-pointer rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-slate-800 disabled:opacity-50"
                   >
-                    🔒 Planı Onayla & Kilitle (Ready)
+                    Planı Onayla & Kilitle (Ready)
                   </button>
                 </>
               ) : (
-                <div className="rounded-xl border border-ok/30 bg-ok/10 p-4 text-center">
-                  <div className="text-sm font-semibold text-ok">
-                    ✓ Plan Kilitlendi (Ready)
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800">
+                      <CheckCircle2 className="size-4 text-emerald-600" />
+                      <span>Plan Onaylandı & Kilitlendi</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-emerald-700">
+                      Bu planın verileri dondurulmuştur. Değişiklik yapılamaz.
+                    </p>
                   </div>
-                  <p className="mt-1 text-xs text-ink-soft">
-                    Snapshot donduruldu. Bu aşamada PDF basılmaz; basılacak veri hazır olur.
-                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    disabled={isGeneratingPdf}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-xs font-bold text-white shadow-xs hover:bg-slate-800"
+                  >
+                    <Download className="size-4" />
+                    <span>24 Sayfalık PDF İndir</span>
+                  </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Clinic Branding Info */}
-          <div className="rounded-2xl border border-line bg-paper-2 p-5 text-xs text-ink-soft">
-            <div className="font-semibold uppercase tracking-wider text-ink">
-              Klinik Ayarları (Salt Okunur)
+          {/* Klinik Antet Kartı */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs text-xs text-slate-500">
+            <div className="flex items-center gap-2 font-bold text-slate-900 mb-2">
+              <Building2 className="size-4 text-slate-400" />
+              <span>Klinik Antet Bilgisi</span>
             </div>
-            <div className="mt-2 space-y-1">
-              <div>Klinik: <strong>{clinicSettings.name || "Örnek Klinik"}</strong></div>
-              <div>Telefon: {clinicSettings.phone || "+90 555 000 0000"}</div>
-              <div>Palet: <Badge>{clinicSettings.palette}</Badge></div>
+            <div className="space-y-1">
+              <div>Klinik: <strong className="text-slate-800">{clinicSettings.name || "Klinik"}</strong></div>
+              <div>Hekim: <strong className="text-slate-800">{clinicSettings.doctor?.name || "Yetkili Hekim"}</strong></div>
+              <div>Telefon: <span className="text-slate-800">{clinicSettings.phone || "—"}</span></div>
+              <div>Şablon Paleti: <span className="font-semibold capitalize text-slate-800">{palette}</span></div>
+              <div>Para Birimi: <strong className="text-slate-800">{currency}</strong></div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Confirmation Modal for Ready */}
+      {/* Plan Kilitleme Onay Modalı */}
       {showConfirmReady && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-line bg-paper-2 p-6 shadow-2xl">
-            <h3 className="font-serif text-xl font-medium text-ink">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md transition-all duration-300">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-2xl">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-900 mb-4">
+              <Lock className="size-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-slate-900">
               Planı Kilitlemek İstiyor musunuz?
             </h3>
-            <p className="mt-2 text-sm text-ink-soft">
-              Bu işlem planı <strong>READY</strong> durumuna geçirir ve mevcut klinik bilgileri, hasta bilgileri, seanslar ve fiyatları <strong>değiştirilemez snapshot</strong> olarak kilitler.
+            <p className="mt-2 text-xs leading-relaxed text-slate-600">
+              Bu işlem planı <strong>READY (Kilitli)</strong> durumuna geçirir. Mevcut klinik profili, hasta bilgileri, seanslar ve fiyatlar <strong>değiştirilemez bir snapshot</strong> olarak dondurulur ve 24 sayfalık kurumsal PDF çıktısı üretilir.
             </p>
-            <p className="mt-2 text-xs text-wait">
-              ⚠️ Kilitlendikten sonra satır eklenemez veya silinemez.
+            <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] font-semibold text-amber-800">
+              ⚠️ Kilitlendikten sonra seans ve tedavi satırları düzenlenemez.
             </p>
 
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowConfirmReady(false)}
-                className="rounded-xl border border-line px-4 py-2 text-sm text-ink-soft hover:bg-paper"
+                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
               >
                 Vazgeç
               </button>
@@ -865,96 +1349,10 @@ export function ClassicPlanClient({
                 type="button"
                 disabled={isPending}
                 onClick={handleLockReady}
-                className="rounded-xl bg-teal px-5 py-2 text-sm font-medium text-white hover:bg-teal-deep disabled:opacity-50"
+                className="cursor-pointer rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50"
               >
-                {isPending ? "Kilitleniyor..." : "Evet, Kilitle (Ready)"}
+                {isPending ? "Kilitleniyor..." : "Evet, Kilitle & Hazırla"}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Locked Snapshot Card (Visible when ready) */}
-      {isLocked && Boolean(plan.snapshotJson) && (
-        <div className="mt-10 overflow-hidden rounded-3xl border-2 border-teal/40 bg-paper-2 p-8 shadow-lg">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-6">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-teal">
-                PDF Baskı Önizlemesi (Veri Hazır)
-              </span>
-              <h2 className="mt-1 font-serif text-3xl font-medium text-ink">
-                {clinicSettings.name || "Tedavi Planı"}
-              </h2>
-              <p className="text-sm text-ink-soft">
-                Hasta: <strong>{plan.patient?.name}</strong> • İletişim: {plan.patient?.contact}
-              </p>
-            </div>
-            <div className="text-right">
-              <Badge tone="ok">Snapshot Kilitli</Badge>
-              <div className="mt-1 text-xs text-ink-soft">
-                Public Link Yok · Güvenli Tenant İçi
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-6">
-            {/* Snapshot Visits & Items */}
-            {visits.map((v) => {
-              const vItems = items.filter((it) => it.visit_id === v.id);
-              return (
-                <div key={v.id} className="rounded-xl border border-line/80 bg-paper p-5">
-                  <h4 className="font-serif font-medium text-ink">{v.title}</h4>
-                  <table className="mt-3 w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-line text-ink-soft">
-                        <th className="pb-2">Tedavi</th>
-                        <th className="pb-2">Diş</th>
-                        <th className="pb-2">Adet</th>
-                        <th className="pb-2 text-right">Birim Fiyat</th>
-                        <th className="pb-2 text-right">Toplam</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line/40">
-                      {vItems.map((it, i) => (
-                        <tr key={i} className="text-ink">
-                          <td className="py-2 font-medium">
-                            {it.treatment_name}
-                            {it.is_package && (
-                              <span className="ml-2 text-wait">(Paket İçi)</span>
-                            )}
-                          </td>
-                          <td className="py-2 text-ink-soft">{it.tooth_number || "—"}</td>
-                          <td className="py-2">{it.quantity}</td>
-                          <td className="py-2 text-right">
-                            {formatMoney(money(it.unit_price, plan.currency))}
-                          </td>
-                          <td className="py-2 text-right font-semibold">
-                            {formatMoney(
-                              money(
-                                it.is_package ? 0 : it.quantity * it.unit_price,
-                                plan.currency
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })}
-
-            {/* Grand Total Footer */}
-            <div className="flex flex-col items-end gap-1 border-t border-line pt-4 text-sm">
-              <div className="text-ink-soft">
-                Ara Toplam: {formatMoney(money(plan.totalsSubtotal, plan.currency))}
-              </div>
-              <div className="text-danger">
-                İndirim: - {formatMoney(money(plan.totalsDiscount, plan.currency))}
-              </div>
-              <div className="font-serif text-2xl font-bold text-teal-deep">
-                Genel Toplam: {formatMoney(money(plan.totalsGrand, plan.currency))}
-              </div>
             </div>
           </div>
         </div>

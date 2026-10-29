@@ -1,18 +1,53 @@
 "use client";
 
+import React, { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState, useTransition } from "react";
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  ExternalLink,
+  FilePlus,
+  FileText,
+  Filter,
+  Phone,
+  Plus,
+  PlusCircle,
+  Search,
+  User,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 
 import type { Patient, Plan } from "@/modules/plan/domain/plan";
 import { formatMoney, money } from "@/shared/money";
-import { Badge } from "@/ui/badge";
 import { createPatientAction, createPlanAction } from "./actions";
 
 interface Props {
   workspaceId: string;
   initialPlans: Plan[];
   initialPatients: Patient[];
+}
+
+const TITLE_SUGGESTIONS = [
+  "İmplant ve Kuron Planı",
+  "Estetik Gülüş Tasarımı",
+  "Zirkonyum Kaplama",
+  "Kanal ve Dolgu Tedavisi",
+  "Ortodonti & Şeffaf Plak",
+];
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  if (!first) return "H";
+  if (parts.length === 1 || !last) return first.slice(0, 2).toUpperCase();
+  return (first.charAt(0) + last.charAt(0)).toUpperCase();
 }
 
 export function PlansListClient({
@@ -27,19 +62,23 @@ export function PlansListClient({
   const [isPending, startTransition] = useTransition();
 
   // Combine server plans with any newly created plans
-  const plans = [
+  const plans = useMemo(() => [
     ...createdPlans.filter((cp) => !initialPlans.some((ip) => ip.id === cp.id)),
     ...initialPlans,
-  ];
+  ], [createdPlans, initialPlans]);
 
-  const patients = [
+  const patients = useMemo(() => [
     ...initialPatients,
     ...createdPatients.filter((cp) => !initialPatients.some((ip) => ip.id === cp.id)),
-  ];
+  ], [initialPatients, createdPatients]);
 
   useEffect(() => {
     router.refresh();
   }, [router]);
+
+  // Search & Filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "ready" | "draft">("all");
 
   // Modal form state
   const [selectedPatientId, setSelectedPatientId] = useState<string>(
@@ -52,6 +91,69 @@ export function PlansListClient({
   const [newPatientContact, setNewPatientContact] = useState("");
   const [planTitle, setPlanTitle] = useState("");
   const [formError, setFormError] = useState("");
+
+  // Custom Combobox state for modal
+  const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
+  const [patientSearch, setPatientSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close combobox when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsPatientDropdownOpen(false);
+      }
+    }
+    if (isPatientDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isPatientDropdownOpen]);
+
+  // Filtered patients for the combobox inside modal
+  const filteredModalPatients = useMemo(() => {
+    if (!patientSearch.trim()) return patients;
+    const q = patientSearch.toLowerCase().trim();
+    return patients.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.contact && p.contact.toLowerCase().includes(q))
+    );
+  }, [patients, patientSearch]);
+
+  const selectedPatient = useMemo(
+    () => patients.find((p) => p.id === selectedPatientId) ?? patients[0],
+    [patients, selectedPatientId]
+  );
+
+  // Filtered plans for the table
+  const filteredPlans = useMemo(() => {
+    return plans.filter((p) => {
+      // Status filter
+      if (statusFilter === "ready" && p.status?.toLowerCase() !== "ready") return false;
+      if (statusFilter === "draft" && p.status?.toLowerCase() === "ready") return false;
+
+      // Search filter
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.toLowerCase().trim();
+      const pName = p.patient?.name?.toLowerCase() || "";
+      const pTitle = p.title?.toLowerCase() || "";
+      const pContact = p.patient?.contact?.toLowerCase() || "";
+      return pName.includes(q) || pTitle.includes(q) || pContact.includes(q);
+    });
+  }, [plans, statusFilter, searchTerm]);
+
+  // Metrics
+  const readyCount = useMemo(
+    () => plans.filter((p) => p.status?.toLowerCase() === "ready").length,
+    [plans]
+  );
+  const draftCount = useMemo(
+    () => plans.filter((p) => p.status?.toLowerCase() !== "ready").length,
+    [plans]
+  );
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +187,7 @@ export function PlansListClient({
 
       const planRes = await createPlanAction(
         patientId,
-        planTitle.trim() || "Tedavi Planı (Classic)",
+        planTitle.trim() || "Tedavi Planı",
         ["Dentin Çürüğü"],
         workspaceId
       );
@@ -97,108 +199,205 @@ export function PlansListClient({
 
       setCreatedPlans((prev) => [planRes.data!, ...prev]);
       setShowModal(false);
-      // Navigate to plan detail
       router.push(`/app/plans/${planRes.data.id}`);
     });
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto max-w-7xl space-y-6">
+      {/* 1. Üst Başlık & Eylem Butonu */}
+      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="font-serif text-3xl font-medium tracking-tight text-ink">
-              Tedavi Planları
-            </h1>
-            <Badge tone="ok">Faz 4 · Classic Form</Badge>
-          </div>
-          <p className="mt-1 text-sm text-ink-soft">
-            “Bu hasta için ne, kaç seans, kaça?” — Sunucu hesaplamalı, PDF verisi hazır planlar.
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Tedavi Planları
+          </h1>
+          <p className="mt-1 text-xs text-slate-500">
+            Hastalarınıza sunacağınız seans bazlı tedavi planları, fiyatlandırma ve sunum arşivi.
           </p>
         </div>
+
         <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-teal-deep"
+          type="button"
+          onClick={() => {
+            setFormError("");
+            setIsCreatingPatient(patients.length === 0);
+            setShowModal(true);
+          }}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-98"
         >
-          <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Yeni Classic Plan Oluştur
+          <PlusCircle className="size-4" />
+          <span>Yeni Tedavi Planı Oluştur</span>
         </button>
       </div>
 
-      {/* Plan List */}
-      <div className="mt-8">
-        {plans.length === 0 ? (
-          <div className="rounded-2xl border border-line bg-paper-2 p-12 text-center">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-teal/10 text-teal">
-              <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+      {/* 2. Hızlı Metrik Kartları (3 Adet Sade Kart) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+            <span>Toplam Plan Sayısı</span>
+            <FileText className="size-4 text-slate-400" />
+          </div>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{plans.length}</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+            <span>Hazır & Onaylı Sunumlar</span>
+            <CheckCircle2 className="size-4 text-emerald-600" />
+          </div>
+          <p className="mt-2 text-2xl font-bold text-emerald-700">{readyCount}</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+            <span>Aktif Taslaklar</span>
+            <Clock className="size-4 text-amber-500" />
+          </div>
+          <p className="mt-2 text-2xl font-bold text-amber-700">{draftCount}</p>
+        </div>
+      </div>
+
+      {/* 3. Arama & Filtreleme Çubuğu */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+        {/* Arama Inputu */}
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-2.5 size-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Hasta adı, telefon veya plan başlığı ile ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-3.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:bg-white focus:outline-hidden"
+          />
+        </div>
+
+        {/* Durum Filtre Butonları */}
+        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+          <Filter className="size-3.5 text-slate-400 ml-1 mr-1" />
+          <button
+            type="button"
+            onClick={() => setStatusFilter("all")}
+            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              statusFilter === "all"
+                ? "bg-slate-900 text-white shadow-2xs"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Tümü ({plans.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("ready")}
+            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              statusFilter === "ready"
+                ? "bg-slate-900 text-white shadow-2xs"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Hazır ({readyCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("draft")}
+            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              statusFilter === "draft"
+                ? "bg-slate-900 text-white shadow-2xs"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Taslak ({draftCount})
+          </button>
+        </div>
+      </div>
+
+      {/* 4. Planlar Tablosu */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {filteredPlans.length === 0 ? (
+          <div className="px-6 py-16 text-center">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <FilePlus className="size-6" />
             </div>
-            <h3 className="mt-4 font-serif text-lg font-medium text-ink">Henüz plan bulunmuyor</h3>
-            <p className="mt-1 text-sm text-ink-soft">
-              İlk hastanız için 2 seanslı, indirimli ve server-hesaplamalı classic planınızı oluşturun.
+            <h3 className="mt-4 text-base font-bold text-slate-900">
+              {searchTerm || statusFilter !== "all"
+                ? "Aramanıza uygun plan bulunamadı"
+                : "Henüz bir tedavi planı bulunmuyor"}
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              {searchTerm || statusFilter !== "all"
+                ? "Farklı bir arama terimi deneyin veya filtreleri temizleyin."
+                : "İlk hastanız için seans bazlı, kurumsal ve 3D destekli tedavi planı oluşturun."}
             </p>
             <button
-              onClick={() => setShowModal(true)}
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-teal px-4 py-2 text-sm font-medium text-white hover:bg-teal-deep"
+              type="button"
+              onClick={() => {
+                setFormError("");
+                setIsCreatingPatient(patients.length === 0);
+                setShowModal(true);
+              }}
+              className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800"
             >
-              Hemen Başla
+              <PlusCircle className="size-3.5" />
+              <span>Yeni Plan Başlat</span>
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-line bg-paper-2 shadow-xs">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-line bg-paper text-xs font-semibold uppercase tracking-wider text-ink-soft">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="w-[24%] min-w-[210px] px-6 py-4">Hasta</th>
-                  <th className="w-[30%] min-w-[220px] px-6 py-4">Plan Başlığı</th>
-                  <th className="w-[14%] min-w-[140px] px-6 py-4">Durum</th>
-                  <th className="w-[11%] min-w-[110px] px-6 py-4">Seanslar</th>
-                  <th className="w-[10%] min-w-[110px] px-6 py-4 text-right">Genel Toplam</th>
-                  <th className="w-[11%] min-w-[130px] px-6 py-4 text-right">İşlem</th>
+                  <th className="px-6 py-4">Hasta</th>
+                  <th className="px-6 py-4">Plan Başlığı & Teşhisler</th>
+                  <th className="px-6 py-4">Durum</th>
+                  <th className="px-6 py-4">Seans / Kalem</th>
+                  <th className="px-6 py-4 text-right">Genel Toplam</th>
+                  <th className="px-6 py-4 text-right">İşlem</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line/60">
-                {plans.map((p) => {
+              <tbody className="divide-y divide-slate-100">
+                {filteredPlans.map((p) => {
                   const m = money(p.totalsGrand, p.currency);
                   const isReady = p.status?.toLowerCase() === "ready";
+                  const patientName = p.patient?.name || "İsimsiz Hasta";
+                  const visitsCount = p.visits?.length || 0;
+                  const itemsCount = p.items?.length || 0;
+
                   return (
                     <tr
                       key={p.id}
-                      className="group transition-colors hover:bg-paper/40"
+                      className="group transition-colors hover:bg-slate-50/70"
                     >
-                      {/* Hasta Bilgisi: Okunaklı İsim + Hemen Altında İletişim */}
-                      <td className="px-6 py-4.5 align-top">
-                        <div className="font-semibold text-ink text-base tracking-tight whitespace-nowrap">
-                          {p.patient?.name || "İsimsiz Hasta"}
-                        </div>
-                        <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-soft">
-                          <svg className="size-3.5 text-teal shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                          <span className="font-medium tracking-tight text-ink/80">
-                            {p.patient?.contact ? p.patient.contact : "İletişim bilgisi yok"}
-                          </span>
+                      {/* Hasta Bilgisi */}
+                      <td className="px-6 py-4.5 align-middle">
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                            {getInitials(patientName)}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900 text-sm">
+                              {patientName}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                              <Phone className="size-3" />
+                              <span>{p.patient?.contact || "İletişim yok"}</span>
+                            </div>
+                          </div>
                         </div>
                       </td>
 
                       {/* Plan Başlığı & Teşhisler */}
-                      <td className="px-6 py-4.5 align-top">
+                      <td className="px-6 py-4.5 align-middle">
                         <Link
                           href={`/app/plans/${p.id}`}
-                          className="font-medium text-teal hover:underline text-sm"
+                          className="font-semibold text-slate-900 hover:text-blue-600 transition"
                         >
-                          {p.title || "Classic Plan"}
+                          {p.title || "Tedavi Planı"}
                         </Link>
                         {p.diagnoses && p.diagnoses.length > 0 && (
-                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          <div className="mt-1 flex flex-wrap gap-1">
                             {p.diagnoses.map((d, i) => (
                               <span
                                 key={i}
-                                className="inline-flex items-center rounded-md border border-line/70 bg-paper px-2 py-0.5 text-[11px] font-medium text-ink-soft whitespace-nowrap"
+                                className="inline-block rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600"
                               >
                                 {d}
                               </span>
@@ -207,42 +406,44 @@ export function PlansListClient({
                         )}
                       </td>
 
-                      {/* Durum */}
-                      <td className="px-6 py-4.5 align-top whitespace-nowrap">
+                      {/* Durum Rozeti */}
+                      <td className="px-6 py-4.5 align-middle">
                         {isReady ? (
-                          <Badge tone="ok">🔒 Hazır (Kilitli)</Badge>
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                            <span className="size-1.5 rounded-full bg-emerald-600" />
+                            Hazır / Sunuldu
+                          </span>
                         ) : (
-                          <Badge tone="wait">✏️ Taslak</Badge>
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                            <span className="size-1.5 rounded-full bg-amber-500" />
+                            Taslak
+                          </span>
                         )}
                       </td>
 
-                      {/* Seanslar */}
-                      <td className="px-6 py-4.5 align-top whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-line/70 bg-paper px-2.5 py-1 text-xs font-medium text-ink">
-                          <svg className="size-3.5 text-teal shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          {p.visits && p.visits.length > 0
-                            ? `${p.visits.length} Seans`
-                            : "2 Seans"}
+                      {/* Seans / Kalem */}
+                      <td className="px-6 py-4.5 align-middle text-xs text-slate-500">
+                        <span className="font-semibold text-slate-700">
+                          {visitsCount} Seans
                         </span>
+                        {itemsCount > 0 && (
+                          <span className="text-slate-400"> • {itemsCount} Kalem</span>
+                        )}
                       </td>
 
-                      {/* Genel Toplam */}
-                      <td className="px-6 py-4.5 align-top text-right whitespace-nowrap">
-                        <div className="font-serif text-base font-bold text-ink">
-                          {formatMoney(m)}
-                        </div>
+                      {/* Tutar */}
+                      <td className="px-6 py-4.5 align-middle text-right font-bold text-slate-900 text-sm">
+                        {formatMoney(m)}
                       </td>
 
                       {/* İşlem */}
-                      <td className="px-6 py-4.5 align-top text-right whitespace-nowrap">
+                      <td className="px-6 py-4.5 align-middle text-right">
                         <Link
                           href={`/app/plans/${p.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-paper px-3.5 py-1.5 text-xs font-medium text-ink transition hover:border-teal hover:bg-teal hover:text-white shadow-2xs"
+                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900"
                         >
-                          <span>{isReady ? "İncele (Kilitli)" : "Düzenle"}</span>
-                          <span className="text-sm leading-none">&rarr;</span>
+                          <span>Düzenle</span>
+                          <ExternalLink className="size-3 text-slate-400" />
                         </Link>
                       </td>
                     </tr>
@@ -254,114 +455,288 @@ export function PlansListClient({
         )}
       </div>
 
-      {/* Modal */}
+      {/* YENİ PLAN OLUŞTURMA MODALI (PREMIUM & ULTRA ŞIK COMBOBOX DROPDOWN İLE) */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-line bg-paper-2 p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-line pb-4">
-              <h2 className="font-serif text-xl font-medium text-ink">
-                Yeni Classic Tedavi Planı
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md transition-all duration-300">
+          <div className="w-full max-w-lg overflow-visible rounded-3xl border border-slate-200/80 bg-white p-7 shadow-2xl shadow-slate-900/10">
+            {/* Modal Üst Başlık */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-2xs">
+                  <FileText className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950">
+                    Yeni Tedavi Planı Oluştur
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Hasta seçin ve seans planlamasına başlayın.
+                  </p>
+                </div>
+              </div>
+
               <button
-                onClick={() => setShowModal(false)}
-                className="text-ink-soft hover:text-ink"
+                type="button"
+                onClick={() => {
+                  setShowModal(false);
+                  setIsPatientDropdownOpen(false);
+                }}
+                className="flex size-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >
-                ✕
+                <X className="size-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="mt-5 space-y-4">
+            <form onSubmit={handleCreate} className="mt-6 space-y-5">
               {formError && (
-                <div className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-xs text-danger">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-xs font-medium text-rose-800">
                   {formError}
                 </div>
               )}
 
-              {/* Patient Selector */}
+              {/* Hasta Seçim Tabı */}
               <div>
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-ink-soft">
-                    Hasta
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsCreatingPatient(!isCreatingPatient)}
-                    className="text-xs font-medium text-teal hover:underline"
-                  >
-                    {isCreatingPatient ? "Mevcut Hastalardan Seç" : "+ Yeni Hasta Ekle"}
-                  </button>
-                </div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                  Hasta Bilgisi
+                </label>
 
-                {isCreatingPatient ? (
-                  <div className="mt-2 space-y-2 rounded-xl border border-line bg-paper p-3">
-                    <input
-                      type="text"
-                      placeholder="Hasta Adı Soyadı *"
-                      value={newPatientName}
-                      onChange={(e) => setNewPatientName(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-paper-2 px-3 py-2 text-sm text-ink outline-hidden focus:border-teal"
-                      required
-                    />
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="İletişim (Telefon / E-posta) - Şifreli saklanır"
-                        value={newPatientContact}
-                        onChange={(e) => setNewPatientContact(e.target.value)}
-                        className="w-full rounded-lg border border-line bg-paper-2 px-3 py-2 text-sm text-ink outline-hidden focus:border-teal"
+                {patients.length > 0 && (
+                  <div className="mt-2 flex rounded-xl border border-slate-200/80 bg-slate-100/80 p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingPatient(false);
+                        setIsPatientDropdownOpen(false);
+                      }}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition ${
+                        !isCreatingPatient
+                          ? "bg-white text-slate-950 shadow-xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      <Users className="size-3.5" />
+                      <span>Kayıtlı Hasta Seç</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingPatient(true);
+                        setIsPatientDropdownOpen(false);
+                      }}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition ${
+                        isCreatingPatient
+                          ? "bg-white text-slate-950 shadow-xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      <UserPlus className="size-3.5" />
+                      <span>+ Yeni Hasta Tanımla</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Kayıtlı Hasta Seçimi (ÖZEL COMBOBOX DROPDOWN) */}
+                {!isCreatingPatient && patients.length > 0 ? (
+                  <div ref={dropdownRef} className="relative mt-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsPatientDropdownOpen((prev) => !prev)}
+                      className="flex w-full cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-3 text-left transition hover:border-slate-300 hover:bg-slate-50 focus:border-slate-900 focus:bg-white focus:outline-hidden"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 font-bold text-xs text-white">
+                          {selectedPatient ? getInitials(selectedPatient.name) : "H"}
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            {selectedPatient?.name || "Hasta Seçin"}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {selectedPatient?.contact
+                              ? selectedPatient.contact
+                              : "İletişim bilgisi yok"}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronDown
+                        className={`size-4 text-slate-400 transition-transform duration-200 ${
+                          isPatientDropdownOpen ? "rotate-180 text-slate-700" : ""
+                        }`}
                       />
-                      <span className="pointer-events-none absolute right-3 top-2.5 text-xs text-teal">
-                        🔒 AES-256
-                      </span>
-                    </div>
+                    </button>
+
+                    {/* Açılır Liste */}
+                    {isPatientDropdownOpen && (
+                      <div className="absolute left-0 top-full z-60 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
+                        <div className="relative border-b border-slate-100 pb-2">
+                          <Search className="pointer-events-none absolute left-3 top-2.5 size-3.5 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Hasta adı veya telefon ara..."
+                            value={patientSearch}
+                            onChange={(e) => setPatientSearch(e.target.value)}
+                            autoFocus
+                            className="w-full rounded-xl bg-slate-50 py-1.5 pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-hidden"
+                          />
+                        </div>
+
+                        <div className="mt-1.5 max-h-52 overflow-y-auto space-y-1">
+                          {filteredModalPatients.length === 0 ? (
+                            <div className="py-4 text-center text-xs text-slate-400">
+                              Eşleşen hasta bulunamadı.
+                            </div>
+                          ) : (
+                            filteredModalPatients.map((pat) => {
+                              const isSelected = pat.id === selectedPatientId;
+                              return (
+                                <button
+                                  key={pat.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPatientId(pat.id);
+                                    setIsPatientDropdownOpen(false);
+                                  }}
+                                  className={`flex w-full cursor-pointer items-center justify-between rounded-xl p-2.5 text-left transition ${
+                                    isSelected
+                                      ? "bg-slate-900 text-white"
+                                      : "hover:bg-slate-50 text-slate-800"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <div
+                                      className={`flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                                        isSelected
+                                          ? "bg-white/20 text-white"
+                                          : "bg-slate-100 text-slate-700"
+                                      }`}
+                                    >
+                                      {getInitials(pat.name)}
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-semibold leading-tight">
+                                        {pat.name}
+                                      </p>
+                                      <p
+                                        className={`text-[11px] ${
+                                          isSelected ? "text-slate-300" : "text-slate-400"
+                                        }`}
+                                      >
+                                        {pat.contact || "İletişim yok"}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {isSelected && <Check className="size-4 text-white" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        <div className="mt-2 border-t border-slate-100 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCreatingPatient(true);
+                              setIsPatientDropdownOpen(false);
+                            }}
+                            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition"
+                          >
+                            <Plus className="size-3.5" />
+                            <span>Yeni Hasta Kaydı Başlat</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <select
-                    value={selectedPatientId}
-                    onChange={(e) => setSelectedPatientId(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-line bg-paper-2 px-3 py-2.5 text-sm text-ink outline-hidden focus:border-teal"
-                  >
-                    {patients.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} {p.contact ? `(${p.contact})` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  /* Yeni Hasta Formu */
+                  <div className="mt-3 space-y-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3.5">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600">
+                        Hasta Adı ve Soyadı *
+                      </label>
+                      <div className="relative mt-1">
+                        <User className="pointer-events-none absolute left-3 top-2.5 size-4 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Örn: Ayşe Demir"
+                          value={newPatientName}
+                          onChange={(e) => setNewPatientName(e.target.value)}
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600">
+                        Telefon / İletişim Bilgisi
+                      </label>
+                      <div className="relative mt-1">
+                        <Phone className="pointer-events-none absolute left-3 top-2.5 size-4 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Örn: +90 532 000 00 00"
+                          value={newPatientContact}
+                          onChange={(e) => setNewPatientContact(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Plan Title */}
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-ink-soft">
-                  Plan Başlığı
+              {/* Plan Başlığı & Şablon Önerileri */}
+              <div className="border-t border-slate-100 pt-4">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                  Tedavi Plan Başlığı
                 </label>
-                <input
-                  type="text"
-                  placeholder="Örn: 2026 Kapsamlı Tedavi Planı"
-                  value={planTitle}
-                  onChange={(e) => setPlanTitle(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-line bg-paper-2 px-3 py-2.5 text-sm text-ink outline-hidden focus:border-teal"
-                />
+                <div className="relative mt-2">
+                  <FileText className="pointer-events-none absolute left-3.5 top-3 size-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Örn: Estetik Gülüş Tasarımı ve İmplant"
+                    value={planTitle}
+                    onChange={(e) => setPlanTitle(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:bg-white focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {TITLE_SUGGESTIONS.map((sug) => (
+                    <button
+                      key={sug}
+                      type="button"
+                      onClick={() => setPlanTitle(sug)}
+                      className="cursor-pointer rounded-lg border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="rounded-xl border border-line/70 bg-paper p-3 text-xs text-ink-soft">
-                💡 Yeni plan <strong>2 seans</strong> ile taslak olarak başlayacak. Tedavileri seçip indirim eklediğinizde sunucu genel toplamı hesaplar.
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4">
+              {/* Modal Butonları */}
+              <div className="mt-7 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
-                  className="rounded-xl border border-line px-4 py-2 text-sm text-ink-soft hover:bg-paper"
+                  onClick={() => {
+                    setShowModal(false);
+                    setIsPatientDropdownOpen(false);
+                  }}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                 >
-                  İptal
+                  Vazgeç
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="rounded-xl bg-teal px-5 py-2 text-sm font-medium text-white hover:bg-teal-deep disabled:opacity-50"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 active:scale-98"
                 >
-                  {isPending ? "Oluşturuluyor..." : "Planı Başlat"}
+                  <span>{isPending ? "Oluşturuluyor..." : "Planı Başlat & Düzenle"}</span>
+                  <ArrowRight className="size-3.5" />
                 </button>
               </div>
             </form>

@@ -8,7 +8,7 @@ import type {
   PlanReader,
   PlanWriter,
 } from "../../application/ports";
-import type { Patient, Plan, PlanItem, Visit, Discount } from "../../domain/plan";
+import type { Patient, Plan, PlanItem, Visit, Discount, Situation } from "../../domain/plan";
 
 type RawPatient = {
   id: string;
@@ -26,7 +26,10 @@ type RawPlan = {
   kind: "classic";
   status: "draft" | "ready";
   currency: string;
+  palette?: "navy" | "forest" | "rose" | "slate";
+  locale?: "tr" | "en";
   diagnoses: string[];
+  situation?: Situation;
   totals_subtotal: number;
   totals_discount: number;
   totals_grand: number;
@@ -44,6 +47,9 @@ type RawVisit = {
   plan_id?: string;
   order_num: number;
   title: string;
+  phase_label?: string;
+  healing_note?: string;
+  chart_teeth?: string[];
 };
 
 type RawPlanItem = {
@@ -52,7 +58,10 @@ type RawPlanItem = {
   visit_id?: string;
   treatment_id?: string;
   treatment_name: string;
+  animation_code?: string;
   tooth_number?: string;
+  teeth?: string[];
+  description?: string;
   quantity: number;
   unit_price: number;
   is_package: boolean;
@@ -93,7 +102,10 @@ export class PlanHttpGateway
       patientId: string;
       title?: string;
       currency?: string;
+      palette?: string;
+      locale?: string;
       diagnoses?: string[];
+      situation?: Situation;
     },
     accessToken?: string
   ): Promise<Plan> {
@@ -105,7 +117,10 @@ export class PlanHttpGateway
         patient_id: input.patientId,
         title: input.title,
         currency: input.currency,
+        palette: input.palette,
+        locale: input.locale,
         diagnoses: input.diagnoses,
+        situation: input.situation,
       },
     });
     return toPlanDomain(res);
@@ -113,7 +128,14 @@ export class PlanHttpGateway
 
   async updatePlanHeader(
     id: ID,
-    input: { title?: string; diagnoses?: string[] },
+    input: {
+      title?: string;
+      diagnoses?: string[];
+      palette?: string;
+      locale?: string;
+      currency?: string;
+      situation?: Situation;
+    },
     accessToken?: string
   ): Promise<Plan> {
     const res = await this.http.request<RawPlan>({
@@ -127,7 +149,14 @@ export class PlanHttpGateway
 
   async putVisits(
     id: ID,
-    visits: { id?: string; order_num: number; title: string }[],
+    visits: {
+      id?: string;
+      order_num: number;
+      title: string;
+      phase_label?: string;
+      healing_note?: string;
+      chart_teeth?: string[];
+    }[],
     accessToken?: string
   ): Promise<Plan> {
     const res = await this.http.request<RawPlan>({
@@ -146,7 +175,10 @@ export class PlanHttpGateway
       visit_id?: string;
       treatment_id?: string;
       treatment_name?: string;
+      animation_code?: string;
       tooth_number?: string;
+      teeth?: string[];
+      description?: string;
       quantity: number;
       unit_price?: number;
       is_package: boolean;
@@ -244,7 +276,10 @@ function toPlanDomain(raw: RawPlan): Plan {
     kind: "classic",
     status: raw.status ?? "draft",
     currency: (raw.currency as Currency) ?? "TRY",
+    palette: raw.palette ?? "navy",
+    locale: raw.locale ?? "tr",
     diagnoses: raw.diagnoses ?? [],
+    situation: raw.situation,
     totalsSubtotal: raw.totals_subtotal ?? 0,
     totalsDiscount: raw.totals_discount ?? 0,
     totalsGrand: raw.totals_grand ?? 0,
@@ -264,6 +299,9 @@ function toVisitDomain(raw: RawVisit): Visit {
     planId: raw.plan_id ? (raw.plan_id as ID) : undefined,
     orderNum: raw.order_num ?? 0,
     title: raw.title ?? "",
+    phaseLabel: raw.phase_label ?? "",
+    healingNote: raw.healing_note ?? "",
+    chartTeeth: raw.chart_teeth ?? [],
   };
 }
 
@@ -274,7 +312,10 @@ function toItemDomain(raw: RawPlanItem): PlanItem {
     visitId: raw.visit_id ? (raw.visit_id as ID) : undefined,
     treatmentId: raw.treatment_id ? (raw.treatment_id as ID) : undefined,
     treatmentName: raw.treatment_name ?? "",
+    animationCode: raw.animation_code,
     toothNumber: raw.tooth_number,
+    teeth: raw.teeth ?? (raw.tooth_number ? [raw.tooth_number] : []),
+    description: raw.description ?? "",
     quantity: raw.quantity ?? 1,
     unitPrice: raw.unit_price ?? 0,
     isPackage: Boolean(raw.is_package),

@@ -1,6 +1,6 @@
 import type { ID } from "@/shared/id";
 
-import type { Patient, Plan } from "../domain/plan";
+import type { Patient, Plan, Situation } from "../domain/plan";
 
 export interface PlanReader {
   getById(id: ID, accessToken?: string): Promise<Plan>;
@@ -13,18 +13,35 @@ export interface PlanWriter {
       patientId: string;
       title?: string;
       currency?: string;
+      palette?: string;
+      locale?: string;
       diagnoses?: string[];
+      situation?: Situation;
     },
     accessToken?: string
   ): Promise<Plan>;
   updatePlanHeader(
     id: ID,
-    input: { title?: string; diagnoses?: string[] },
+    input: {
+      title?: string;
+      diagnoses?: string[];
+      palette?: string;
+      locale?: string;
+      currency?: string;
+      situation?: Situation;
+    },
     accessToken?: string
   ): Promise<Plan>;
   putVisits(
     id: ID,
-    visits: { id?: string; order_num: number; title: string }[],
+    visits: {
+      id?: string;
+      order_num: number;
+      title: string;
+      phase_label?: string;
+      healing_note?: string;
+      chart_teeth?: string[];
+    }[],
     accessToken?: string
   ): Promise<Plan>;
   putItems(
@@ -34,7 +51,10 @@ export interface PlanWriter {
       visit_id?: string;
       treatment_id?: string;
       treatment_name?: string;
+      animation_code?: string;
       tooth_number?: string;
+      teeth?: string[];
+      description?: string;
       quantity: number;
       unit_price?: number;
       is_package: boolean;

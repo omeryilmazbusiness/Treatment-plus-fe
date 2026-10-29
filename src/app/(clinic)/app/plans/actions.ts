@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getRuntime } from "@/bootstrap";
 import type { Diagnosis, PriceList, Treatment } from "@/modules/catalog/domain/catalog";
 import type { ClinicSettings } from "@/modules/clinic/domain/clinic";
-import type { Patient, Plan } from "@/modules/plan/domain/plan";
+import type { Patient, Plan, Situation } from "@/modules/plan/domain/plan";
 import { resolveActiveSession } from "@/platform/auth/session";
 import type { ID } from "@/shared/id";
 
@@ -137,18 +137,28 @@ export async function fetchPlanDetailAction(planId: string): Promise<
 export type SavePlanPayload = {
   workspaceId?: string;
   title: string;
+  palette?: "navy" | "forest" | "rose" | "slate";
+  locale?: "tr" | "en";
+  currency?: "TRY" | "EUR" | "USD";
   diagnoses: string[];
+  situation?: Situation;
   visits: {
     id?: string;
     order_num: number;
     title: string;
+    phase_label?: string;
+    healing_note?: string;
+    chart_teeth?: string[];
   }[];
   items: {
     id?: string;
     visit_id?: string;
     treatment_id?: string;
     treatment_name: string;
+    animation_code?: string;
     tooth_number?: string;
+    teeth?: string[];
+    description?: string;
     quantity: number;
     unit_price: number;
     is_package: boolean;
@@ -188,28 +198,60 @@ export async function savePlanDetailsAction(
     // 1. Update Header
     await runtime.plan.updatePlanHeader(
       planId as ID,
-      { title: payload.title, diagnoses: payload.diagnoses },
+      {
+        title: payload.title,
+        diagnoses: payload.diagnoses,
+        palette: payload.palette,
+        locale: payload.locale,
+        currency: payload.currency,
+        situation: payload.situation,
+      },
       session.accessToken
     );
 
     // 2. Put Visits
     await runtime.plan.putVisits(
       planId as ID,
-      payload.visits,
+      payload.visits.map((v, i) => ({
+        id: v.id,
+        order_num: v.order_num || i + 1,
+        title: v.title,
+        phase_label: v.phase_label,
+        healing_note: v.healing_note,
+        chart_teeth: v.chart_teeth,
+      })),
       session.accessToken
     );
 
     // 3. Put Items (Server calculates subtotal)
     await runtime.plan.putItems(
       planId as ID,
-      payload.items,
+      payload.items.map((it, i) => ({
+        id: it.id,
+        visit_id: it.visit_id,
+        treatment_id: it.treatment_id,
+        treatment_name: it.treatment_name,
+        animation_code: it.animation_code,
+        tooth_number: it.tooth_number,
+        teeth: it.teeth,
+        description: it.description,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        is_package: it.is_package,
+        order_num: it.order_num || i + 1,
+      })),
       session.accessToken
     );
 
     // 4. Put Discounts (Server calculates grand total)
     const updatedPlan = await runtime.plan.putDiscounts(
       planId as ID,
-      payload.discounts,
+      payload.discounts.map((d, i) => ({
+        id: d.id,
+        label: d.label,
+        amount: d.amount,
+        order_num: d.order_num || i + 1,
+      })),
       session.accessToken
     );
 
@@ -223,11 +265,39 @@ export async function savePlanDetailsAction(
   }
 }
 
+export async function generatePdfAction(
+  planId: string
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    const runtime = getRuntime();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    await runtime.backend.request({
+      path: `/v1/plans/${planId}/pdf`,
+      method: "POST",
+      accessToken: session.accessToken,
+    });
+
+    return { success: true, data: { success: true } };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "PDF oluşturulamadı";
+    return { success: false, error: msg };
+  }
+}
+
 export async function createPlanAction(
   patientId: string,
   title: string,
-  diagnoses: string[],
-  expectedWorkspaceId?: string
+  diagnoses: string[] = [],
+  expectedWorkspaceId?: string,
+  currency?: "TRY" | "EUR" | "USD"
 ): Promise<ActionResult<Plan>> {
   try {
     const runtime = getRuntime();
@@ -253,7 +323,7 @@ export async function createPlanAction(
       {
         patientId,
         title: title || "Tedavi Planı",
-        currency: "TRY",
+        currency,
         diagnoses,
       },
       session.accessToken
