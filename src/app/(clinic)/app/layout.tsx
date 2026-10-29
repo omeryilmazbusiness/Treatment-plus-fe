@@ -27,7 +27,20 @@ export default function ClinicLayout({ children }: { children: ReactNode }) {
             </div>
           </Link>
 
-          <ClinicNav />
+          <Suspense
+            fallback={
+              <nav className="mt-6 space-y-1.5">
+                <div className="px-3 pb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+                  Yönetim Paneli
+                </div>
+                <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
+                <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
+                <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
+              </nav>
+            }
+          >
+            <ClinicNav />
+          </Suspense>
         </div>
 
         {/* Alt Bilgi */}

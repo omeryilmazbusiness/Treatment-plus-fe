@@ -21,6 +21,12 @@ export interface CatalogWriter {
     input: { code: string; name: string },
     accessToken?: string
   ): Promise<Treatment>;
+  updateTreatment(
+    id: ID,
+    input: { name?: string; isActive?: boolean },
+    accessToken?: string
+  ): Promise<Treatment>;
+  deleteTreatment(id: ID, accessToken?: string): Promise<void>;
   createPriceList(
     input: { name: string; currency: string; isDefault?: boolean },
     accessToken?: string

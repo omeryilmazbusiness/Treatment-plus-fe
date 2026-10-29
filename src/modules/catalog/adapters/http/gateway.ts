@@ -138,6 +138,36 @@ export class CatalogHttpGateway implements CatalogReader, CatalogWriter {
     };
   }
 
+  async updateTreatment(
+    id: ID,
+    input: { name?: string; isActive?: boolean },
+    accessToken?: string
+  ): Promise<Treatment> {
+    const t = await this.http.request<RawTreatment>({
+      path: `/v1/catalog/treatments/${id}`,
+      method: "PATCH",
+      accessToken,
+      body: {
+        name: input.name,
+        is_active: input.isActive,
+      },
+    });
+    return {
+      id: t.id as ID,
+      code: t.code,
+      name: t.name,
+      isActive: t.is_active,
+    };
+  }
+
+  async deleteTreatment(id: ID, accessToken?: string): Promise<void> {
+    await this.http.request<{ status?: string }>({
+      path: `/v1/catalog/treatments/${id}`,
+      method: "DELETE",
+      accessToken,
+    });
+  }
+
   async createPriceList(
     input: { name: string; currency: string; isDefault?: boolean },
     accessToken?: string

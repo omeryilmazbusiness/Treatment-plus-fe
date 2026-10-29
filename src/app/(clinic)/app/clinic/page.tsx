@@ -5,8 +5,19 @@ import { Suspense } from "react";
 import { fetchClinicSettingsDataAction } from "../actions";
 import { ClinicSettingsView } from "./clinic-settings-view";
 
-async function ClinicSettingsContent() {
+interface PageProps {
+  searchParams?: Promise<{ tab?: string }>;
+}
+
+async function ClinicSettingsContent({ searchParams }: PageProps) {
   await connection();
+  const sp = searchParams ? await searchParams : {};
+  const rawTab = sp.tab;
+  const initialTab =
+    rawTab && ["general", "media", "doctor", "pdf", "pricing"].includes(rawTab)
+      ? (rawTab as "general" | "media" | "doctor" | "pdf" | "pricing")
+      : "general";
+
   const result = await fetchClinicSettingsDataAction();
 
   if (result.unauthenticated) {
@@ -32,11 +43,14 @@ async function ClinicSettingsContent() {
       initialSettings={result.data.settings}
       userEmail={result.data.userEmail}
       workspaceId={result.data.workspaceId}
+      initialTreatments={result.data.treatments}
+      initialPriceList={result.data.priceList}
+      initialTab={initialTab}
     />
   );
 }
 
-export default function ClinicSettingsPage() {
+export default function ClinicSettingsPage(props: PageProps) {
   return (
     <Suspense
       fallback={
@@ -45,7 +59,7 @@ export default function ClinicSettingsPage() {
         </div>
       }
     >
-      <ClinicSettingsContent />
+      <ClinicSettingsContent {...props} />
     </Suspense>
   );
 }

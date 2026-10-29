@@ -420,7 +420,7 @@ export async function createPatientAction(
   }
 }
 
-async function seedDefaultCatalog(accessToken: string): Promise<void> {
+export async function seedDefaultCatalog(accessToken: string): Promise<void> {
   const runtime = getRuntime();
 
   // Create diagnoses

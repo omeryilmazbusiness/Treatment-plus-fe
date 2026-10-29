@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Clock,
   ExternalLink,
+  Eye,
   FilePlus,
   FileText,
   Filter,
@@ -211,9 +212,6 @@ export function PlansListClient({
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Tedavi Planları
           </h1>
-          <p className="mt-1 text-xs text-slate-500">
-            Hastalarınıza sunacağınız seans bazlı tedavi planları, fiyatlandırma ve sunum arşivi.
-          </p>
         </div>
 
         <button
@@ -346,9 +344,9 @@ export function PlansListClient({
               <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-6 py-4">Hasta</th>
-                  <th className="px-6 py-4">Plan Başlığı & Teşhisler</th>
+                  <th className="px-6 py-4">Plan Başlığı</th>
                   <th className="px-6 py-4">Durum</th>
-                  <th className="px-6 py-4">Seans / Kalem</th>
+                  <th className="px-6 py-4 whitespace-nowrap">Seans / Kalem</th>
                   <th className="px-6 py-4 text-right">Genel Toplam</th>
                   <th className="px-6 py-4 text-right">İşlem</th>
                 </tr>
@@ -359,7 +357,8 @@ export function PlansListClient({
                   const isReady = p.status?.toLowerCase() === "ready";
                   const patientName = p.patient?.name || "İsimsiz Hasta";
                   const visitsCount = p.visits?.length || 0;
-                  const itemsCount = p.items?.length || 0;
+                  const snapshotItems = (p.snapshotJson as { items?: unknown[] })?.items;
+                  const itemsCount = p.items?.length || snapshotItems?.length || 0;
 
                   return (
                     <tr
@@ -384,7 +383,7 @@ export function PlansListClient({
                         </div>
                       </td>
 
-                      {/* Plan Başlığı & Teşhisler */}
+                      {/* Plan Başlığı */}
                       <td className="px-6 py-4.5 align-middle">
                         <Link
                           href={`/app/plans/${p.id}`}
@@ -392,18 +391,6 @@ export function PlansListClient({
                         >
                           {p.title || "Tedavi Planı"}
                         </Link>
-                        {p.diagnoses && p.diagnoses.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {p.diagnoses.map((d, i) => (
-                              <span
-                                key={i}
-                                className="inline-block rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600"
-                              >
-                                {d}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </td>
 
                       {/* Durum Rozeti */}
@@ -411,7 +398,7 @@ export function PlansListClient({
                         {isReady ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                             <span className="size-1.5 rounded-full bg-emerald-600" />
-                            Hazır / Sunuldu
+                            Hazır
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
@@ -422,13 +409,10 @@ export function PlansListClient({
                       </td>
 
                       {/* Seans / Kalem */}
-                      <td className="px-6 py-4.5 align-middle text-xs text-slate-500">
-                        <span className="font-semibold text-slate-700">
-                          {visitsCount} Seans
-                        </span>
-                        {itemsCount > 0 && (
-                          <span className="text-slate-400"> • {itemsCount} Kalem</span>
-                        )}
+                      <td className="px-6 py-4.5 align-middle text-xs whitespace-nowrap text-slate-600 font-medium">
+                        <span>{visitsCount} Seans</span>
+                        <span className="mx-1 text-slate-300">/</span>
+                        <span>{itemsCount} Kalem</span>
                       </td>
 
                       {/* Tutar */}
@@ -440,10 +424,19 @@ export function PlansListClient({
                       <td className="px-6 py-4.5 align-middle text-right">
                         <Link
                           href={`/app/plans/${p.id}`}
-                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition"
                         >
-                          <span>Düzenle</span>
-                          <ExternalLink className="size-3 text-slate-400" />
+                          {isReady ? (
+                            <>
+                              <Eye className="size-3.5 text-slate-400" />
+                              <span>Görüntüle</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Düzenle</span>
+                              <ExternalLink className="size-3 text-slate-400" />
+                            </>
+                          )}
                         </Link>
                       </td>
                     </tr>

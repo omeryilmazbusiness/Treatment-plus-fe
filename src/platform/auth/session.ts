@@ -115,6 +115,7 @@ export async function writeSession(cfg: Config, session: Session): Promise<void>
       sameSite: "lax",
       secure: cfg.session.secure,
       path: "/",
+      maxAge: 30 * 24 * 60 * 60, // 30 gün
     });
   } catch {
     // Silently ignore if called in Server Component render where cookie modification is forbidden
