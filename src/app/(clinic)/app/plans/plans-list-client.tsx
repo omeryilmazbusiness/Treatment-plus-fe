@@ -9,11 +9,11 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
-  ExternalLink,
   Eye,
   FilePlus,
   FileText,
   Filter,
+  Pencil,
   Phone,
   Plus,
   PlusCircle,
@@ -27,6 +27,7 @@ import {
 import type { Patient, Plan } from "@/modules/plan/domain/plan";
 import { formatMoney, money } from "@/shared/money";
 import { createPatientAction, createPlanAction } from "./actions";
+import { PlanShareModal } from "./plan-share-modal";
 
 interface Props {
   workspaceId: string;
@@ -60,6 +61,7 @@ export function PlansListClient({
   const [createdPlans, setCreatedPlans] = useState<Plan[]>([]);
   const [createdPatients, setCreatedPatients] = useState<Patient[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [sharePlan, setSharePlan] = useState<Plan | null>(null);
   const [isPending, startTransition] = useTransition();
 
   // Combine server plans with any newly created plans
@@ -133,8 +135,8 @@ export function PlansListClient({
   const filteredPlans = useMemo(() => {
     return plans.filter((p) => {
       // Status filter
-      if (statusFilter === "ready" && p.status?.toLowerCase() !== "ready") return false;
-      if (statusFilter === "draft" && p.status?.toLowerCase() === "ready") return false;
+      if (statusFilter === "ready" && p.status?.toLowerCase() === "draft") return false;
+      if (statusFilter === "draft" && p.status?.toLowerCase() !== "draft") return false;
 
       // Search filter
       if (!searchTerm.trim()) return true;
@@ -148,11 +150,11 @@ export function PlansListClient({
 
   // Metrics
   const readyCount = useMemo(
-    () => plans.filter((p) => p.status?.toLowerCase() === "ready").length,
+    () => plans.filter((p) => p.status?.toLowerCase() !== "draft").length,
     [plans]
   );
   const draftCount = useMemo(
-    () => plans.filter((p) => p.status?.toLowerCase() !== "ready").length,
+    () => plans.filter((p) => p.status?.toLowerCase() === "draft").length,
     [plans]
   );
 
@@ -339,14 +341,14 @@ export function PlansListClient({
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[300px]">
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="border-b border-slate-100 bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-6 py-4">Hasta</th>
                   <th className="px-6 py-4">Plan Başlığı</th>
                   <th className="px-6 py-4">Durum</th>
-                  <th className="px-6 py-4 whitespace-nowrap">Seans / Kalem</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center">Seans / Kalem</th>
                   <th className="px-6 py-4 text-right">Genel Toplam</th>
                   <th className="px-6 py-4 text-right">İşlem</th>
                 </tr>
@@ -354,7 +356,7 @@ export function PlansListClient({
               <tbody className="divide-y divide-slate-100">
                 {filteredPlans.map((p) => {
                   const m = money(p.totalsGrand, p.currency);
-                  const isReady = p.status?.toLowerCase() === "ready";
+                  const isReady = p.status?.toLowerCase() !== "draft";
                   const patientName = p.patient?.name || "İsimsiz Hasta";
                   const visitsCount = p.visits?.length || 0;
                   const snapshotItems = (p.snapshotJson as { items?: unknown[] })?.items;
@@ -395,7 +397,22 @@ export function PlansListClient({
 
                       {/* Durum Rozeti */}
                       <td className="px-6 py-4.5 align-middle">
-                        {isReady ? (
+                        {p.status?.toLowerCase() === "accepted" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                            <span className="size-1.5 rounded-full bg-emerald-600" />
+                            Hasta Onayladı
+                          </span>
+                        ) : p.status?.toLowerCase() === "viewed" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700">
+                            <span className="size-1.5 rounded-full bg-cyan-600" />
+                            İncelendi
+                          </span>
+                        ) : p.status?.toLowerCase() === "sent" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                            <span className="size-1.5 rounded-full bg-blue-600" />
+                            Gönderildi
+                          </span>
+                        ) : isReady ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                             <span className="size-1.5 rounded-full bg-emerald-600" />
                             Hazır
@@ -409,10 +426,10 @@ export function PlansListClient({
                       </td>
 
                       {/* Seans / Kalem */}
-                      <td className="px-6 py-4.5 align-middle text-xs whitespace-nowrap text-slate-600 font-medium">
-                        <span>{visitsCount} Seans</span>
+                      <td className="px-6 py-4.5 align-middle text-center text-xs whitespace-nowrap text-slate-600 font-medium">
+                        <span>{visitsCount}</span>
                         <span className="mx-1 text-slate-300">/</span>
-                        <span>{itemsCount} Kalem</span>
+                        <span>{itemsCount}</span>
                       </td>
 
                       {/* Tutar */}
@@ -422,22 +439,32 @@ export function PlansListClient({
 
                       {/* İşlem */}
                       <td className="px-6 py-4.5 align-middle text-right">
-                        <Link
-                          href={`/app/plans/${p.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition"
-                        >
-                          {isReady ? (
-                            <>
-                              <Eye className="size-3.5 text-slate-400" />
-                              <span>Görüntüle</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>Düzenle</span>
-                              <ExternalLink className="size-3 text-slate-400" />
-                            </>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {isReady && (
+                            <button
+                              type="button"
+                              onClick={() => setSharePlan(p)}
+                              title="Plan Sunumu & Dokümanlar (Web & PDF)"
+                              aria-label="Plan Sunumu & Dokümanlar"
+                              className="inline-flex size-8.5 cursor-pointer items-center justify-center rounded-xl border border-slate-900/15 bg-slate-900/[0.05] text-slate-800 shadow-2xs transition-all duration-150 hover:scale-105 hover:border-slate-900 hover:bg-slate-900 hover:text-white hover:shadow-xs active:scale-95 group-hover:border-slate-900/25"
+                            >
+                              <FileText className="size-4" />
+                            </button>
                           )}
-                        </Link>
+
+                          <Link
+                            href={`/app/plans/${p.id}`}
+                            title={isReady ? "Görüntüle" : "Düzenle"}
+                            aria-label={isReady ? "Görüntüle" : "Düzenle"}
+                            className="inline-flex size-8.5 cursor-pointer items-center justify-center rounded-xl border border-slate-900/15 bg-slate-900/[0.05] text-slate-800 shadow-2xs transition-all duration-150 hover:scale-105 hover:border-slate-900 hover:bg-slate-900 hover:text-white hover:shadow-xs active:scale-95 group-hover:border-slate-900/25"
+                          >
+                            {isReady ? (
+                              <Eye className="size-4" />
+                            ) : (
+                              <Pencil className="size-3.5" />
+                            )}
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -735,6 +762,19 @@ export function PlansListClient({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Ultimate Web Sunumu & Paylaşım Modalı */}
+      {sharePlan && (
+        <PlanShareModal
+          isOpen={Boolean(sharePlan)}
+          onClose={() => setSharePlan(null)}
+          planId={sharePlan.id}
+          planTitle={sharePlan.title}
+          patientName={sharePlan.patient?.name || "Kayıtlı Hasta"}
+          patientContact={sharePlan.patient?.contact}
+          isReady={sharePlan.status !== "draft"}
+        />
       )}
     </div>
   );

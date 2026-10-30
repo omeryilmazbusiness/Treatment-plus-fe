@@ -1,8 +1,10 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { AlertCircle } from "lucide-react";
 
-import { Badge } from "@/ui/badge";
-import { Mark } from "@/ui/mark";
+import { getRuntime } from "@/bootstrap";
+import type { UltimatePlanDTO } from "@/modules/share/domain/share";
+import { PatientPresentationClient } from "./patient-presentation-client";
 
 export default function PatientPage({
   params,
@@ -12,9 +14,9 @@ export default function PatientPage({
   return (
     <Suspense
       fallback={
-        <main className="mx-auto min-h-dvh w-full max-w-2xl px-6 py-16 text-sm text-ink-soft">
-          Plan yükleniyor…
-        </main>
+        <div className="flex min-h-screen items-center justify-center bg-[#faf8f5] text-slate-500 text-xs font-medium">
+          Tedavi planınız yükleniyor...
+        </div>
       }
     >
       <PatientBody params={params} />
@@ -26,21 +28,45 @@ async function PatientBody({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
 
-  return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-6 py-16">
-      <div className="flex items-center gap-3 text-teal-deep">
-        <Mark className="size-8" />
-        <p className="text-sm font-semibold">Treatment Plus</p>
-      </div>
-      <Badge tone="wait">Faz 6 · PHI · no-store</Badge>
-      <h1 className="mt-4 font-serif text-4xl tracking-tight">Tedavi planınız</h1>
-      <p className="mt-3 text-sm leading-6 text-ink-soft">
-        Bu rota Redis/CDN cache kullanmaz. Token hashed saklanır; plan
-        görünümü tek output modelinden (PlanView) render edilir.
-      </p>
-      <p className="mt-8 rounded-2xl border border-line bg-paper-2 px-4 py-3 font-mono text-xs text-ink-soft">
-        token {token}
-      </p>
-    </main>
-  );
+  const runtime = getRuntime();
+  const backendUrl = runtime.config.api.url;
+
+  let planData: UltimatePlanDTO | null = null;
+  let errorMsg = "";
+
+  try {
+    const res = await fetch(`${backendUrl}/v1/public/plans/${token}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      planData = await res.json();
+    } else {
+      errorMsg = "Tedavi planı bulunamadı veya bağlantı süresi dolmuş olabilir.";
+    }
+  } catch {
+    errorMsg = "Bağlantı sağlanamadı. Lütfen daha sonra tekrar deneyiniz.";
+  }
+
+  if (!planData) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#faf8f5] p-6 text-center">
+        <div className="max-w-md rounded-3xl border border-[#e5dfd5] bg-white p-8 shadow-xs space-y-4">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <AlertCircle className="size-6" />
+          </div>
+          <h2 className="text-base font-bold text-slate-900">
+            Tedavi Planına Ulaşılamadı
+          </h2>
+          <p className="text-xs text-slate-600 leading-relaxed font-light">
+            {errorMsg ||
+              "Bu bağlantı geçersiz veya süresi dolmuş olabilir. Lütfen kliniğiniz ile iletişime geçiniz."}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  return <PatientPresentationClient data={planData} token={token} />;
 }

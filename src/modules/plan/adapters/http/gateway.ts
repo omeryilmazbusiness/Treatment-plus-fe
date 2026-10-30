@@ -8,7 +8,7 @@ import type {
   PlanReader,
   PlanWriter,
 } from "../../application/ports";
-import type { Patient, Plan, PlanItem, Visit, Discount, Situation } from "../../domain/plan";
+import type { Patient, Plan, PlanItem, PlanStatus, Visit, Discount, Situation } from "../../domain/plan";
 
 type RawPatient = {
   id: string;
@@ -24,7 +24,7 @@ type RawPlan = {
   patient_id: string;
   title: string;
   kind: "classic";
-  status: "draft" | "ready";
+  status: "draft" | "ready" | "sent" | "viewed" | "accepted" | "expired" | string;
   currency: string;
   palette?: "navy" | "forest" | "rose" | "slate";
   locale?: "tr" | "en";
@@ -274,7 +274,7 @@ function toPlanDomain(raw: RawPlan): Plan {
     patientId: raw.patient_id as ID,
     title: raw.title ?? "",
     kind: "classic",
-    status: raw.status ?? "draft",
+    status: (raw.status as PlanStatus) ?? "draft",
     currency: (raw.currency as Currency) ?? "TRY",
     palette: raw.palette ?? "navy",
     locale: raw.locale ?? "tr",

@@ -6,6 +6,12 @@ import { getRuntime } from "@/bootstrap";
 import type { Diagnosis, PriceList, Treatment } from "@/modules/catalog/domain/catalog";
 import type { ClinicSettings } from "@/modules/clinic/domain/clinic";
 import type { Patient, Plan, Situation } from "@/modules/plan/domain/plan";
+import type {
+  PlanAnalytics,
+  ShareLink,
+  ShareResult,
+  UltimatePlanDTO,
+} from "@/modules/share/domain/share";
 import { resolveActiveSession } from "@/platform/auth/session";
 import type { ID } from "@/shared/id";
 
@@ -379,7 +385,7 @@ export async function readyPlanAction(
 
     return { success: true, data: readyPlan };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Plan kilitlenemedi";
+    const msg = err instanceof Error ? err.message : "Plan onaylanamadı";
     return { success: false, error: msg };
   }
 }
@@ -485,4 +491,206 @@ export async function seedDefaultCatalog(accessToken: string): Promise<void> {
     ],
     accessToken
   );
+}
+
+// ==========================================
+// Ultimate Share & Presentation Actions
+// ==========================================
+
+export async function createShareLinkAction(
+  planId: string,
+  ttlHours: number = 720
+): Promise<ActionResult<ShareResult>> {
+  try {
+    const runtime = getRuntime();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    const res = await runtime.backend.request<ShareResult>({
+      path: `/v1/plans/${planId}/share`,
+      method: "POST",
+      body: { ttl_hours: ttlHours },
+      accessToken: session.accessToken,
+    });
+
+    // Make sure public_url points to frontend domain if available
+    const appBase = process.env.APP_URL || "http://localhost:3000";
+    const frontendPublicUrl = `${appBase.replace(/\/$/, "")}/p/${res.token}`;
+
+    revalidatePath(`/app/plans/${planId}`);
+    return {
+      success: true,
+      data: {
+        ...res,
+        public_url: frontendPublicUrl,
+      },
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Paylaşım linki oluşturulamadı";
+    return { success: false, error: msg };
+  }
+}
+
+export async function listShareLinksAction(
+  planId: string
+): Promise<ActionResult<ShareLink[]>> {
+  try {
+    const runtime = getRuntime();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    const res = await runtime.backend.request<{ links?: ShareLink[] } | ShareLink[]>({
+      path: `/v1/plans/${planId}/share`,
+      method: "GET",
+      accessToken: session.accessToken,
+    });
+
+    const links = Array.isArray(res) ? res : res?.links || [];
+    return { success: true, data: links };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Paylaşım linkleri getirilemedi";
+    return { success: false, error: msg };
+  }
+}
+
+export async function revokeShareLinkAction(
+  planId: string,
+  linkId: string
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    const runtime = getRuntime();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    await runtime.backend.request({
+      path: `/v1/plans/${planId}/share/${linkId}`,
+      method: "DELETE",
+      accessToken: session.accessToken,
+    });
+
+    revalidatePath(`/app/plans/${planId}`);
+    return { success: true, data: { success: true } };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Paylaşım linki iptal edilemedi";
+    return { success: false, error: msg };
+  }
+}
+
+export async function getPlanAnalyticsAction(
+  planId: string
+): Promise<ActionResult<PlanAnalytics>> {
+  try {
+    const runtime = getRuntime();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    const analytics = await runtime.backend.request<PlanAnalytics>({
+      path: `/v1/plans/${planId}/analytics`,
+      method: "GET",
+      accessToken: session.accessToken,
+    });
+
+    return { success: true, data: analytics };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Analitik verileri alınamadı";
+    return { success: false, error: msg };
+  }
+}
+
+export async function getPublicPlanAction(
+  token: string
+): Promise<ActionResult<UltimatePlanDTO>> {
+  try {
+    const runtime = getRuntime();
+    const backendUrl = runtime.config.api.url;
+    const res = await fetch(`${backendUrl}/v1/public/plans/${token}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return { success: false, error: errText || "Tedavi planı bulunamadı" };
+    }
+
+    const data: UltimatePlanDTO = await res.json();
+    return { success: true, data };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Plan yüklenemedi";
+    return { success: false, error: msg };
+  }
+}
+
+export async function acceptPublicPlanAction(
+  token: string,
+  signature: string
+): Promise<ActionResult<{ status: string; accepted_at: string }>> {
+  try {
+    const runtime = getRuntime();
+    const backendUrl = runtime.config.api.url;
+    const res = await fetch(`${backendUrl}/v1/public/plans/${token}/accept`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ signature }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return { success: false, error: errText || "Onay kaydedilemedi" };
+    }
+
+    const data = await res.json();
+    return { success: true, data };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Bağlantı hatası oluştu";
+    return { success: false, error: msg };
+  }
+}
+
+export async function recordPublicEventAction(
+  token: string,
+  kind: string,
+  metadata?: Record<string, unknown>
+): Promise<ActionResult<{ status: string }>> {
+  try {
+    const runtime = getRuntime();
+    const backendUrl = runtime.config.api.url;
+    const res = await fetch(`${backendUrl}/v1/public/plans/${token}/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, metadata }),
+    });
+
+    if (!res.ok) {
+      return { success: false, error: "Event kaydedilemedi" };
+    }
+
+    return { success: true, data: { status: "ok" } };
+  } catch {
+    return { success: false, error: "Event error" };
+  }
 }

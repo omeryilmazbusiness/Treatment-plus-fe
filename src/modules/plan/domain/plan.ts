@@ -4,6 +4,10 @@ import type { Currency } from "@/shared/money";
 export const PlanStatus = {
   Draft: "draft",
   Ready: "ready",
+  Sent: "sent",
+  Viewed: "viewed",
+  Accepted: "accepted",
+  Expired: "expired",
 } as const;
 
 export type PlanStatus = (typeof PlanStatus)[keyof typeof PlanStatus];

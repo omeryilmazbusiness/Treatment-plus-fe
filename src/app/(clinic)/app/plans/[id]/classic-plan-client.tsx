@@ -4,18 +4,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState, useTransition } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   BadgePercent,
   CalendarPlus,
   CheckCircle2,
   Clock,
   Download,
+  FileCheck2,
   FileText,
   Lock,
   Phone,
   Plus,
   Receipt,
   Save,
+  Share2,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -27,6 +31,7 @@ import { formatMoney, money, type Currency } from "@/shared/money";
 import { PriceInput } from "@/ui/price-input";
 import { TreatmentCombobox } from "@/ui/treatment-combobox";
 import { generatePdfAction, readyPlanAction, savePlanDetailsAction } from "../actions";
+import { PlanShareModal } from "../plan-share-modal";
 
 interface Props {
   workspaceId: string;
@@ -117,7 +122,7 @@ export function ClassicPlanClient({
 }: Props) {
   const router = useRouter();
   const [plan, setPlan] = useState<Plan>(initialPlan);
-  const isLocked = plan.status === "ready";
+  const isLocked = Boolean(plan.status && plan.status.toLowerCase() !== "draft");
 
   // Plan presentation & header states
   const [title, setTitle] = useState(plan.title || "Tedavi Planı");
@@ -224,6 +229,7 @@ export function ClassicPlanClient({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
   const [showConfirmReady, setShowConfirmReady] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Price map from default price list
   const defaultList = priceLists.find((pl) => pl.isDefault) || priceLists[0];
@@ -492,53 +498,55 @@ export function ClassicPlanClient({
     setShowConfirmReady(false);
 
     startTransition(async () => {
-      // First save current inputs
-      await savePlanDetailsAction(String(plan.id), {
-        workspaceId,
-        title: title.trim(),
-        palette,
-        locale,
-        currency,
-        diagnoses,
-        visits: visits.map((v, i) => ({
-          id: v.id?.startsWith("v-temp-") ? undefined : v.id,
-          order_num: i + 1,
-          title: v.title,
-          phase_label: v.phase_label,
-          healing_note: v.healing_note,
-          chart_teeth: v.chart_teeth,
-        })),
-        items: items.map((it, i) => ({
-          id: it.id,
-          visit_id: it.visit_id?.startsWith("v-temp-") ? undefined : it.visit_id,
-          treatment_id: it.treatment_id,
-          treatment_name: it.treatment_name,
-          animation_code: it.animation_code,
-          tooth_number: it.tooth_number || undefined,
-          teeth: it.teeth,
-          description: it.description,
-          quantity: Number(it.quantity) || 1,
-          unit_price: Number(it.unit_price) || 0,
-          is_package: Boolean(it.is_package),
-          order_num: i + 1,
-        })),
-        discounts: discounts.map((d, i) => ({
-          id: d.id,
-          label: d.label,
-          amount: Number(d.amount) || 0,
-          order_num: i + 1,
-        })),
-      });
+      // First save current inputs if plan is still in draft
+      if (!isLocked) {
+        await savePlanDetailsAction(String(plan.id), {
+          workspaceId,
+          title: title.trim(),
+          palette,
+          locale,
+          currency,
+          diagnoses,
+          visits: visits.map((v, i) => ({
+            id: v.id?.startsWith("v-temp-") ? undefined : v.id,
+            order_num: i + 1,
+            title: v.title,
+            phase_label: v.phase_label,
+            healing_note: v.healing_note,
+            chart_teeth: v.chart_teeth,
+          })),
+          items: items.map((it, i) => ({
+            id: it.id,
+            visit_id: it.visit_id?.startsWith("v-temp-") ? undefined : it.visit_id,
+            treatment_id: it.treatment_id,
+            treatment_name: it.treatment_name,
+            animation_code: it.animation_code,
+            tooth_number: it.tooth_number || undefined,
+            teeth: it.teeth,
+            description: it.description,
+            quantity: Number(it.quantity) || 1,
+            unit_price: Number(it.unit_price) || 0,
+            is_package: Boolean(it.is_package),
+            order_num: i + 1,
+          })),
+          discounts: discounts.map((d, i) => ({
+            id: d.id,
+            label: d.label,
+            amount: Number(d.amount) || 0,
+            order_num: i + 1,
+          })),
+        });
+      }
 
       // Now set ready
       const res = await readyPlanAction(String(plan.id), workspaceId);
       if (!res.success || !res.data) {
-        setMessage({ text: res.error || "Plan kilitlenemedi", type: "err" });
+        setMessage({ text: res.error || "Plan onaylanamadı", type: "err" });
         return;
       }
 
       // Trigger background PDF generation
-      await generatePdfAction(String(plan.id));
+      generatePdfAction(String(plan.id)).catch(() => {});
 
       setPlan(res.data);
       if (res.data.currency) {
@@ -546,7 +554,7 @@ export function ClassicPlanClient({
       }
       router.refresh();
       setMessage({
-        text: "Plan başarıyla kilitlendi (READY). 24 sayfalık kurumsal PDF ve sunum hazır.",
+        text: "Tedavi planı başarıyla onaylandı. Kurumsal PDF ve dijital hasta sunumu hazır.",
         type: "ok",
       });
     });
@@ -625,21 +633,28 @@ export function ClassicPlanClient({
             </div>
 
             {isLocked ? (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 shadow-2xs">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
-                  <span>Hazır & Kilitli</span>
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-2xs ${
+                  plan.status?.toLowerCase() === "accepted"
+                    ? "border-emerald-300 bg-emerald-100/80 text-emerald-900"
+                    : plan.status?.toLowerCase() === "viewed"
+                    ? "border-cyan-200 bg-cyan-50 text-cyan-800"
+                    : plan.status?.toLowerCase() === "sent"
+                    ? "border-blue-200 bg-blue-50 text-blue-800"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                }`}
+              >
+                <CheckCircle2 className="size-4 text-emerald-600" />
+                <span>
+                  {plan.status?.toLowerCase() === "accepted"
+                    ? "Hasta Onayladı"
+                    : plan.status?.toLowerCase() === "viewed"
+                    ? "Hasta İnceledi"
+                    : plan.status?.toLowerCase() === "sent"
+                    ? "Hastaya Gönderildi"
+                    : "Onaylandı (Hazır)"}
                 </span>
-                <button
-                  type="button"
-                  onClick={handleDownloadPdf}
-                  disabled={isGeneratingPdf}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-slate-800 disabled:opacity-50"
-                >
-                  <Download className="size-3.5" />
-                  <span>PDF İndir</span>
-                </button>
-              </div>
+              </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 shadow-2xs">
                 <Clock className="size-4 text-amber-600" />
@@ -1363,8 +1378,8 @@ export function ClassicPlanClient({
                     onClick={() => setShowConfirmReady(true)}
                     className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-slate-800 disabled:opacity-50"
                   >
-                    <Lock className="size-3.5" />
-                    <span>Planı Onayla & Kilitle</span>
+                    <FileCheck2 className="size-3.5 text-emerald-400" />
+                    <span>Planı Onayla & Hazırla</span>
                   </button>
 
                   <button
@@ -1395,21 +1410,32 @@ export function ClassicPlanClient({
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-center">
                     <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800">
                       <CheckCircle2 className="size-4 text-emerald-600" />
-                      <span>Plan Onaylandı & Kilitlendi</span>
+                      <span>
+                        {plan.status?.toLowerCase() === "accepted"
+                          ? "Hasta Onayladı"
+                          : plan.status?.toLowerCase() === "viewed"
+                          ? "Hasta Sunumu İnceledi"
+                          : plan.status?.toLowerCase() === "sent"
+                          ? "Hastaya Gönderildi"
+                          : "Plan Onaylandı & Paylaşıma Hazır"}
+                      </span>
                     </div>
                     <p className="mt-0.5 text-[11px] text-emerald-700">
-                      Bu planın verileri dondurulmuştur.
+                      {plan.status?.toLowerCase() === "accepted"
+                        ? "Hasta bu tedavi planını dijital olarak onaylamıştır."
+                        : plan.status?.toLowerCase() === "viewed"
+                        ? "Hasta dijital web sunumunu incelemiştir."
+                        : "Tedavi ve fiyat bilgileri resmi teklif olarak sabitlenmiştir."}
                     </p>
                   </div>
 
                   <button
                     type="button"
-                    onClick={handleDownloadPdf}
-                    disabled={isGeneratingPdf}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800"
+                    onClick={() => setShowShareModal(true)}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 py-2.5 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:opacity-95 transition active:scale-98"
                   >
-                    <Download className="size-4" />
-                    <span>24 Sayfalık PDF İndir</span>
+                    <FileText className="size-4" />
+                    <span>Sunumlar</span>
                   </button>
                 </div>
               )}
@@ -1418,29 +1444,44 @@ export function ClassicPlanClient({
         </div>
       </div>
 
-      {/* Plan Kilitleme Onay Modalı */}
+      {/* Plan Onaylama ve Kesinleştirme Onay Modalı */}
       {showConfirmReady && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md transition-all duration-300">
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <div className="flex size-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-900 mb-3.5">
-              <Lock className="size-5" />
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-8 ring-blue-50/50 mb-4">
+              <FileCheck2 className="size-5" />
             </div>
 
             <h3 className="text-base font-bold text-slate-900">
-              Planı Kilitlemek İstiyor musunuz?
+              Tedavi Planını Onaylamak İstiyor musunuz?
             </h3>
-            <p className="mt-2 text-xs leading-relaxed text-slate-600">
-              Bu işlem planı <strong>READY (Kilitli)</strong> durumuna geçirir. Mevcut klinik profili, hasta bilgileri, seanslar ve fiyatlar <strong>değiştirilemez bir snapshot</strong> olarak dondurulur ve 24 sayfalık kurumsal PDF çıktısı üretilir.
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+              Bu işlem planı taslak aşamasından çıkarıp resmi teklif haline getirir:
             </p>
-            <p className="mt-2.5 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] font-semibold text-amber-800">
-              ⚠️ Kilitlendikten sonra seans ve tedavi satırları düzenlenemez.
-            </p>
+
+            <div className="mt-3.5 space-y-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-xs text-slate-700">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-600 mt-0.5" />
+                <span>Hastaya özel <strong>interaktif web sunumu</strong> ve <strong>kurumsal PDF teklif dosyası</strong> hazırlanır.</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-600 mt-0.5" />
+                <span>WhatsApp, SMS ve QR kod ile hasta paylaşımı aktif hale gelir.</span>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 p-2.5 text-[11px] text-amber-900 leading-relaxed">
+              <AlertCircle className="size-4 shrink-0 text-amber-600 mt-0.5" />
+              <span>
+                <strong>Bilgi:</strong> Hastaya sunulan teklifin tutarlılığı ve resmiyeti için, onay sonrasında seanslar ve tedavi satırları <strong>düzenlemeye kapatılır</strong>.
+              </span>
+            </div>
 
             <div className="mt-5 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => setShowConfirmReady(false)}
-                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
               >
                 Vazgeç
               </button>
@@ -1448,14 +1489,36 @@ export function ClassicPlanClient({
                 type="button"
                 disabled={isPending}
                 onClick={handleLockReady}
-                className="cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50"
+                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50 transition active:scale-98"
               >
-                {isPending ? "Kilitleniyor..." : "Evet, Kilitle & Hazırla"}
+                {isPending ? (
+                  <>
+                    <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Hazırlanıyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileCheck2 className="size-3.5" />
+                    <span>Evet, Onayla & Hazırla</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Ultimate Web Sunumu & Paylaşım Modalı */}
+      <PlanShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        planId={String(plan.id)}
+        planTitle={title}
+        patientName={patientName}
+        patientContact={plan.patient?.contact}
+        clinicName={clinicSettings?.name}
+        isReady={isLocked}
+      />
     </div>
   );
 }

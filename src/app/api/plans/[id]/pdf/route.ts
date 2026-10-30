@@ -16,11 +16,28 @@ export async function GET(
     }
 
     const backendUrl = runtime.config.api.url;
-    const response = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
+    let response = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
       },
     });
+
+    // If PDF has not been generated yet, generate it on demand
+    if (response.status === 404) {
+      const genRes = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+      });
+      if (genRes.ok) {
+        response = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
+          },
+        });
+      }
+    }
 
     if (!response.ok) {
       const errText = await response.text();
