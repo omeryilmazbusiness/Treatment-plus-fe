@@ -208,6 +208,7 @@ export function ClinicSettingsView({
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [uploadingKind, setUploadingKind] = useState<string | null>(null);
+  const [pdfTextTab, setPdfTextTab] = useState<"welcome" | "legal">("welcome");
 
   // Treatments & Pricing tab state
   const [treatmentsList, setTreatmentsList] = useState<Treatment[]>(initialTreatments || []);
@@ -1098,15 +1099,20 @@ export function ClinicSettingsView({
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Hekim Kısa Biyografisi (PDF Hekim Tanıtım Sayfası)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Hekim Kısa Biyografisi (PDF Hekim Tanıtım Sayfası)
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    PDF ve web sunumunda hekim kartında yer alır
+                  </span>
+                </div>
                 <textarea
-                  rows={3}
+                  rows={5}
                   value={settings.doctor.bio}
                   onChange={(e) => handleDoctorChange("bio", e.target.value)}
                   placeholder="15 yılı aşkın süredir ileri cerrahi ve gülüş estetiği alanında uluslararası vakaları yönetmektedir..."
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
+                  className="mt-1.5 w-full min-h-[140px] resize-y rounded-xl border border-slate-200 px-3.5 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
                 />
               </div>
 
@@ -1348,50 +1354,77 @@ export function ClinicSettingsView({
                 </div>
               </div>
 
-              {/* 3. Satır: Şablon Metinleri */}
-              <div className="mt-4 border-t border-slate-100 pt-3.5 space-y-3">
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                      <FileText className="size-3.5 text-slate-400" />
-                      Hasta Karşılama Ön Yazısı
-                    </label>
-                    <span className="text-[10px] text-slate-400">PDF Başlangıcı</span>
+              {/* 3. Satır: Şablon Metinleri (Sade & Karmaşadan Uzak) */}
+              <div className="mt-5 border-t border-slate-100 pt-4 space-y-3">
+                {/* Minimal İkili Sekme */}
+                <div className="flex items-center justify-between">
+                  <div className="inline-flex rounded-xl bg-slate-100 p-1 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPdfTextTab("welcome")}
+                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                        pdfTextTab === "welcome"
+                          ? "bg-white text-slate-900 shadow-2xs font-bold"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      Karşılama Yazısı
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfTextTab("legal")}
+                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                        pdfTextTab === "legal"
+                          ? "bg-white text-slate-900 shadow-2xs font-bold"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      Yasal & KVKK
+                    </button>
                   </div>
-                  <textarea
-                    rows={2}
-                    value={settings.welcomeBody || settings.intro}
-                    onChange={(e) => {
-                      handleFieldChange("welcomeBody", e.target.value);
-                      handleFieldChange("intro", e.target.value);
-                    }}
-                    placeholder="Sayın hastamız, size özel hazırlanan tedavi planı sunulmuştur..."
-                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-2.5 text-xs text-slate-800 placeholder:text-slate-400 transition focus:border-slate-900 focus:bg-white focus:outline-hidden"
-                  />
+
+                  <span className="text-[11px] font-medium text-slate-400">
+                    {pdfTextTab === "welcome" ? "PDF 1. Sayfa Açılışı" : "PDF Alt Dipnotu"}
+                  </span>
                 </div>
 
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                      <FileCheck2 className="size-3.5 text-slate-400" />
-                      Yasal Bilgilendirme ve KVKK Notu
-                    </label>
-                    <span className="text-[10px] text-slate-400">PDF Alt Dipnot</span>
+                {/* Tek, Ferah ve Sade Metin Alanı */}
+                {pdfTextTab === "welcome" ? (
+                  <div>
+                    <textarea
+                      rows={5}
+                      value={settings.welcomeBody || settings.intro}
+                      onChange={(e) => {
+                        handleFieldChange("welcomeBody", e.target.value);
+                        handleFieldChange("intro", e.target.value);
+                      }}
+                      placeholder="Sayın hastamız, size özel hazırlanan tedavi planı sunulmuştur..."
+                      className="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-hidden"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Bu metin PDF teklifinin ilk sayfasında hastaya hitaben gösterilir.
+                    </p>
                   </div>
-                  <textarea
-                    rows={2}
-                    value={settings.legal}
-                    onChange={(e) => handleFieldChange("legal", e.target.value)}
-                    placeholder="İşbu tedavi planı hekim muayenesi sonrası ön tanı niteliğindedir..."
-                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-2.5 text-xs text-slate-800 placeholder:text-slate-400 transition focus:border-slate-900 focus:bg-white focus:outline-hidden"
-                  />
-                </div>
+                ) : (
+                  <div>
+                    <textarea
+                      rows={5}
+                      value={settings.legal}
+                      onChange={(e) => handleFieldChange("legal", e.target.value)}
+                      placeholder="İşbu tedavi planı hekim muayenesi sonrası ön tanı niteliğindedir..."
+                      className="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-hidden"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Bu metin PDF teklifinin alt kısmında hukuki ön tanı ve KVKK dipnotu olarak yer alır.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Bilgi Çizgisi */}
               <div className="mt-4 border-t border-slate-100 pt-3 text-center">
                 <span className="text-[11px] text-slate-400">
-                  Değişiklikler anlık sağdaki önizlemeye yansır.
+                  Değişiklikler anlık sağdaki canlı önizlemeye yansır.
                 </span>
               </div>
             </div>

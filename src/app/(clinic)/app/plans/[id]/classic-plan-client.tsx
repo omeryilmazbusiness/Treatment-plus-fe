@@ -1432,7 +1432,7 @@ export function ClassicPlanClient({
                   <button
                     type="button"
                     onClick={() => setShowShareModal(true)}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 py-2.5 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:opacity-95 transition active:scale-98"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition active:scale-98"
                   >
                     <FileText className="size-4" />
                     <span>Sunumlar</span>

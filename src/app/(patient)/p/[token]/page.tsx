@@ -14,7 +14,7 @@ export default function PatientPage({
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#faf8f5] text-slate-500 text-xs font-medium">
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500 text-xs font-medium">
           Tedavi planınız yükleniyor...
         </div>
       }
@@ -51,8 +51,8 @@ async function PatientBody({ params }: { params: Promise<{ token: string }> }) {
 
   if (!planData) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#faf8f5] p-6 text-center">
-        <div className="max-w-md rounded-3xl border border-[#e5dfd5] bg-white p-8 shadow-xs space-y-4">
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
+        <div className="max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xs space-y-4">
           <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
             <AlertCircle className="size-6" />
           </div>
