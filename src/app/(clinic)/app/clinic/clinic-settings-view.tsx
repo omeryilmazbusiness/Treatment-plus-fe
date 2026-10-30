@@ -1393,10 +1393,9 @@ export function ClinicSettingsView({
                   <div>
                     <textarea
                       rows={5}
-                      value={settings.welcomeBody || settings.intro}
+                      value={settings.welcomeBody || ""}
                       onChange={(e) => {
                         handleFieldChange("welcomeBody", e.target.value);
-                        handleFieldChange("intro", e.target.value);
                       }}
                       placeholder="Sayın hastamız, size özel hazırlanan tedavi planı sunulmuştur..."
                       className="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-hidden"
