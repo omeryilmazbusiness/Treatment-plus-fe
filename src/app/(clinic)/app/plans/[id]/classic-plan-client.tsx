@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState, useTransition } from "react";
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   BadgePercent,
   CalendarPlus,
   CheckCircle2,
@@ -30,6 +31,7 @@ import type { Patient, Plan } from "@/modules/plan/domain/plan";
 import { formatMoney, money, type Currency } from "@/shared/money";
 import { PriceInput } from "@/ui/price-input";
 import { TreatmentCombobox } from "@/ui/treatment-combobox";
+import { TreatmentStudio, type StudioPlanItem, type StudioVisit, type ToothCondition } from "@/ui/treatment-studio";
 import { generatePdfAction, readyPlanAction, savePlanDetailsAction } from "../actions";
 import { PlanShareModal } from "../plan-share-modal";
 
@@ -134,6 +136,7 @@ export function ClassicPlanClient({
     plan.currency || clinicSettings?.currency || "TRY"
   );
   const [diagnoses] = useState<string[]>(plan.diagnoses ?? []);
+  const [viewMode, setViewMode] = useState<"studio" | "table">("studio");
 
   // Visits state
   const [visits, setVisits] = useState(
@@ -571,8 +574,160 @@ export function ClassicPlanClient({
 
   const patientName = plan.patient?.name || "Kayıtlı Hasta";
 
+  const studioVisits: StudioVisit[] = useMemo(() => {
+    return visits.map((v, idx) => ({
+      id: v.id,
+      orderNum: v.order_num || idx + 1,
+      title: v.title,
+      phaseLabel: v.phase_label,
+      healingNote: v.healing_note,
+      chartTeeth: v.chart_teeth || [],
+    }));
+  }, [visits]);
+
+  const studioItems: StudioPlanItem[] = useMemo(() => {
+    return items.map((it, idx) => ({
+      id: it.id || `it-${idx}`,
+      treatmentType: "implant",
+      treatmentName: it.treatment_name || "Tedavi",
+      teeth: it.teeth || (it.tooth_number ? it.tooth_number.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean) : []),
+      quantity: Number(it.quantity) || 1,
+      unitPrice: (Number(it.unit_price) || 0) / 100,
+      isPackage: Boolean(it.is_package),
+      visitId: it.visit_id || visits[0]?.id || "v-1",
+      description: it.description,
+      animationCode: it.animation_code,
+    }));
+  }, [items, visits]);
+
+  const studioConditions: Record<string, ToothCondition> = useMemo(() => {
+    const map: Record<string, ToothCondition> = {};
+    if (plan.situation?.toothFindings) {
+      plan.situation.toothFindings.forEach((tf) => {
+        if (tf.tooth && tf.status) {
+          map[tf.tooth] = tf.status as ToothCondition;
+        }
+      });
+    }
+    return map;
+  }, [plan.situation]);
+
+  const handleStudioSave = async (studioData: {
+    conditions: Record<string, ToothCondition>;
+    items: StudioPlanItem[];
+    visits: StudioVisit[];
+  }) => {
+    startTransition(async () => {
+      await savePlanDetailsAction(String(plan.id), {
+        workspaceId,
+        title: title.trim(),
+        palette,
+        locale,
+        currency,
+        diagnoses,
+        situation: {
+          toothFindings: Object.entries(studioData.conditions).map(([tooth, cond]) => ({
+            tooth,
+            status: cond as any,
+          })),
+        },
+        visits: studioData.visits.map((v, i) => ({
+          id: v.id.startsWith("v-temp-") || v.id.startsWith("v-allon4-") ? undefined : v.id,
+          order_num: i + 1,
+          title: v.title,
+          phase_label: v.phaseLabel,
+          healing_note: v.healingNote || "",
+          chart_teeth: v.chartTeeth,
+        })),
+        items: studioData.items.map((it, i) => ({
+          id: it.id.startsWith("it-") || it.id.startsWith("tpl-") ? undefined : it.id,
+          visit_id: it.visitId.startsWith("v-temp-") || it.visitId.startsWith("v-allon4-") ? undefined : it.visitId,
+          treatment_name: it.treatmentName,
+          tooth_number: it.teeth.join(", "),
+          teeth: it.teeth,
+          quantity: it.quantity,
+          unit_price: Math.round(it.unitPrice * 100),
+          is_package: Boolean(it.isPackage),
+          order_num: i + 1,
+        })),
+        discounts: discounts.map((d, i) => ({
+          id: d.id,
+          label: d.label,
+          amount: Number(d.amount) || 0,
+          order_num: i + 1,
+        })),
+      });
+      router.refresh();
+      setMessage({ text: "Plan başarıyla kaydedildi.", type: "ok" });
+    });
+  };
+
+  if (viewMode === "studio") {
+    return (
+      <div className="w-full">
+        <TreatmentStudio
+          embedded={true}
+          viewMode={viewMode}
+          onViewModeChange={(m) => setViewMode(m)}
+          backHref="/app/plans"
+          initialPatient={{
+            id: String(plan.patientId),
+            name: patientName,
+            dob: "1988-06-15",
+            phone: plan.patient?.contact || "",
+          }}
+          initialClinic={{
+            name: clinicSettings?.name || "Treatment+ Dental Clinic",
+            doctorName: clinicSettings?.signerName || "Dr. Selin Yılmaz",
+            phone: clinicSettings?.phone || "+90 (212) 555 0199",
+            whatsapp: clinicSettings?.phone || "",
+            address: clinicSettings?.address || "İstanbul",
+            stats: {
+              satisfactionRate: "99.4%",
+              yearsExperience: "15+ Yıl",
+              happySmiles: "12,000+",
+            },
+          }}
+          initialConditions={studioConditions}
+          initialItems={studioItems}
+          initialVisits={studioVisits}
+          initialCurrency={currency === "TRY" ? "TRY" : currency === "USD" ? "USD" : "EUR"}
+          initialLocale={locale}
+          onSave={handleStudioSave}
+          isSaving={isPending}
+        />
+
+        {showShareModal && (
+          <PlanShareModal
+            planId={String(plan.id)}
+            planTitle={title}
+            patientName={patientName}
+            patientContact={plan.patient?.contact}
+            clinicName={clinicSettings?.name}
+            isReady={Boolean(plan.status && plan.status.toLowerCase() !== "draft")}
+            isOpen={showShareModal}
+            onClose={() => setShowShareModal(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-12">
+      {/* View Switcher in Classic Table view */}
+      <div className="flex items-center justify-between px-1">
+        <button
+          type="button"
+          onClick={() => setViewMode("studio")}
+          className="flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 text-xs font-bold shadow-xs transition"
+        >
+          <Sparkles className="size-3.5 text-blue-400" />
+          <span>Modern 3D Treatment Studio Görünümüne Geç</span>
+          <ArrowRight className="size-3.5" />
+        </button>
+      </div>
+
       {/* 1. Üst Başlık & Hasta / Plan Kartı */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
