@@ -1123,30 +1123,24 @@ export function ClassicPlanClient({
               </button>
               </div>
             ) : (
-              <>
-                <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-2xs">
-                  <Clock className="size-3.5 text-amber-600" />
-                  <span>Taslak Modu</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-2xs">
-                  {isAutoSaving || isPending ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin text-cyan-600" />
-                      <span>Kaydediliyor...</span>
-                    </>
-                  ) : isDirty ? (
-                    <>
-                      <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
-                      <span>Kaydediliyor...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="size-3.5 text-emerald-500" />
-                      <span>Otomatik Kaydedildi</span>
-                    </>
-                  )}
-                </span>
-              </>
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-2xs">
+                {isAutoSaving || isPending ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin text-cyan-600" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : isDirty ? (
+                  <>
+                    <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="size-3.5 text-emerald-500" />
+                    <span>Otomatik Kaydedildi</span>
+                  </>
+                )}
+              </span>
             )}
           </div>
         </div>
