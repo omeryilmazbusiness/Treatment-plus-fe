@@ -223,6 +223,15 @@ export class PlanHttpGateway
     return toPlanDomain(res);
   }
 
+  async reopenDraft(id: ID, accessToken?: string): Promise<Plan> {
+    const res = await this.http.request<RawPlan>({
+      path: `/v1/plans/${id}/reopen`,
+      method: "POST",
+      accessToken,
+    });
+    return toPlanDomain(res);
+  }
+
   async list(accessToken?: string): Promise<Patient[]> {
     const res = await this.http.request<{ patients: RawPatient[] }>({
       path: "/v1/patients",

@@ -14,7 +14,9 @@ import {
   Download,
   FileCheck2,
   FileText,
+  Loader2,
   Lock,
+  Unlock,
   Phone,
   Plus,
   Receipt,
@@ -22,6 +24,7 @@ import {
   Share2,
   Sparkles,
   Trash2,
+  User,
   X,
 } from "lucide-react";
 
@@ -31,8 +34,15 @@ import type { Patient, Plan } from "@/modules/plan/domain/plan";
 import { formatMoney, money, type Currency } from "@/shared/money";
 import { PriceInput } from "@/ui/price-input";
 import { TreatmentCombobox } from "@/ui/treatment-combobox";
-import { TreatmentStudio, type StudioPlanItem, type StudioVisit, type ToothCondition } from "@/ui/treatment-studio";
-import { generatePdfAction, readyPlanAction, savePlanDetailsAction } from "../actions";
+import {
+  TreatmentStudio,
+  inferTreatmentType,
+  type StudioPlanItem,
+  type StudioVisit,
+  type ToothCondition,
+} from "@/ui/treatment-studio";
+import { generatePdfAction, readyPlanAction,
+  reopenPlanAction, savePlanDetailsAction } from "../actions";
 import { PlanShareModal } from "../plan-share-modal";
 
 interface Props {
@@ -425,75 +435,94 @@ export function ClassicPlanClient({
     setDiscounts(discounts.filter((_, i) => i !== idx));
   };
 
-  // Save Draft (Sends to server, server calculates and returns authoritative totals)
-  const handleSaveDraft = () => {
-    if (isLocked || !isDirty) return;
-    setMessage(null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
 
-    startTransition(async () => {
-      const res = await savePlanDetailsAction(String(plan.id), {
-        workspaceId,
-        title: title.trim(),
-        palette,
-        locale,
-        currency,
-        diagnoses,
-        visits: visits.map((v, i) => ({
-          id: v.id?.startsWith("v-temp-") ? undefined : v.id,
-          order_num: i + 1,
-          title: v.title,
-          phase_label: v.phase_label,
-          healing_note: v.healing_note,
-          chart_teeth: v.chart_teeth,
-        })),
-        items: items.map((it, i) => ({
-          id: it.id,
-          visit_id: it.visit_id?.startsWith("v-temp-") ? undefined : it.visit_id,
-          treatment_id: it.treatment_id,
-          treatment_name: it.treatment_name,
-          animation_code: it.animation_code,
-          tooth_number: it.tooth_number || undefined,
-          teeth: it.teeth,
-          description: it.description,
-          quantity: Number(it.quantity) || 1,
-          unit_price: Number(it.unit_price) || 0,
-          is_package: Boolean(it.is_package),
-          order_num: i + 1,
-        })),
-        discounts: discounts.map((d, i) => ({
-          id: d.id,
-          label: d.label,
-          amount: Number(d.amount) || 0,
-          order_num: i + 1,
-        })),
-      });
+  // Debounced Auto-save for Classic Table View (1200ms)
+  useEffect(() => {
+    if (viewMode !== "table" || isLocked || !isDirty || isPending || isAutoSaving) return;
 
-      if (!res.success || !res.data) {
-        setMessage({ text: res.error || "Plan kaydedilemedi", type: "err" });
-        return;
-      }
-
-      setPlan(res.data);
-      if (res.data.currency) {
-        setCurrency(res.data.currency);
-      }
-      setSavedSnapshot(
-        createPlanSnapshot(
-          res.data.title || title,
-          res.data.locale || locale,
-          res.data.currency || currency,
-          res.data.diagnoses ?? diagnoses,
+    const timer = setTimeout(async () => {
+      setIsAutoSaving(true);
+      try {
+        const payloadSnapshot = createPlanSnapshot(
+          title,
+          locale,
+          currency,
+          diagnoses,
           visits,
           items,
           discounts
-        )
-      );
-      setMessage({
-        text: "Plan başarıyla kaydedildi.",
-        type: "ok",
-      });
-    });
-  };
+        );
+
+        const res = await savePlanDetailsAction(String(plan.id), {
+          workspaceId,
+          title: title.trim(),
+          palette,
+          locale,
+          currency,
+          diagnoses,
+          visits: visits.map((v, i) => ({
+            id: v.id?.startsWith("v-temp-") ? undefined : v.id,
+            order_num: i + 1,
+            title: v.title,
+            phase_label: v.phase_label,
+            healing_note: v.healing_note,
+            chart_teeth: v.chart_teeth,
+          })),
+          items: items.map((it, i) => ({
+            id: it.id,
+            visit_id: it.visit_id?.startsWith("v-temp-") ? undefined : it.visit_id,
+            treatment_id: it.treatment_id,
+            treatment_name: it.treatment_name,
+            animation_code: it.animation_code,
+            tooth_number: it.tooth_number || undefined,
+            teeth: it.teeth,
+            description: it.description,
+            quantity: Number(it.quantity) || 1,
+            unit_price: Number(it.unit_price) || 0,
+            is_package: Boolean(it.is_package),
+            order_num: i + 1,
+          })),
+          discounts: discounts.map((d, i) => ({
+            id: d.id,
+            label: d.label,
+            amount: Number(d.amount) || 0,
+            order_num: i + 1,
+          })),
+        });
+
+        if (res.success && res.data) {
+          setPlan(res.data);
+          if (res.data.currency) {
+            setCurrency(res.data.currency);
+          }
+          setSavedSnapshot(payloadSnapshot);
+        }
+      } catch (err) {
+        console.error("Classic table auto-save error:", err);
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [
+    viewMode,
+    isDirty,
+    isLocked,
+    isPending,
+    isAutoSaving,
+    title,
+    locale,
+    currency,
+    diagnoses,
+    visits,
+    items,
+    discounts,
+    plan.id,
+    workspaceId,
+    palette,
+  ]);
 
   // Lock and ready
   const handleLockReady = () => {
@@ -572,6 +601,30 @@ export function ClassicPlanClient({
     }
   };
 
+  const handleUnlockPlan = async (): Promise<boolean> => {
+    try {
+      setMessage(null);
+      const res = await reopenPlanAction(String(plan.id), workspaceId);
+      if (!res.success || !res.data) {
+        setMessage({ text: res.error || "Plan kilidi açılamadı", type: "err" });
+        return false;
+      }
+      setPlan(res.data);
+      if (res.data.currency) {
+        setCurrency(res.data.currency);
+      }
+      router.refresh();
+      setMessage({
+        text: "Plan kilidi açıldı. Artık tedavileri ve kalemleri özgürce düzenleyebilirsiniz.",
+        type: "ok",
+      });
+      return true;
+    } catch {
+      setMessage({ text: "Plan kilidi açılırken bir hata oluştu", type: "err" });
+      return false;
+    }
+  };
+
   const patientName = plan.patient?.name || "Kayıtlı Hasta";
 
   const studioVisits: StudioVisit[] = useMemo(() => {
@@ -586,19 +639,24 @@ export function ClassicPlanClient({
   }, [visits]);
 
   const studioItems: StudioPlanItem[] = useMemo(() => {
-    return items.map((it, idx) => ({
-      id: it.id || `it-${idx}`,
-      treatmentType: "implant",
-      treatmentName: it.treatment_name || "Tedavi",
-      teeth: it.teeth || (it.tooth_number ? it.tooth_number.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean) : []),
-      quantity: Number(it.quantity) || 1,
-      unitPrice: (Number(it.unit_price) || 0) / 100,
-      isPackage: Boolean(it.is_package),
-      visitId: it.visit_id || visits[0]?.id || "v-1",
-      description: it.description,
-      animationCode: it.animation_code,
-    }));
-  }, [items, visits]);
+    return items.map((it, idx) => {
+      const tr = treatmentsCatalog.find((t) => String(t.id) === it.treatment_id);
+      return {
+        id: it.id || `it-${idx}`,
+        treatmentId: it.treatment_id,
+        treatmentCode: tr?.code,
+        treatmentType: inferTreatmentType(it.treatment_name || tr?.name || "", tr?.code),
+        treatmentName: it.treatment_name || tr?.name || "Tedavi",
+        teeth: it.teeth || (it.tooth_number ? it.tooth_number.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean) : []),
+        quantity: Number(it.quantity) || 1,
+        unitPrice: (Number(it.unit_price) || 0) / 100,
+        isPackage: Boolean(it.is_package),
+        visitId: it.visit_id || visits[0]?.id || "v-1",
+        description: it.description,
+        animationCode: it.animation_code,
+      };
+    });
+  }, [items, visits, treatmentsCatalog]);
 
   const studioConditions: Record<string, ToothCondition> = useMemo(() => {
     const map: Record<string, ToothCondition> = {};
@@ -617,48 +675,113 @@ export function ClassicPlanClient({
     items: StudioPlanItem[];
     visits: StudioVisit[];
   }) => {
-    startTransition(async () => {
-      await savePlanDetailsAction(String(plan.id), {
-        workspaceId,
-        title: title.trim(),
-        palette,
-        locale,
-        currency,
-        diagnoses,
-        situation: {
-          toothFindings: Object.entries(studioData.conditions).map(([tooth, cond]) => ({
-            tooth,
-            status: cond as any,
-          })),
-        },
-        visits: studioData.visits.map((v, i) => ({
-          id: v.id.startsWith("v-temp-") || v.id.startsWith("v-allon4-") ? undefined : v.id,
-          order_num: i + 1,
-          title: v.title,
-          phase_label: v.phaseLabel,
-          healing_note: v.healingNote || "",
-          chart_teeth: v.chartTeeth,
+    const res = await savePlanDetailsAction(String(plan.id), {
+      workspaceId,
+      title: title.trim(),
+      palette,
+      locale,
+      currency,
+      diagnoses,
+      situation: {
+        toothFindings: Object.entries(studioData.conditions).map(([tooth, cond]) => ({
+          tooth,
+          status: cond as any,
         })),
-        items: studioData.items.map((it, i) => ({
-          id: it.id.startsWith("it-") || it.id.startsWith("tpl-") ? undefined : it.id,
-          visit_id: it.visitId.startsWith("v-temp-") || it.visitId.startsWith("v-allon4-") ? undefined : it.visitId,
-          treatment_name: it.treatmentName,
-          tooth_number: it.teeth.join(", "),
-          teeth: it.teeth,
-          quantity: it.quantity,
-          unit_price: Math.round(it.unitPrice * 100),
-          is_package: Boolean(it.isPackage),
-          order_num: i + 1,
-        })),
-        discounts: discounts.map((d, i) => ({
-          id: d.id,
-          label: d.label,
-          amount: Number(d.amount) || 0,
-          order_num: i + 1,
-        })),
-      });
-      router.refresh();
-      setMessage({ text: "Plan başarıyla kaydedildi.", type: "ok" });
+      },
+      visits: studioData.visits.map((v, i) => ({
+        id: v.id.startsWith("v-temp-") || v.id.startsWith("v-allon4-") ? undefined : v.id,
+        order_num: i + 1,
+        title: v.title,
+        phase_label: v.phaseLabel,
+        healing_note: v.healingNote || "",
+        chart_teeth: v.chartTeeth,
+      })),
+      items: studioData.items.map((it, i) => ({
+        id: it.id.startsWith("it-") || it.id.startsWith("tpl-") ? undefined : it.id,
+        visit_id: it.visitId.startsWith("v-temp-") || it.visitId.startsWith("v-allon4-") ? undefined : it.visitId,
+        treatment_id: it.treatmentId,
+        treatment_name: it.treatmentName,
+        tooth_number: it.teeth && it.teeth.length > 0 ? it.teeth.join(", ") : "",
+        teeth: it.teeth,
+        quantity: it.quantity,
+        unit_price: Math.round(it.unitPrice * 100),
+        is_package: Boolean(it.isPackage),
+        order_num: i + 1,
+      })),
+      discounts: discounts.map((d, i) => ({
+        id: d.id,
+        label: d.label,
+        amount: Number(d.amount) || 0,
+        order_num: i + 1,
+      })),
+    });
+
+    if (res.success && res.data) {
+      setPlan(res.data);
+      if (res.data.currency) setCurrency(res.data.currency);
+      if (res.data.visits) {
+        setVisits(
+          res.data.visits.map((v, i) => ({
+            id: String(v.id),
+            order_num: v.orderNum || i + 1,
+            title: v.title || `${i + 1}. Seans`,
+            phase_label: v.phaseLabel || "",
+            healing_note: v.healingNote || "",
+            chart_teeth: v.chartTeeth || [],
+          }))
+        );
+      }
+      if (res.data.items) {
+        setItems(
+          res.data.items.map((it, i) => ({
+            id: it.id ? String(it.id) : undefined,
+            visit_id: it.visitId ? String(it.visitId) : undefined,
+            treatment_id: it.treatmentId ? String(it.treatmentId) : undefined,
+            treatment_name: it.treatmentName || "",
+            animation_code: it.animationCode || "",
+            tooth_number: it.toothNumber || "",
+            teeth:
+              it.teeth && it.teeth.length > 0
+                ? it.teeth
+                : (it.toothNumber || "")
+                    .split(/[,;\s]+/)
+                    .map((s) => s.trim())
+                    .filter((s) => s.length > 0 && /^\d+$/.test(s)),
+            description: it.description || "",
+            quantity: it.quantity || 1,
+            unit_price: it.unitPrice || 0,
+            is_package: Boolean(it.isPackage),
+            order_num: it.orderNum || i + 1,
+          }))
+        );
+      }
+      setSavedSnapshot(
+        createPlanSnapshot(
+          res.data.title || title,
+          res.data.locale || locale,
+          res.data.currency || currency,
+          res.data.diagnoses ?? diagnoses,
+          visits,
+          items,
+          discounts
+        )
+      );
+    }
+  };
+
+  const handleStudioLockReady = async () => {
+    const res = await readyPlanAction(String(plan.id), workspaceId);
+    if (!res.success || !res.data) {
+      setMessage({ text: res.error || "Plan onaylanamadı", type: "err" });
+      throw new Error(res.error || "Plan onaylanamadı");
+    }
+
+    generatePdfAction(String(plan.id)).catch(() => {});
+    setPlan(res.data);
+    router.refresh();
+    setMessage({
+      text: "Plan başarıyla onaylandı ve hasta sunumuna hazırlandı! Düzenleme kilitlendi.",
+      type: "ok",
     });
   };
 
@@ -670,6 +793,15 @@ export function ClassicPlanClient({
           viewMode={viewMode}
           onViewModeChange={(m) => setViewMode(m)}
           backHref="/app/plans"
+          planId={String(plan.id)}
+          planTitle={title}
+          onPlanTitleChange={(newTitle) => setTitle(newTitle)}
+          planStatus={plan.status}
+          isLocked={isLocked}
+          onUnlockPlan={handleUnlockPlan}
+          onLockReady={handleStudioLockReady}
+          treatmentsCatalog={treatmentsCatalog}
+          priceMap={priceMap}
           initialPatient={{
             id: String(plan.patientId),
             name: patientName,
@@ -715,81 +847,59 @@ export function ClassicPlanClient({
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-12">
-      {/* View Switcher in Classic Table view */}
-      <div className="flex items-center justify-between px-1">
-        <button
-          type="button"
-          onClick={() => setViewMode("studio")}
-          className="flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 text-xs font-bold shadow-xs transition"
-        >
-          <Sparkles className="size-3.5 text-blue-400" />
-          <span>Modern 3D Treatment Studio Görünümüne Geç</span>
-          <ArrowRight className="size-3.5" />
-        </button>
-      </div>
-
-      {/* 1. Üst Başlık & Hasta / Plan Kartı */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* Sol: Geri Dön & Hasta Bilgisi */}
-          <div className="flex items-center gap-3.5">
+      {/* 1. Üst Araç Çubuğu (Treatment Studio ile Birebir Uyumlu Tasarım Dili) */}
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Sol: Geri Dön + Studio Geçiş Butonu + Hasta & Başlık Rozeti */}
+          <div className="flex items-center gap-2.5 flex-wrap">
             <Link
               href="/app/plans"
-              className="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900"
+              className="flex size-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:border-slate-300 transition shadow-2xs mr-0.5"
               title="Tedavi Planlarına Dön"
             >
               <ArrowLeft className="size-4" />
             </Link>
 
-            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+            <button
+              type="button"
+              onClick={() => setViewMode("studio")}
+              className="group flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-3.5 py-2 text-xs border border-slate-800 shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer active:scale-95"
+              title="Modern 3D Treatment Studio Görünümüne Geç"
+            >
+              <Sparkles className="size-3.5 text-blue-400" />
+              <span>Modern 3D Treatment Studio Görünümüne Geç</span>
+              <ArrowRight className="size-3.5 text-blue-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
 
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white shadow-2xs">
-                {getInitials(patientName)}
-              </div>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Hasta Profili
-                </span>
-                <h1 className="text-sm font-bold text-slate-900 leading-tight">
-                  {patientName}
-                </h1>
-                {plan.patient?.contact && (
-                  <div className="flex items-center gap-1 text-[11px] text-slate-500">
-                    <Phone className="size-3 text-slate-400" />
-                    <span>{plan.patient.contact}</span>
-                  </div>
-                )}
-              </div>
+            {/* Hasta & Plan Başlığı Rozeti (Treatment Studio ile Birebir Aynı) */}
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs text-slate-700 shadow-2xs">
+              <User className="size-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900">{patientName}</span>
+              <span className="h-3.5 w-px bg-slate-200" />
+              <input
+                type="text"
+                disabled={isLocked}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Plan Başlığı"
+                className="bg-transparent font-medium text-slate-700 hover:text-slate-900 focus:text-slate-900 focus:outline-none w-32 sm:w-44 transition placeholder:text-slate-400"
+                title="Plan Başlığını Düzenle"
+              />
             </div>
           </div>
 
-          {/* Orta: Plan Başlığı Girişi */}
-          <div className="w-full lg:max-w-sm xl:max-w-md">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Plan Başlığı
-            </label>
-            <input
-              type="text"
-              disabled={isLocked}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Örn: İmplant & Kuron Tedavisi"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 hover:bg-white focus:bg-white focus:border-slate-900 focus:outline-hidden transition shadow-2xs disabled:bg-slate-50 disabled:text-slate-500"
-            />
-          </div>
-
           {/* Sağ: İstatistik & Durum Rozeti */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-xs font-semibold text-slate-600">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-2xs">
               <span>{visits.length} Seans</span>
               <span className="text-slate-300">•</span>
               <span>{items.length} Kalem</span>
             </div>
 
             {isLocked ? (
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-2xs ${
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-2xs ${
                   plan.status?.toLowerCase() === "accepted"
                     ? "border-emerald-300 bg-emerald-100/80 text-emerald-900"
                     : plan.status?.toLowerCase() === "viewed"
@@ -799,7 +909,7 @@ export function ClassicPlanClient({
                     : "border-emerald-200 bg-emerald-50 text-emerald-800"
                 }`}
               >
-                <CheckCircle2 className="size-4 text-emerald-600" />
+                <CheckCircle2 className="size-3.5 text-emerald-600" />
                 <span>
                   {plan.status?.toLowerCase() === "accepted"
                     ? "Hasta Onayladı"
@@ -810,11 +920,41 @@ export function ClassicPlanClient({
                     : "Onaylandı (Hazır)"}
                 </span>
               </span>
+              <button
+                type="button"
+                onClick={handleUnlockPlan}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-2xs transition cursor-pointer"
+                title="Planı düzenlemeye aç"
+              >
+                <Unlock className="size-3.5 text-amber-700" />
+                <span>Kilidi Aç (Düzenle)</span>
+              </button>
+            </div>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 shadow-2xs">
-                <Clock className="size-4 text-amber-600" />
-                <span>Taslak Modu</span>
-              </span>
+              <>
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-2xs">
+                  <Clock className="size-3.5 text-amber-600" />
+                  <span>Taslak Modu</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-2xs">
+                  {isAutoSaving || isPending ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin text-cyan-600" />
+                      <span>Kaydediliyor...</span>
+                    </>
+                  ) : isDirty ? (
+                    <>
+                      <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+                      <span>Kaydediliyor...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="size-3.5 text-emerald-500" />
+                      <span>Otomatik Kaydedildi</span>
+                    </>
+                  )}
+                </span>
+              </>
             )}
           </div>
         </div>
@@ -1537,28 +1677,25 @@ export function ClassicPlanClient({
                     <span>Planı Onayla & Hazırla</span>
                   </button>
 
-                  <button
-                    type="button"
-                    disabled={isPending || !isDirty}
-                    onClick={handleSaveDraft}
-                    className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-bold shadow-2xs transition ${
-                      isDirty
-                        ? "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
-                        : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed opacity-60"
-                    }`}
-                  >
-                    <Save className="size-3.5" />
-                    <span>
-                      {isPending
-                        ? "Kaydediliyor..."
-                        : isDirty
-                        ? "Taslağı Kaydet"
-                        : "Tüm Değişiklikler Kaydedildi"}
-                    </span>
-                    {isDirty && (
-                      <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  {/* Otomatik Kayıt Durum Bilgisi */}
+                  <div className="flex items-center justify-center gap-1.5 py-1 text-xs font-semibold text-slate-500">
+                    {isAutoSaving || isPending ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin text-cyan-600" />
+                        <span className="text-slate-600">Değişiklikler kaydediliyor...</span>
+                      </>
+                    ) : isDirty ? (
+                      <>
+                        <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="text-slate-600">Değişiklikler kaydediliyor...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="size-3.5 text-emerald-500" />
+                        <span className="text-slate-500">Tüm değişiklikler otomatik kaydedildi</span>
+                      </>
                     )}
-                  </button>
+                  </div>
                 </>
               ) : (
                 <div className="space-y-2.5">
@@ -1583,6 +1720,15 @@ export function ClassicPlanClient({
                         : "Tedavi ve fiyat bilgileri resmi teklif olarak sabitlenmiştir."}
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleUnlockPlan}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50/80 py-2.5 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition active:scale-98"
+                  >
+                    <Unlock className="size-3.5 text-amber-700" />
+                    <span>Plan Kilidini Aç & Düzenle</span>
+                  </button>
 
                   <button
                     type="button"

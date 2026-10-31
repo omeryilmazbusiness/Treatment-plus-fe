@@ -9,6 +9,7 @@ import {
   ChevronUp,
   FileText,
   Layers,
+  Lock,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -90,6 +91,7 @@ interface DiagnosisModuleProps {
   xrayUrl?: string;
   onXrayChange?: (url: string) => void;
   patientName?: string;
+  isLocked?: boolean;
 }
 
 export function DiagnosisModule({
@@ -98,6 +100,7 @@ export function DiagnosisModule({
   xrayUrl,
   onXrayChange,
   patientName = "Ömer Yılmaz",
+  isLocked = false,
 }: DiagnosisModuleProps) {
   const [selectedTeeth, setSelectedTeeth] = useState<string[]>([]);
   const [openSections, setOpenSections] = useState<{
@@ -131,7 +134,7 @@ export function DiagnosisModule({
   };
 
   const handleApplyCondition = (cond: ToothCondition) => {
-    if (selectedTeeth.length === 0) return;
+    if (isLocked || selectedTeeth.length === 0) return;
     const next = { ...conditions };
     selectedTeeth.forEach((t) => {
       if (cond === "intact") {
@@ -145,6 +148,7 @@ export function DiagnosisModule({
   };
 
   const handleRemoveSingleCondition = (tooth: string) => {
+    if (isLocked) return;
     const next = { ...conditions };
     delete next[tooth];
     onConditionsChange(next);
@@ -205,6 +209,14 @@ export function DiagnosisModule({
 
   return (
     <div className="space-y-6">
+      {/* Kilitli Plan Bilgilendirme Uyarısı */}
+      {isLocked && (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 font-semibold shadow-2xs">
+          <Lock className="size-4 text-amber-600 shrink-0" />
+          <span>Bu tedavi planı onaylanıp kilitlendiği için diş teşhisleri düzenlemeye kapatılmıştır (salt okunur mod).</span>
+        </div>
+      )}
+
       {/* ============================================================== */}
       {/* 1. Odontogram & Condition Selector Panel */}
       {/* Unified Parent Container Matching X-Ray Container */}
@@ -225,7 +237,7 @@ export function DiagnosisModule({
           <div className="space-y-3.5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <span className="size-2 rounded-full bg-blue-600 ring-2 ring-blue-100" />
+                <span className="size-2 rounded-full bg-slate-900 ring-2 ring-slate-200" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
                   Teşhis Belirle
                 </span>
@@ -242,11 +254,11 @@ export function DiagnosisModule({
             </div>
 
             {selectedTeeth.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-blue-50/90 border border-blue-200/80">
-                <span className="text-[11px] font-bold text-blue-800">
+              <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-slate-900 text-white shadow-2xs">
+                <span className="text-[11px] font-bold text-slate-300">
                   {selectedTeeth.length} Diş Seçili:
                 </span>
-                <span className="text-xs text-blue-700 font-mono font-bold">
+                <span className="text-xs text-white font-mono font-bold">
                   {selectedTeeth.map((t) => `#${t}`).join(", ")}
                 </span>
               </div>
@@ -270,9 +282,13 @@ export function DiagnosisModule({
                 <button
                   key={btn.id}
                   type="button"
-                  disabled={selectedTeeth.length === 0}
+                  disabled={isLocked || selectedTeeth.length === 0}
                   onClick={() => handleApplyCondition(btn.id)}
-                  className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white hover:bg-slate-100 hover:border-slate-300 text-slate-700 p-2 text-center text-xs font-semibold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95"
+                  className={`flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white p-2 text-center text-xs font-semibold transition shadow-2xs ${
+                    isLocked || selectedTeeth.length === 0
+                      ? "opacity-40 cursor-not-allowed"
+                      : "hover:bg-slate-100 hover:border-slate-300 text-slate-700 cursor-pointer active:scale-95"
+                  }`}
                 >
                   <span>{btn.label}</span>
                   <span className="text-[9px] text-slate-400 font-normal">
@@ -283,20 +299,22 @@ export function DiagnosisModule({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={() => {
-                onConditionsChange({});
-                setSelectedTeeth([]);
-              }}
-              className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 py-2.5 text-xs font-bold transition cursor-pointer shadow-2xs active:scale-95"
-              title="Tüm dişlerdeki teşhis ve durumları sıfırlayıp sağlam hale getirir"
-            >
-              <RotateCcw className="size-3.5 text-rose-600" />
-              <span>Tüm Teşhisleri Sıfırla</span>
-            </button>
-          </div>
+          {!isLocked && (
+            <div className="pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  onConditionsChange({});
+                  setSelectedTeeth([]);
+                }}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 py-2.5 text-xs font-bold transition cursor-pointer shadow-2xs active:scale-95"
+                title="Tüm dişlerdeki teşhis ve durumları sıfırlayıp sağlam hale getirir"
+              >
+                <RotateCcw className="size-3.5 text-rose-600" />
+                <span>Tüm Teşhisleri Sıfırla</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -328,7 +346,7 @@ export function DiagnosisModule({
                 className="flex items-center justify-between cursor-pointer select-none"
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
+                  <div className="p-2 rounded-xl bg-slate-900 text-white">
                     <FileText className="size-4" />
                   </div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
@@ -340,7 +358,7 @@ export function DiagnosisModule({
                   <span
                     className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
                       generalNotes.trim()
-                        ? "bg-blue-50 text-blue-700 border-blue-200/80"
+                        ? "bg-slate-900 text-white border-slate-900"
                         : "bg-slate-100 text-slate-400 border-slate-200"
                     }`}
                   >
@@ -390,10 +408,11 @@ export function DiagnosisModule({
                   <div className="relative">
                     <textarea
                       rows={4}
+                      disabled={isLocked}
                       value={generalNotes}
                       onChange={(e) => setGeneralNotes(e.target.value)}
                       placeholder="Hastanın kemik yapısı, oklüzyon, yumuşak doku ve implantasyon hazırlığına ilişkin genel hekim notlarını giriniz..."
-                      className="w-full text-xs text-slate-700 leading-relaxed bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition resize-y"
+                      className="w-full text-xs text-slate-700 leading-relaxed bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-900 transition resize-y"
                     />
                     <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1 px-1">
                       <span>Otomatik kaydedilir</span>
@@ -411,7 +430,7 @@ export function DiagnosisModule({
                 className="flex items-center justify-between cursor-pointer select-none"
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-sky-50 text-sky-700">
+                  <div className="p-2 rounded-xl bg-slate-900 text-white">
                     <Layers className="size-4" />
                   </div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
@@ -460,7 +479,7 @@ export function DiagnosisModule({
                             key={tooth}
                             className={`flex items-center justify-between p-3 rounded-xl border transition shadow-2xs ${
                               isSelected
-                                ? "bg-blue-50/80 border-blue-400 ring-2 ring-blue-500/20"
+                                ? "bg-slate-900/5 border-slate-800 ring-2 ring-slate-900/10"
                                 : "bg-white border-slate-200/80 hover:border-slate-300"
                             }`}
                           >
@@ -487,14 +506,16 @@ export function DiagnosisModule({
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSingleCondition(tooth)}
-                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0 ml-1"
-                              title="Bu teşhisi kaldır (Sağlam yap)"
-                            >
-                              <X className="size-3.5" />
-                            </button>
+                            {!isLocked && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSingleCondition(tooth)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0 ml-1"
+                                title="Bu teşhisi kaldır (Sağlam yap)"
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -511,7 +532,7 @@ export function DiagnosisModule({
                 className="flex items-center justify-between cursor-pointer select-none"
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                  <div className="p-2 rounded-xl bg-slate-900 text-white">
                     <Layers className="size-4" />
                   </div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
@@ -560,7 +581,7 @@ export function DiagnosisModule({
                             key={tooth}
                             className={`flex items-center justify-between p-3 rounded-xl border transition shadow-2xs ${
                               isSelected
-                                ? "bg-blue-50/80 border-blue-400 ring-2 ring-blue-500/20"
+                                ? "bg-slate-900/5 border-slate-800 ring-2 ring-slate-900/10"
                                 : "bg-white border-slate-200/80 hover:border-slate-300"
                             }`}
                           >
@@ -587,14 +608,16 @@ export function DiagnosisModule({
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSingleCondition(tooth)}
-                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0 ml-1"
-                              title="Bu teşhisi kaldır (Sağlam yap)"
-                            >
-                              <X className="size-3.5" />
-                            </button>
+                            {!isLocked && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSingleCondition(tooth)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0 ml-1"
+                                title="Bu teşhisi kaldır (Sağlam yap)"
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -612,7 +635,7 @@ export function DiagnosisModule({
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <div className="size-2 rounded-full bg-blue-600 ring-2 ring-blue-100" />
+                <div className="size-2 rounded-full bg-slate-900 ring-2 ring-slate-200" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
                   Klinik Durum Özeti
                 </span>
@@ -627,7 +650,7 @@ export function DiagnosisModule({
               {/* 1. Toplam Diş */}
               <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-100 flex items-center justify-between transition hover:border-slate-200">
                 <div className="flex items-center gap-3">
-                  <div className="size-9 rounded-lg bg-blue-100/80 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
+                  <div className="size-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
                     32
                   </div>
                   <div>
@@ -639,7 +662,7 @@ export function DiagnosisModule({
                     </div>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-md">
+                <span className="text-[10px] font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
                   Tam Ark
                 </span>
               </div>

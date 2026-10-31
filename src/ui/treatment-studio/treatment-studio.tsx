@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -16,7 +16,9 @@ import {
   FileCheck2,
   FileDown,
   Layers,
+  Loader2,
   Lock,
+  Unlock,
   Menu,
   Minus,
   Plus,
@@ -26,6 +28,7 @@ import {
   Share2,
   Sparkles,
   Stethoscope,
+  Table,
   Undo2,
   User,
   X,
@@ -35,16 +38,15 @@ import type {
   AnimationTimelineStage,
   ClinicBrandInfo,
   PatientInfo,
-  SavedDraftTemplate,
   StudioPlanItem,
   StudioVisit,
   ToothCondition,
 } from "./types";
+import type { Treatment } from "@/modules/catalog/domain/catalog";
 import { DiagnosisModule } from "./diagnosis-module";
 import { TreatmentsModule } from "./treatments-module";
 import { SimulationModule, DEFAULT_ANIMATION_STAGES } from "./simulation-module";
 import { OverviewModule } from "./overview-module";
-import { DraftsModal, DEFAULT_TEMPLATES } from "./drafts-modal";
 
 export type StudioTab = "diagnosis" | "treatments" | "animation" | "ai_summary" | "overview";
 
@@ -56,6 +58,13 @@ export interface TreatmentStudioProps {
   initialVisits?: StudioVisit[];
   initialCurrency?: "EUR" | "USD" | "TRY";
   initialLocale?: "en" | "tr";
+  planId?: string;
+  planTitle?: string;
+  onPlanTitleChange?: (title: string) => void;
+  planStatus?: string;
+  isLocked?: boolean;
+  onUnlockPlan?: () => Promise<boolean> | boolean;
+  onLockReady?: () => Promise<void> | void;
   onSave?: (data: {
     conditions: Record<string, ToothCondition>;
     items: StudioPlanItem[];
@@ -66,6 +75,8 @@ export interface TreatmentStudioProps {
   embedded?: boolean;
   viewMode?: "studio" | "table";
   onViewModeChange?: (mode: "studio" | "table") => void;
+  treatmentsCatalog?: Treatment[];
+  priceMap?: Map<string, number>;
 }
 
 export function TreatmentStudio({
@@ -76,15 +87,43 @@ export function TreatmentStudio({
   initialVisits,
   initialCurrency = "EUR",
   initialLocale = "tr",
+  planId,
+  planTitle,
+  onPlanTitleChange,
+  planStatus,
+  isLocked: isLockedProp,
+  onUnlockPlan,
+  onLockReady,
   onSave,
   isSaving = false,
   backHref = "/app/plans",
   embedded = false,
   viewMode = "studio",
   onViewModeChange,
+  treatmentsCatalog,
+  priceMap,
 }: TreatmentStudioProps) {
   // Navigation & Tabs
   const [activeTab, setActiveTab] = useState<StudioTab>("diagnosis");
+
+  // Plan Title state
+  const [currentTitle, setCurrentTitle] = useState(planTitle || "Tedavi Planı");
+  useEffect(() => {
+    if (planTitle !== undefined) {
+      setCurrentTitle(planTitle);
+    }
+  }, [planTitle]);
+
+  // Plan lock & status state
+  const [localStatus, setLocalStatus] = useState<string | undefined>(planStatus);
+  useEffect(() => {
+    if (planStatus) setLocalStatus(planStatus);
+  }, [planStatus]);
+
+  const isPlanLocked = Boolean(
+    isLockedProp ??
+    ((localStatus || planStatus) && (localStatus || planStatus)?.toLowerCase() !== "draft")
+  );
 
   // Locale & Currency
   const [locale, setLocale] = useState<"en" | "tr">(initialLocale);
@@ -197,59 +236,101 @@ export function TreatmentStudio({
   );
 
   // Modals & Panels
-  const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
 
-  // Apply draft template
-  const handleApplyTemplate = (tpl: SavedDraftTemplate) => {
-    const newItems: StudioPlanItem[] = [];
-    if (tpl.packageUpperPrice) {
-      newItems.push({
-        id: `tpl-up-${Date.now()}`,
-        treatmentType: "implant",
-        treatmentName: `${tpl.title} — Üst Paket`,
-        teeth: ["12", "14", "22", "24"],
-        quantity: 1,
-        unitPrice: tpl.packageUpperPrice,
-        isPackage: true,
-        visitId: visits[0]?.id || "v-1",
-      });
-    }
-    if (tpl.packageLowerPrice) {
-      newItems.push({
-        id: `tpl-low-${Date.now()}`,
-        treatmentType: "implant",
-        treatmentName: `${tpl.title} — Alt Paket`,
-        teeth: ["32", "34", "42", "44"],
-        quantity: 1,
-        unitPrice: tpl.packageLowerPrice,
-        isPackage: true,
-        visitId: visits[0]?.id || "v-1",
-      });
-    }
-    tpl.items
-      .filter((it) => it.type !== "package")
-      .forEach((it, idx) => {
-        newItems.push({
-          id: `tpl-it-${idx}-${Date.now()}`,
-          treatmentType: it.type === "implant" ? "implant" : "dentures",
-          treatmentName: it.label,
-          teeth: it.teeth,
-          quantity: it.teeth.length || 1,
-          unitPrice: 0,
-          visitId: visits[0]?.id || "v-1",
-        });
-      });
+  // Serializer for detecting unsaved changes
+  const serializeState = (
+    c: Record<string, ToothCondition>,
+    it: StudioPlanItem[],
+    v: StudioVisit[],
+    t?: string
+  ) =>
+    JSON.stringify({
+      t: t ?? currentTitle,
+      c,
+      it: it.map((x) => ({
+        name: x.treatmentName,
+        teeth: [...(x.teeth || [])].sort(),
+        qty: x.quantity || 1,
+        price: x.unitPrice || 0,
+        vId: x.visitId,
+        pkg: Boolean(x.isPackage),
+      })),
+      v: v.map((x) => ({
+        id: x.id,
+        title: x.title,
+        teeth: [...(x.chartTeeth || [])].sort(),
+        hNote: x.healingNote || "",
+      })),
+    });
 
-    setItems(newItems);
-  };
+  // Baseline snapshot of saved state
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string>(() =>
+    serializeState(conditions, items, visits, currentTitle)
+  );
 
-  const handleSave = async () => {
+  // Synchronize baseline snapshot if initial props change externally
+  useEffect(() => {
+    if (initialConditions || initialItems || initialVisits || planTitle) {
+      const snap = serializeState(
+        initialConditions || conditions,
+        initialItems && initialItems.length > 0 ? initialItems : items,
+        initialVisits || visits,
+        planTitle || currentTitle
+      );
+      setLastSavedSnapshot(snap);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialConditions, initialItems, initialVisits, planTitle]);
+
+  // Current state snapshot
+  const currentSnapshot = useMemo(
+    () => serializeState(conditions, items, visits, currentTitle),
+    [conditions, items, visits, currentTitle]
+  );
+
+  // Dirty check: Are there any unsaved modifications?
+  const hasUnsavedChanges = currentSnapshot !== lastSavedSnapshot;
+
+  const [isLocalSaving, setIsLocalSaving] = useState(false);
+  const isSavingActive = isSaving || isLocalSaving;
+
+  const handleSave = React.useCallback(async () => {
+    if (isPlanLocked || !onSave) return;
+    setIsLocalSaving(true);
+    try {
+      const snap = currentSnapshot;
+      await onSave({ conditions, items, visits });
+      setLastSavedSnapshot(snap);
+      setSaveSuccessMsg(true);
+      setTimeout(() => setSaveSuccessMsg(false), 2000);
+    } catch (e) {
+      console.error("Studio save error:", e);
+    } finally {
+      setIsLocalSaving(false);
+    }
+  }, [isPlanLocked, onSave, currentSnapshot, conditions, items, visits]);
+
+  // Debounced Auto-save (1200ms)
+  useEffect(() => {
+    if (isPlanLocked || !hasUnsavedChanges || isSavingActive) return;
+
+    const timer = setTimeout(() => {
+      handleSave();
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [hasUnsavedChanges, isPlanLocked, isSavingActive, handleSave]);
+
+  const handleStudioLockAndReady = async () => {
     if (onSave) {
       await onSave({ conditions, items, visits });
-      setSaveSuccessMsg(true);
-      setTimeout(() => setSaveSuccessMsg(false), 3000);
+      setLastSavedSnapshot(currentSnapshot);
     }
+    if (onLockReady) {
+      await onLockReady();
+    }
+    setLocalStatus("ready");
   };
 
   const currSymbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "₺";
@@ -273,77 +354,114 @@ export function TreatmentStudio({
               </Link>
             )}
 
-            {/* View Mode Switcher (Studio vs Klasik Tablo) */}
+            {/* Klasik Tablo Yapısına Geç Butonu (Sekme Rengiyle Birebir: bg-slate-900) */}
             {onViewModeChange && (
-              <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200/80 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => onViewModeChange("studio")}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                    viewMode === "studio"
-                      ? "bg-slate-900 text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <Sparkles className="size-3 text-blue-400" />
-                  <span>3D Treatment Studio</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onViewModeChange("table")}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                    viewMode === "table"
-                      ? "bg-slate-900 text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <span>📑 Klasik Tablo</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => onViewModeChange("table")}
+                className="group flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-3.5 py-2 text-xs border border-slate-800 shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer active:scale-95"
+                title="Klasik Tablo Yapısına Geç"
+              >
+                <Table className="size-3.5 text-blue-400" />
+                <span>Klasik Tablo Yapısına Geç</span>
+                <ArrowRight className="size-3.5 text-blue-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
             )}
 
-            {/* Patient & Plan Info Chip (Tek Kutu, Renksiz/Nötr) */}
+            {/* Patient & Plan Info Chip (Hasta Adı + Plan Başlığı) */}
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs text-slate-700 shadow-2xs">
               <User className="size-3.5 text-slate-400" />
               <span className="font-semibold text-slate-900">{patient.name}</span>
               <span className="h-3.5 w-px bg-slate-200" />
-              <span className="text-slate-500">Tedavi Planı</span>
+              {onPlanTitleChange && !isPlanLocked ? (
+                <input
+                  type="text"
+                  disabled={isPlanLocked}
+                  value={currentTitle}
+                  onChange={(e) => {
+                    setCurrentTitle(e.target.value);
+                    onPlanTitleChange(e.target.value);
+                  }}
+                  placeholder="Plan Başlığı"
+                  className="bg-transparent font-medium text-slate-700 hover:text-slate-900 focus:text-slate-900 focus:outline-none w-32 sm:w-44 transition placeholder:text-slate-400 disabled:opacity-80"
+                  title="Plan Başlığı"
+                />
+              ) : (
+                <span className="font-medium text-slate-700">{currentTitle || "Tedavi Planı"}</span>
+              )}
             </div>
+
+            {/* Plan Onaylandı / Kilitli Rozeti & Kilidi Aç Butonu */}
+            {isPlanLocked && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 shadow-2xs">
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
+                  <span>Onaylandı (Salt Okunur)</span>
+                </div>
+                {onUnlockPlan && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await onUnlockPlan();
+                      if (ok) setLocalStatus("draft");
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-50 active:bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-xs transition cursor-pointer"
+                    title="Plan kilidini aç ve düzenle"
+                  >
+                    <Unlock className="size-3.5 text-amber-600" />
+                    <span>Kilidi Aç & Düzenle</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Right: ONLY Şablonlar (Drafts) & Kaydet */}
+          {/* Right: Şablonlar & Otomatik Kayıt Durumu */}
           <div className="flex items-center gap-2">
-            {/* Şablonlar (Saved Drafts) */}
-            <button
-              type="button"
-              onClick={() => setIsDraftsModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-bold px-3.5 py-2 text-xs shadow-2xs transition cursor-pointer active:scale-95"
-            >
-              <Sparkles className="size-3.5 text-blue-600" />
-              <span>Şablonlar (Drafts)</span>
-            </button>
+            {/* Şablonlar (Saved Drafts) - Yalnızca Taslak Aşamasında Aktif */}
 
-            {/* Kaydet */}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 text-xs shadow-xs transition cursor-pointer disabled:opacity-50 active:scale-95"
-            >
-              <Save className="size-3.5" />
-              <span>{isSaving ? "Kaydediliyor..." : "Kaydet"}</span>
-            </button>
+            {/* Otomatik Kayıt Durum Rozeti / Plan Kilitli Rozeti */}
+            {isPlanLocked ? (
+              <div
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-2xs select-none"
+                title="Plan resmi olarak onaylandı ve kilitlendi. Düzenleme yapılamaz."
+              >
+                <Lock className="size-3.5 text-emerald-600" />
+                <span>Plan Kilitli</span>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 select-none shadow-2xs"
+                title={
+                  isSavingActive
+                    ? "Değişiklikler sunucuya kaydediliyor..."
+                    : hasUnsavedChanges
+                    ? "Değişiklikler algılandı, otomatik kaydediliyor..."
+                    : "Tüm değişiklikler otomatik olarak kaydedildi"
+                }
+              >
+                {isSavingActive ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin text-cyan-600" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : hasUnsavedChanges ? (
+                  <>
+                    <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="size-3.5 text-emerald-500" />
+                    <span>Otomatik Kaydedildi</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Save Success Alert Banner */}
-      {saveSuccessMsg && (
-        <div className="rounded-xl bg-emerald-600 text-white text-xs font-semibold px-4 py-2.5 shadow-xs transition flex items-center justify-center gap-2">
-          <CheckCircle2 className="size-4" />
-          <span>Tedavi planı ve tüm modüller başarıyla kaydedildi ve senkronize edildi.</span>
-        </div>
-      )}
 
       {/* ============================================================== */}
       {/* 2. CHEVRON WIZARD STEP NAVIGATION BAR */}
@@ -402,6 +520,7 @@ export function TreatmentStudio({
             conditions={conditions}
             onConditionsChange={setConditions}
             patientName={patient.name}
+            isLocked={isPlanLocked}
           />
         )}
 
@@ -414,6 +533,17 @@ export function TreatmentStudio({
             currency={currency}
             onItemsChange={setItems}
             onVisitsChange={setVisits}
+            isLocked={isPlanLocked}
+            onUnlockPlan={async () => {
+              if (onUnlockPlan) {
+                const ok = await onUnlockPlan();
+                if (ok) setLocalStatus("draft");
+                return ok;
+              }
+              return false;
+            }}
+            treatmentsCatalog={treatmentsCatalog}
+            priceMap={priceMap}
           />
         )}
 
@@ -493,17 +623,15 @@ export function TreatmentStudio({
             items={items}
             visits={visits}
             currency={currency}
+            planId={planId}
+            planTitle={currentTitle}
+            planStatus={localStatus || planStatus}
+            isLocked={isPlanLocked}
+            onLockReady={handleStudioLockAndReady}
             onPatientDobChange={(dob) => setPatient({ ...patient, dob })}
           />
         )}
       </div>
-
-      {/* Global Saved Drafts Modal */}
-      <DraftsModal
-        isOpen={isDraftsModalOpen}
-        onClose={() => setIsDraftsModalOpen(false)}
-        onApplyTemplate={handleApplyTemplate}
-      />
     </div>
   );
 }

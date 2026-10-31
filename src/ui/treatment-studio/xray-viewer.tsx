@@ -163,16 +163,16 @@ function InteractiveSlider({
         <div className="w-full h-1.5 bg-slate-200 rounded-full relative overflow-hidden">
           {/* Active Fill Track */}
           <div
-            className="h-full bg-blue-600 rounded-full"
+            className="h-full bg-slate-900 rounded-full"
             style={{ width: `${percentage}%` }}
           />
         </div>
 
         {/* Thumb Knob */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-4.5 rounded-full bg-blue-600 border-2 border-white shadow-md transition-transform ${
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-4.5 rounded-full bg-slate-900 border-2 border-white shadow-md transition-transform ${
             isDragging
-              ? "scale-125 cursor-grabbing ring-4 ring-blue-500/20"
+              ? "scale-125 cursor-grabbing ring-4 ring-slate-900/20"
               : "group-hover:scale-110 cursor-grab"
           }`}
           style={{ left: `${percentage}%` }}
@@ -535,11 +535,11 @@ export function XRayViewer({
       onClick={() => fileInputRef.current?.click()}
       className={`relative w-full h-full min-h-[460px] md:min-h-[500px] flex-1 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center p-6 text-center cursor-pointer select-none group ${
         isDragOver
-          ? "border-blue-500 bg-blue-50/80 shadow-md scale-[0.99]"
-          : "border-slate-300 hover:border-blue-400 bg-slate-50/70 hover:bg-slate-100/70"
+          ? "border-slate-800 bg-slate-100 shadow-md scale-[0.99]"
+          : "border-slate-300 hover:border-slate-600 bg-slate-50/70 hover:bg-slate-100/70"
       }`}
     >
-      <div className="size-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-110 transition shadow-xs">
+      <div className="size-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center mb-3 group-hover:scale-110 transition shadow-xs">
         <UploadCloud className="size-7" />
       </div>
 
@@ -558,7 +558,7 @@ export function XRayViewer({
             e.stopPropagation();
             fileInputRef.current?.click();
           }}
-          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
+          className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
         >
           <UploadCloud className="size-4" />
           <span>Röntgen / Fotoğraf Seç</span>
@@ -772,7 +772,7 @@ export function XRayViewer({
             {/* Header: Title + Global Reset */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-blue-100/70 text-blue-700">
+                <div className="p-1.5 rounded-lg bg-slate-900 text-white">
                   <Sliders className="size-4" />
                 </div>
                 <div>
@@ -811,7 +811,7 @@ export function XRayViewer({
                       onClick={() => handleApplyPreset(item.id)}
                       className={`flex flex-col items-start px-2.5 py-1.5 rounded-xl border text-left transition cursor-pointer ${
                         isActive
-                          ? "bg-blue-600 border-blue-600 text-white shadow-xs"
+                          ? "bg-slate-900 border-slate-900 text-white shadow-xs"
                           : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700 shadow-2xs"
                       }`}
                     >
@@ -821,7 +821,7 @@ export function XRayViewer({
                       </div>
                       <span
                         className={`text-[9px] ${
-                          isActive ? "text-blue-100" : "text-slate-400"
+                          isActive ? "text-slate-300" : "text-slate-400"
                         }`}
                       >
                         {item.tip}
@@ -907,7 +907,7 @@ export function XRayViewer({
                 }
                 className={`flex flex-col items-center justify-center p-2 rounded-xl border text-[10px] font-semibold transition cursor-pointer shadow-2xs ${
                   settings.isFlipped
-                    ? "bg-blue-50 border-blue-300 text-blue-700"
+                    ? "bg-slate-900 border-slate-900 text-white"
                     : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700"
                 }`}
                 title="Aynalama (Yatay Çevir)"
@@ -927,7 +927,7 @@ export function XRayViewer({
                 }
                 className={`flex flex-col items-center justify-center p-2 rounded-xl border text-[10px] font-semibold transition cursor-pointer shadow-2xs ${
                   settings.showGrid
-                    ? "bg-blue-50 border-blue-300 text-blue-700"
+                    ? "bg-slate-900 border-slate-900 text-white"
                     : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700"
                 }`}
                 title="Ölçüm Izgarasını Aç/Kapat"

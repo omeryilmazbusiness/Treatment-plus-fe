@@ -353,6 +353,43 @@ export async function createPlanAction(
   }
 }
 
+export async function reopenPlanAction(
+  planId: string,
+  expectedWorkspaceId?: string
+): Promise<ActionResult<Plan>> {
+  try {
+    const runtime = getRuntime();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return {
+        success: false,
+        unauthenticated: true,
+        error: "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    if (expectedWorkspaceId && expectedWorkspaceId !== session.clinicId) {
+      return {
+        success: false,
+        error:
+          "Aktif oturum başka bir hesaba ait. Diğer hesabı etkilememek için işlem engellendi.",
+      };
+    }
+
+    const plan = await runtime.plan.reopenDraft(
+      planId as ID,
+      session.accessToken
+    );
+    revalidatePath("/app/plans");
+    revalidatePath(`/app/plans/${planId}`);
+
+    return { success: true, data: plan };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Plan düzenlemeye açılamadı";
+    return { success: false, error: msg };
+  }
+}
+
 export async function readyPlanAction(
   planId: string,
   expectedWorkspaceId?: string

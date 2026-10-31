@@ -82,7 +82,7 @@ export function FdiOdontogram({
       <div className="mb-3">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2.5">
           <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-blue-600"></span>
+            <span className="size-2 rounded-full bg-slate-900"></span>
             <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
               Üst Çene (Maksilla)
             </span>
@@ -108,7 +108,7 @@ export function FdiOdontogram({
                 onClick={() => !readonly && onToggleTooth(tooth)}
                 className={`group relative flex flex-col items-center justify-end rounded-xl px-1 py-1.5 transition-all cursor-pointer ${
                   isSelected
-                    ? "bg-blue-50/90 ring-2 ring-blue-500 shadow-xs scale-105 z-10"
+                    ? "bg-slate-900/10 ring-2 ring-slate-800 shadow-xs scale-105 z-10"
                     : "hover:bg-slate-50 hover:shadow-2xs"
                 }`}
                 title={`${tooth}: ${meta?.nameTr || ""} (${condition})`}
@@ -129,7 +129,7 @@ export function FdiOdontogram({
                 <span
                   className={`mt-1 text-[11px] font-bold transition ${
                     isSelected
-                      ? "text-blue-700 font-black"
+                      ? "text-slate-950 font-black"
                       : "text-slate-600 group-hover:text-slate-900"
                   }`}
                 >
@@ -184,7 +184,7 @@ export function FdiOdontogram({
                 onClick={() => !readonly && onToggleTooth(tooth)}
                 className={`group relative flex flex-col items-center justify-start rounded-xl px-1 py-1.5 transition-all cursor-pointer ${
                   isSelected
-                    ? "bg-blue-50/90 ring-2 ring-blue-500 shadow-xs scale-105 z-10"
+                    ? "bg-slate-900/10 ring-2 ring-slate-800 shadow-xs scale-105 z-10"
                     : "hover:bg-slate-50 hover:shadow-2xs"
                 }`}
                 title={`${tooth}: ${meta?.nameTr || ""} (${condition})`}
@@ -212,7 +212,7 @@ export function FdiOdontogram({
                 <span
                   className={`mb-1 text-[11px] font-bold transition ${
                     isSelected
-                      ? "text-blue-700 font-black"
+                      ? "text-slate-950 font-black"
                       : "text-slate-600 group-hover:text-slate-900"
                   }`}
                 >
@@ -237,7 +237,7 @@ export function FdiOdontogram({
 
         <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 mt-2.5">
           <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-blue-600"></span>
+            <span className="size-2 rounded-full bg-slate-900"></span>
             <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
               Alt Çene (Mandibula)
             </span>

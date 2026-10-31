@@ -20,6 +20,64 @@ export type TreatmentType =
   | "general"
   | "other";
 
+export function inferTreatmentType(name: string, code?: string): TreatmentType {
+  const s = `${code || ""} ${name || ""}`.toLowerCase();
+  if (s.includes("implant")) return "implant";
+  if (
+    s.includes("dolgu") ||
+    s.includes("kompozit") ||
+    s.includes("filling") ||
+    s.includes("bonding") ||
+    s.includes("inley") ||
+    s.includes("onley")
+  ) {
+    return "filling";
+  }
+  if (s.includes("kanal") || s.includes("endo") || s.includes("root")) {
+    return "root_canal";
+  }
+  if (s.includes("çekim") || s.includes("cekim") || s.includes("extraction")) {
+    return "extraction";
+  }
+  if (s.includes("köprü") || s.includes("kopru") || s.includes("bridge") || s.includes("pontic")) {
+    return "bridge";
+  }
+  if (
+    s.includes("kuron") ||
+    s.includes("kron") ||
+    s.includes("crown") ||
+    s.includes("zirkon") ||
+    s.includes("kaplama") ||
+    s.includes("lamina") ||
+    s.includes("veneer") ||
+    s.includes("e-max") ||
+    s.includes("emax")
+  ) {
+    return "crown";
+  }
+  if (s.includes("söküm") || s.includes("sokum") || s.includes("removal")) {
+    return "prosthesis_removal";
+  }
+  if (s.includes("protez") || s.includes("denture") || s.includes("total") || s.includes("hareketli")) {
+    return "dentures";
+  }
+  if (
+    s.includes("röntgen") ||
+    s.includes("rontgen") ||
+    s.includes("xray") ||
+    s.includes("bakım") ||
+    s.includes("profilaksi") ||
+    s.includes("detertraj") ||
+    s.includes("scaling") ||
+    s.includes("muayene") ||
+    s.includes("beyazlatma") ||
+    s.includes("plak")
+  ) {
+    return "general";
+  }
+  return "other";
+}
+
 export interface ToothDiagnosisData {
   condition: ToothCondition;
   cariesSeverity?: "mild" | "moderate" | "severe";
@@ -28,7 +86,9 @@ export interface ToothDiagnosisData {
 
 export interface StudioPlanItem {
   id: string;
-  treatmentType: TreatmentType;
+  treatmentId?: string;
+  treatmentCode?: string;
+  treatmentType: TreatmentType | string;
   treatmentName: string;
   teeth: string[];
   quantity: number;

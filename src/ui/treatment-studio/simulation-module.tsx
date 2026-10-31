@@ -249,17 +249,15 @@ export function SimulationModule({
         </div>
       </div>
 
-      {/* Right 5 Columns: Chronological Treatment Stages Timeline (Image 5 exact style) */}
+      {/* Right 5 Columns: Chronological Treatment Stages Timeline */}
       <div className="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
+          <div className="flex items-center gap-2">
+            <div className="size-2 rounded-full bg-blue-600 ring-2 ring-blue-100" />
             <h3 className="text-sm font-bold text-slate-900">Tedavi Süreç Takvimi</h3>
-            <p className="text-[11px] text-slate-500">
-              Kronolojik klinik aşamalar ve iyileşme periyotları
-            </p>
           </div>
-          <span className="rounded-lg bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-800 border border-blue-200">
-            3D İnteraktif
+          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+            {currentStageIndex + 1} / {stages.length}
           </span>
         </div>
 
@@ -268,13 +266,13 @@ export function SimulationModule({
           {Object.entries(groupedStages).map(([visitTitle, vStages]) => (
             <div key={visitTitle} className="space-y-1.5">
               {/* Visit Header */}
-              <div className="flex items-center gap-2 rounded-xl bg-slate-100/80 px-3.5 py-2 text-xs font-bold text-slate-800">
+              <div className="flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200/70 px-3.5 py-2 text-xs font-bold text-slate-700">
                 <Calendar className="size-3.5 text-slate-500" />
                 <span>{visitTitle}</span>
               </div>
 
               {/* Stages under this visit */}
-              <div className="space-y-1 pl-2">
+              <div className="space-y-1 pl-1">
                 {vStages.map((st) => {
                   const stageIndex = stages.findIndex((s) => s.id === st.id);
                   const isActive = stageIndex === currentStageIndex;
@@ -287,51 +285,43 @@ export function SimulationModule({
                         setCurrentStageIndex(stageIndex);
                         setIsPlaying(false);
                       }}
+                      title={st.description}
                       className={`group flex items-center justify-between rounded-xl px-3 py-2.5 transition cursor-pointer border ${
                         isActive
                           ? "bg-slate-900 border-slate-900 text-white shadow-sm font-semibold"
                           : isPassed
-                          ? "bg-slate-50/60 border-slate-100 text-slate-600 hover:bg-slate-100"
-                          : "bg-white border-transparent text-slate-500 hover:bg-slate-50"
+                          ? "bg-slate-50/70 border-slate-100 text-slate-700 hover:bg-slate-100"
+                          : "bg-white border-transparent text-slate-600 hover:bg-slate-50"
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={`size-2.5 rounded-full ${
-                            isActive
-                              ? "bg-blue-400 ring-2 ring-blue-300/40 animate-pulse"
-                              : isPassed
-                              ? "bg-emerald-500"
-                              : "bg-slate-300"
-                          }`}
-                        />
-                        <div>
-                          <div className="text-xs">{st.stageName}</div>
-                          {st.description && (
-                            <div className={`text-[10px] line-clamp-1 ${isActive ? "text-slate-300" : "text-slate-500"}`}>
-                              {st.description}
-                            </div>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {isActive ? (
+                          <div className="size-2 rounded-full bg-blue-400 ring-4 ring-blue-400/25 shrink-0" />
+                        ) : isPassed ? (
+                          <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                        ) : (
+                          <div className="size-2 rounded-full bg-slate-300 shrink-0" />
+                        )}
+                        <span className="text-xs truncate">{st.stageName}</span>
                       </div>
 
                       {/* Tooth pills */}
                       {st.teeth.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 justify-end max-w-[130px]">
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
                           {st.teeth.slice(0, 4).map((t) => (
                             <span
                               key={t}
-                              className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold ${
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold ${
                                 isActive
                                   ? "bg-slate-800 text-slate-200 border border-slate-700"
-                                  : "bg-slate-100 text-slate-600"
+                                  : "bg-slate-100 text-slate-600 border border-slate-200/60"
                               }`}
                             >
                               {t}
                             </span>
                           ))}
                           {st.teeth.length > 4 && (
-                            <span className="text-[9px] text-slate-400">
+                            <span className={`text-[10px] font-mono font-medium ${isActive ? "text-slate-400" : "text-slate-400"}`}>
                               +{st.teeth.length - 4}
                             </span>
                           )}

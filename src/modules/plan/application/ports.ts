@@ -73,6 +73,7 @@ export interface PlanWriter {
     accessToken?: string
   ): Promise<Plan>;
   markReady(id: ID, accessToken?: string): Promise<Plan>;
+  reopenDraft(id: ID, accessToken?: string): Promise<Plan>;
 }
 
 export interface PatientReader {
