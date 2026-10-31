@@ -17,7 +17,6 @@ import {
   FileDown,
   Layers,
   Loader2,
-  Lock,
   Unlock,
   Menu,
   Minus,
@@ -38,6 +37,7 @@ import type {
   AnimationTimelineStage,
   ClinicBrandInfo,
   PatientInfo,
+  PlanDiscount,
   StudioPlanItem,
   StudioVisit,
   ToothCondition,
@@ -49,6 +49,7 @@ import { SimulationModule, DEFAULT_ANIMATION_STAGES } from "./simulation-module"
 import { OverviewModule } from "./overview-module";
 
 export type StudioTab = "diagnosis" | "treatments" | "animation" | "ai_summary" | "overview";
+const VALID_TABS: StudioTab[] = ["diagnosis", "treatments", "animation", "ai_summary", "overview"];
 
 export interface TreatmentStudioProps {
   initialPatient?: PatientInfo;
@@ -69,8 +70,15 @@ export interface TreatmentStudioProps {
     conditions: Record<string, ToothCondition>;
     items: StudioPlanItem[];
     visits: StudioVisit[];
+    discounts?: PlanDiscount[];
   }) => Promise<void> | void;
   isSaving?: boolean;
+  onItemsChange?: (items: StudioPlanItem[]) => void;
+  onVisitsChange?: (visits: StudioVisit[]) => void;
+  onConditionsChange?: (conditions: Record<string, ToothCondition>) => void;
+  initialDiscounts?: PlanDiscount[];
+  onDiscountsChange?: (discounts: PlanDiscount[]) => void;
+  initialTab?: StudioTab;
   backHref?: string;
   embedded?: boolean;
   viewMode?: "studio" | "table";
@@ -85,6 +93,8 @@ export function TreatmentStudio({
   initialConditions,
   initialItems,
   initialVisits,
+  initialDiscounts,
+  onDiscountsChange: onDiscountsChangeProp,
   initialCurrency = "EUR",
   initialLocale = "tr",
   planId,
@@ -95,6 +105,9 @@ export function TreatmentStudio({
   onUnlockPlan,
   onLockReady,
   onSave,
+  onItemsChange: onItemsChangeProp,
+  onVisitsChange: onVisitsChangeProp,
+  onConditionsChange: onConditionsChangeProp,
   isSaving = false,
   backHref = "/app/plans",
   embedded = false,
@@ -102,9 +115,68 @@ export function TreatmentStudio({
   onViewModeChange,
   treatmentsCatalog,
   priceMap,
+  initialTab,
 }: TreatmentStudioProps) {
-  // Navigation & Tabs
-  const [activeTab, setActiveTab] = useState<StudioTab>("diagnosis");
+  // Navigation & Tabs with URL and Storage Persistence
+  const [activeTab, setActiveTabState] = useState<StudioTab>(initialTab || "diagnosis");
+
+  const setActiveTab = React.useCallback(
+    (tab: StudioTab) => {
+      setActiveTabState(tab);
+      if (typeof window !== "undefined") {
+        try {
+          if (planId) {
+            localStorage.setItem(`tp_plan_${planId}_tab`, tab);
+          } else {
+            sessionStorage.setItem("tp_studio_active_tab", tab);
+          }
+          const url = new URL(window.location.href);
+          url.searchParams.set("tab", tab);
+          window.history.replaceState(window.history.state, "", url.toString());
+        } catch (e) {
+          // ignore storage error
+        }
+      }
+    },
+    [planId]
+  );
+
+  // Restore activeTab on mount / page refresh
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const urlTab = new URLSearchParams(window.location.search).get("tab") as StudioTab;
+      if (urlTab && VALID_TABS.includes(urlTab)) {
+        setActiveTabState(urlTab);
+        return;
+      }
+      const storageKey = planId ? `tp_plan_${planId}_tab` : "tp_studio_active_tab";
+      const storedTab = (
+        planId ? localStorage.getItem(storageKey) : sessionStorage.getItem(storageKey)
+      ) as StudioTab;
+      if (storedTab && VALID_TABS.includes(storedTab)) {
+        setActiveTabState(storedTab);
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", storedTab);
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [planId]);
+
+  // Support browser back/forward buttons
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePopState = () => {
+      const urlTab = new URLSearchParams(window.location.search).get("tab") as StudioTab;
+      if (urlTab && VALID_TABS.includes(urlTab)) {
+        setActiveTabState(urlTab);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Plan Title state
   const [currentTitle, setCurrentTitle] = useState(planTitle || "Tedavi Planı");
@@ -117,8 +189,8 @@ export function TreatmentStudio({
   // Plan lock & status state
   const [localStatus, setLocalStatus] = useState<string | undefined>(planStatus);
   useEffect(() => {
-    if (planStatus) setLocalStatus(planStatus);
-  }, [planStatus]);
+    if (planStatus !== undefined) setLocalStatus(planStatus);
+  }, [planStatus, isLockedProp]);
 
   const isPlanLocked = Boolean(
     isLockedProp ??
@@ -158,41 +230,36 @@ export function TreatmentStudio({
 
   // Conditions (Module 1)
   const [conditions, setConditions] = useState<Record<string, ToothCondition>>(
-    initialConditions || {
+    initialConditions || (embedded ? {} : {
       "16": "filled",
       "14": "caries",
       "24": "caries",
       "26": "missing",
       "36": "missing",
       "46": "root_canal",
-    }
+    })
   );
 
   // Visits & Plan Items (Module 2)
   const [visits, setVisits] = useState<StudioVisit[]>(
-    initialVisits || [
-      {
-        id: "v-1",
-        orderNum: 1,
-        title: "1. Seans: Cerrahi, İmplantasyon ve Hibrit Protez",
-        phaseLabel: "1. Cerrahi Aşama",
-        chartTeeth: ["12", "14", "22", "24", "32", "34", "42", "44"],
-      },
-      {
-        id: "v-2",
-        orderNum: 2,
-        title: "2. Seans: Kalıcı Zirkonyum Köprü Simantasyonu",
-        phaseLabel: "2. Protetik Tamamlama",
-        healingNote: "6 Ay İyileşme Süresi",
-        healingMonths: 6,
-        chartTeeth: ["16", "26", "36", "46"],
-      },
-    ]
+    initialVisits && initialVisits.length > 0
+      ? initialVisits
+      : [
+          {
+            id: "v-1",
+            orderNum: 1,
+            title: "1. Seans: Muayene & Tedavi",
+            phaseLabel: "1. Aşama",
+            chartTeeth: [],
+          },
+        ]
   );
 
   const [items, setItems] = useState<StudioPlanItem[]>(
-    initialItems && initialItems.length > 0
+    initialItems !== undefined
       ? initialItems
+      : embedded
+      ? []
       : [
           {
             id: "it-allon4-up",
@@ -214,26 +281,43 @@ export function TreatmentStudio({
             isPackage: true,
             visitId: "v-1",
           },
-          {
-            id: "it-imp-up",
-            treatmentType: "implant",
-            treatmentName: "Nobel Titanyum İmplant",
-            teeth: ["12", "14", "22", "24"],
-            quantity: 4,
-            unitPrice: 0,
-            visitId: "v-1",
-          },
-          {
-            id: "it-imp-low",
-            treatmentType: "implant",
-            treatmentName: "Nobel Titanyum İmplant",
-            teeth: ["32", "34", "42", "44"],
-            quantity: 4,
-            unitPrice: 0,
-            visitId: "v-1",
-          },
         ]
   );
+
+  // Synchronize internal state when props update
+  useEffect(() => {
+    if (initialConditions !== undefined) {
+      setConditions(initialConditions);
+    }
+  }, [initialConditions]);
+
+  useEffect(() => {
+    if (initialVisits !== undefined && initialVisits.length > 0) {
+      setVisits(initialVisits);
+    }
+  }, [initialVisits]);
+
+  useEffect(() => {
+    if (initialItems !== undefined) {
+      setItems(initialItems);
+    }
+  }, [initialItems]);
+
+  // Discounts state
+  const [discounts, setDiscounts] = useState<PlanDiscount[]>(
+    initialDiscounts && initialDiscounts.length > 0 ? initialDiscounts : []
+  );
+
+  useEffect(() => {
+    if (initialDiscounts !== undefined) {
+      setDiscounts(initialDiscounts);
+    }
+  }, [initialDiscounts]);
+
+  const handleDiscountsChange = (newDiscounts: PlanDiscount[]) => {
+    setDiscounts(newDiscounts);
+    onDiscountsChangeProp?.(newDiscounts);
+  };
 
   // Modals & Panels
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
@@ -243,7 +327,8 @@ export function TreatmentStudio({
     c: Record<string, ToothCondition>,
     it: StudioPlanItem[],
     v: StudioVisit[],
-    t?: string
+    t?: string,
+    d?: PlanDiscount[]
   ) =>
     JSON.stringify({
       t: t ?? currentTitle,
@@ -262,31 +347,36 @@ export function TreatmentStudio({
         teeth: [...(x.chartTeeth || [])].sort(),
         hNote: x.healingNote || "",
       })),
+      d: (d || discounts || []).map((x) => ({
+        l: x.label,
+        a: x.amount,
+      })),
     });
 
   // Baseline snapshot of saved state
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string>(() =>
-    serializeState(conditions, items, visits, currentTitle)
+    serializeState(conditions, items, visits, currentTitle, discounts)
   );
 
   // Synchronize baseline snapshot if initial props change externally
   useEffect(() => {
-    if (initialConditions || initialItems || initialVisits || planTitle) {
+    if (initialConditions || initialItems || initialVisits || planTitle || initialDiscounts) {
       const snap = serializeState(
         initialConditions || conditions,
         initialItems && initialItems.length > 0 ? initialItems : items,
         initialVisits || visits,
-        planTitle || currentTitle
+        planTitle || currentTitle,
+        initialDiscounts || discounts
       );
       setLastSavedSnapshot(snap);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialConditions, initialItems, initialVisits, planTitle]);
+  }, [initialConditions, initialItems, initialVisits, planTitle, initialDiscounts]);
 
   // Current state snapshot
   const currentSnapshot = useMemo(
-    () => serializeState(conditions, items, visits, currentTitle),
-    [conditions, items, visits, currentTitle]
+    () => serializeState(conditions, items, visits, currentTitle, discounts),
+    [conditions, items, visits, currentTitle, discounts]
   );
 
   // Dirty check: Are there any unsaved modifications?
@@ -300,7 +390,7 @@ export function TreatmentStudio({
     setIsLocalSaving(true);
     try {
       const snap = currentSnapshot;
-      await onSave({ conditions, items, visits });
+      await onSave({ conditions, items, visits, discounts });
       setLastSavedSnapshot(snap);
       setSaveSuccessMsg(true);
       setTimeout(() => setSaveSuccessMsg(false), 2000);
@@ -309,7 +399,7 @@ export function TreatmentStudio({
     } finally {
       setIsLocalSaving(false);
     }
-  }, [isPlanLocked, onSave, currentSnapshot, conditions, items, visits]);
+  }, [isPlanLocked, onSave, currentSnapshot, conditions, items, visits, discounts]);
 
   // Debounced Auto-save (1200ms)
   useEffect(() => {
@@ -324,13 +414,53 @@ export function TreatmentStudio({
 
   const handleStudioLockAndReady = async () => {
     if (onSave) {
-      await onSave({ conditions, items, visits });
+      await onSave({ conditions, items, visits, discounts });
       setLastSavedSnapshot(currentSnapshot);
     }
     if (onLockReady) {
       await onLockReady();
     }
     setLocalStatus("ready");
+  };
+
+  const handleItemsChange = (newItems: StudioPlanItem[]) => {
+    setItems(newItems);
+    onItemsChangeProp?.(newItems);
+  };
+  const handleVisitsChange = (newVisits: StudioVisit[]) => {
+    setVisits(newVisits);
+    onVisitsChangeProp?.(newVisits);
+  };
+  const handleConditionsChange = (newConditions: Record<string, ToothCondition>) => {
+    setConditions(newConditions);
+    onConditionsChangeProp?.(newConditions);
+  };
+
+  const handleSwitchToTable = async () => {
+    // 1. Immediately push all current studio state to parent callbacks
+    onItemsChangeProp?.(items);
+    onVisitsChangeProp?.(visits);
+    onConditionsChangeProp?.(conditions);
+    onDiscountsChangeProp?.(discounts);
+    if (onPlanTitleChange) onPlanTitleChange(currentTitle);
+
+    // 2. If there are unsaved modifications, save immediately
+    if (hasUnsavedChanges && !isPlanLocked && onSave) {
+      setIsLocalSaving(true);
+      try {
+        await onSave({ conditions, items, visits, discounts });
+        setLastSavedSnapshot(currentSnapshot);
+      } catch (err) {
+        console.error("Error auto-saving before switching to table:", err);
+      } finally {
+        setIsLocalSaving(false);
+      }
+    }
+
+    // 3. Switch view mode to table
+    if (onViewModeChange) {
+      onViewModeChange("table");
+    }
   };
 
   const currSymbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "₺";
@@ -358,7 +488,7 @@ export function TreatmentStudio({
             {onViewModeChange && (
               <button
                 type="button"
-                onClick={() => onViewModeChange("table")}
+                onClick={handleSwitchToTable}
                 className="group flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-3.5 py-2 text-xs border border-slate-800 shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer active:scale-95"
                 title="Klasik Tablo Yapısına Geç"
               >
@@ -391,44 +521,29 @@ export function TreatmentStudio({
               )}
             </div>
 
-            {/* Plan Onaylandı / Kilitli Rozeti & Kilidi Aç Butonu */}
-            {isPlanLocked && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 shadow-2xs">
-                  <CheckCircle2 className="size-3.5 text-emerald-600" />
-                  <span>Onaylandı (Salt Okunur)</span>
-                </div>
-                {onUnlockPlan && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await onUnlockPlan();
-                      if (ok) setLocalStatus("draft");
-                    }}
-                    className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-50 active:bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-xs transition cursor-pointer"
-                    title="Plan kilidini aç ve düzenle"
-                  >
-                    <Unlock className="size-3.5 text-amber-600" />
-                    <span>Kilidi Aç & Düzenle</span>
-                  </button>
-                )}
-              </div>
-            )}
+
           </div>
 
           {/* Right: Şablonlar & Otomatik Kayıt Durumu */}
           <div className="flex items-center gap-2">
             {/* Şablonlar (Saved Drafts) - Yalnızca Taslak Aşamasında Aktif */}
 
-            {/* Otomatik Kayıt Durum Rozeti / Plan Kilitli Rozeti */}
+            {/* Otomatik Kayıt Durum Rozeti / Kilidi Aç Butonu */}
             {isPlanLocked ? (
-              <div
-                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-2xs select-none"
-                title="Plan resmi olarak onaylandı ve kilitlendi. Düzenleme yapılamaz."
-              >
-                <Lock className="size-3.5 text-emerald-600" />
-                <span>Plan Kilitli</span>
-              </div>
+              onUnlockPlan && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await onUnlockPlan();
+                    if (ok) setLocalStatus("draft");
+                  }}
+                  className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-50 active:bg-amber-100 px-3.5 py-2 text-xs font-bold text-amber-900 shadow-xs transition cursor-pointer"
+                  title="Plan kilidini aç ve düzenle"
+                >
+                  <Unlock className="size-3.5 text-amber-600" />
+                  <span>Kilidi Aç & Düzenle</span>
+                </button>
+              )
             ) : (
               <div
                 className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 select-none shadow-2xs"
@@ -464,46 +579,56 @@ export function TreatmentStudio({
 
 
       {/* ============================================================== */}
-      {/* 2. CHEVRON WIZARD STEP NAVIGATION BAR */}
+      {/* 2. SADE VE ESTETİK STÜDYO SEKME ÇUBUĞU */}
       {/* ============================================================== */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-2xs">
-        <div className="flex items-stretch overflow-x-auto scrollbar-none divide-x divide-slate-100">
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-2xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
           {[
-            { id: "diagnosis" as const, label: "Diagnosis (Teşhis)" },
-            { id: "treatments" as const, label: "Treatments (Tedavi Planlama)" },
-            { id: "animation" as const, label: "Animation (3D Simülasyon)" },
-            { id: "ai_summary" as const, label: "AI summary (Akıllı Özet)" },
-            { id: "overview" as const, label: "Overview (Hasta Sunumu)" },
-          ].map((tab, idx) => {
+            {
+              id: "diagnosis" as const,
+              title: "Teşhis",
+              icon: Stethoscope,
+            },
+            {
+              id: "treatments" as const,
+              title: "Tedavi Planı",
+              icon: Layers,
+            },
+            {
+              id: "animation" as const,
+              title: "3D Simülasyon",
+              icon: Sparkles,
+            },
+            {
+              id: "ai_summary" as const,
+              title: "Akıllı Özet",
+              icon: Bot,
+            },
+            {
+              id: "overview" as const,
+              title: "Hasta Sunumu",
+              icon: Eye,
+            },
+          ].map((tab) => {
             const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`group relative flex-1 min-w-[170px] py-3.5 px-5 text-xs font-bold transition flex items-center justify-center gap-2.5 cursor-pointer ${
+                className={`group flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer select-none flex-1 min-w-[130px] sm:min-w-0 ${
                   isActive
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-600 hover:text-slate-950 hover:bg-slate-50"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-950 hover:bg-slate-100/70"
                 }`}
               >
-                <span
-                  className={`size-5 rounded-full flex items-center justify-center text-[10px] font-mono border font-black ${
-                    isActive
-                      ? "bg-white text-slate-950 border-white"
-                      : "bg-slate-100 text-slate-500 border-slate-200"
-                  }`}
-                >
-                  {idx + 1}
-                </span>
-                <span>{tab.label}</span>
-
-                {/* Right Arrow Chevron indicator */}
-                <span
-                  className={`hidden lg:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 size-0 border-y-[18px] border-y-transparent border-l-[11px] transition ${
-                    isActive ? "border-l-slate-900" : "border-l-transparent"
+                <Icon
+                  className={`size-4 shrink-0 transition-colors ${
+                    isActive ? "text-blue-400" : "text-slate-400 group-hover:text-slate-700"
                   }`}
                 />
+                <span className="truncate">{tab.title}</span>
               </button>
             );
           })}
@@ -518,7 +643,7 @@ export function TreatmentStudio({
         {activeTab === "diagnosis" && (
           <DiagnosisModule
             conditions={conditions}
-            onConditionsChange={setConditions}
+            onConditionsChange={handleConditionsChange}
             patientName={patient.name}
             isLocked={isPlanLocked}
           />
@@ -531,8 +656,8 @@ export function TreatmentStudio({
             items={items}
             visits={visits}
             currency={currency}
-            onItemsChange={setItems}
-            onVisitsChange={setVisits}
+            onItemsChange={handleItemsChange}
+            onVisitsChange={handleVisitsChange}
             isLocked={isPlanLocked}
             onUnlockPlan={async () => {
               if (onUnlockPlan) {
@@ -544,13 +669,15 @@ export function TreatmentStudio({
             }}
             treatmentsCatalog={treatmentsCatalog}
             priceMap={priceMap}
+            discounts={discounts}
+            onDiscountsChange={handleDiscountsChange}
+            onLockReady={handleStudioLockAndReady}
           />
         )}
 
         {/* Module 3: 3D Animasyon (Simulation) */}
         {activeTab === "animation" && (
           <SimulationModule
-            stages={DEFAULT_ANIMATION_STAGES}
             planItems={items}
             visits={visits}
           />

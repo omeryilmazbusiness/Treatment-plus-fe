@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useTransition } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   Award,
@@ -12,7 +12,6 @@ import {
   Download,
   ExternalLink,
   Eye,
-  FileCheck2,
   FileDown,
   FileText,
   HeartHandshake,
@@ -35,7 +34,9 @@ import {
 } from "lucide-react";
 
 import type { UltimatePlanDTO } from "@/modules/share/domain/share";
-import { acceptPublicPlanAction, recordPublicEventAction } from "@/app/(clinic)/app/plans/actions";
+import { recordPublicEventAction } from "@/app/(clinic)/app/plans/actions";
+import { SimulationModule } from "@/ui/treatment-studio/simulation-module";
+import type { StudioPlanItem, StudioVisit } from "@/ui/treatment-studio/types";
 
 interface Props {
   data: UltimatePlanDTO;
@@ -139,13 +140,7 @@ export function PatientPresentationClient({ data, token }: Props) {
     enable_acceptance: true,
   };
 
-  const [accepted, setAccepted] = useState(initialAccepted);
-  const [acceptedAt, setAcceptedAt] = useState(initialAcceptedAt);
-  const [signature, setSignature] = useState(initialSignature);
-  const [showAcceptModal, setShowAcceptModal] = useState(false);
-  const [signatureInput, setSignatureInput] = useState(plan?.patient_name || "");
-  const [isAccepting, startAccepting] = useTransition();
-  const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [accepted] = useState(initialAccepted);
 
   // 3D Viz Modal state
   const [show3DModal, setShow3DModal] = useState(false);
@@ -277,25 +272,54 @@ export function PatientPresentationClient({ data, token }: Props) {
     setShow3DModal(true);
   };
 
-  const handleConfirmAccept = () => {
-    if (!signatureInput.trim()) {
-      setAcceptError("Lütfen onay için adınızı ve soyadınızı giriniz.");
-      return;
-    }
+  // Close 3D Modal on Escape key
+  useEffect(() => {
+    if (!show3DModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShow3DModal(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [show3DModal]);
 
-    startAccepting(async () => {
-      setAcceptError(null);
-      const res = await acceptPublicPlanAction(token, signatureInput.trim());
-      if (res.success && res.data) {
-        setAccepted(true);
-        setSignature(signatureInput.trim());
-        setAcceptedAt(res.data.accepted_at);
-        setShowAcceptModal(false);
-      } else {
-        setAcceptError(res.error || "Onay kaydedilemedi, lütfen tekrar deneyiniz.");
-      }
+  // Map visits & plan items to Studio format for the 3D simulation module
+  const mappedVisits = useMemo<StudioVisit[]>(() => {
+    return visits.map((v: any, idx: number) => ({
+      id: v.id || `visit-${idx + 1}`,
+      orderNum: v.order_num ?? v.orderNum ?? idx + 1,
+      title: v.title || `${v.order_num || idx + 1}. Seans`,
+      phaseLabel: v.phase_label || v.phaseLabel || `${idx + 1}. Aşama`,
+      healingNote: v.healing_note || v.healingNote || "",
+      chartTeeth: Array.isArray(v.chart_teeth)
+        ? v.chart_teeth
+        : Array.isArray(v.chartTeeth)
+        ? v.chartTeeth
+        : [],
+    }));
+  }, [visits]);
+
+  const mappedPlanItems = useMemo<StudioPlanItem[]>(() => {
+    const firstVisitId = mappedVisits[0]?.id || "v-default";
+    return allItems.map((it: any, idx: number) => {
+      const teeth =
+        Array.isArray(it.teeth) && it.teeth.length > 0
+          ? it.teeth
+          : it.tooth_number
+          ? [it.tooth_number]
+          : [];
+      return {
+        id: it.id || `item-${idx + 1}`,
+        visitId: it.visit_id || it.visitId || firstVisitId,
+        treatmentName: it.treatment_name || it.treatmentName || "Tedavi",
+        treatmentType: it.treatment_type || it.treatmentType || "other",
+        teeth,
+        quantity: it.quantity || 1,
+        unitPrice: it.unit_price || it.unitPrice || 0,
+        animationCode: it.animation_code || it.animationCode,
+        description: it.description || "",
+      };
     });
-  };
+  }, [allItems, mappedVisits]);
 
   const cleanPhone = (cta.phone_number || clinic?.phone || "").replace(/[^\d]/g, "");
   const cleanWhatsApp = (cta.whatsapp_number || clinic?.phone || "").replace(/[^\d]/g, "");
@@ -308,22 +332,6 @@ export function PatientPresentationClient({ data, token }: Props) {
   );
 
   const waUrl = cleanWhatsApp ? `https://wa.me/${cleanWhatsApp}?text=${waMessage}` : "";
-
-  // 3D Player URL with plan items encoded
-  const vizPlayerUrl = useMemo(() => {
-    const itemParts: string[] = [];
-    allItems.forEach((it: any) => {
-      const code = it.animation_code || "composite_filling";
-      const teeth = Array.isArray(it.teeth) && it.teeth.length > 0
-        ? it.teeth
-        : it.tooth_number ? [it.tooth_number] : ["16"];
-      teeth.forEach((t: string) => {
-        itemParts.push(`${code}:${t}`);
-      });
-    });
-    const itemsParam = itemParts.length > 0 ? itemParts.join(",") : "composite_filling:16";
-    return `/v1/viz/player?items=${encodeURIComponent(itemsParam)}&locale=tr&autoplay=1`;
-  }, [allItems]);
 
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-900 selection:bg-slate-900 selection:text-white pb-16 font-sans">
@@ -1036,24 +1044,23 @@ export function PatientPresentationClient({ data, token }: Props) {
               </span>
             </div>
 
-            {Boolean(plan?.totals_discount && plan.totals_discount > 0) && (
+            {Array.isArray(plan?.discounts) && plan.discounts.length > 0 ? (
+              plan.discounts.map((d: any, dIdx: number) => (
+                <div key={d.id || dIdx} className="flex justify-between py-1 text-emerald-700">
+                  <span>{d.label || "Özel Klinik İndirimi"}</span>
+                  <span className="font-bold">
+                    -{formatCurrency(d.amount, plan?.currency)}
+                  </span>
+                </div>
+              ))
+            ) : Boolean(plan?.totals_discount && plan.totals_discount > 0) ? (
               <div className="flex justify-between py-1 text-emerald-700">
                 <span>Özel Klinik İndirimi</span>
                 <span className="font-bold">
                   -{formatCurrency(plan?.totals_discount, plan?.currency)}
                 </span>
               </div>
-            )}
-
-            {Array.isArray(plan?.discounts) &&
-              plan.discounts.map((d: any, dIdx: number) => (
-                <div key={d.id || dIdx} className="flex justify-between py-0.5 text-xs text-slate-500">
-                  <span>{d.label || "İndirim"}</span>
-                  <span className="font-medium text-emerald-600">
-                    -{formatCurrency(d.amount, plan?.currency)}
-                  </span>
-                </div>
-              ))}
+            ) : null}
 
             {/* Genel Toplam Vurgulu Kutusu */}
             <div className="mt-4 rounded-2xl bg-slate-900 p-5 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
@@ -1174,131 +1181,40 @@ export function PatientPresentationClient({ data, token }: Props) {
             </div>
           )}
         </section>
-
-        {/* 11. DİJİTAL ONAY & HUKUKİ KABUL KARTI */}
-        <section className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-xs text-center space-y-4">
-          {accepted ? (
-            <div className="space-y-3">
-              <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                <CheckCircle2 className="size-8" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">
-                Tedavi Planı Dijital Olarak Onaylandı
-              </h3>
-              <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-                Bu plan <strong>{signature || patientDisplayName}</strong> adına{" "}
-                {acceptedAt ? new Date(acceptedAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "yakın zamanda"}{" "}
-                tarihinde elektronik onaylanmıştır. Kliniğimiz randevu hazırlığı için sizinle irtibata geçecektir.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-w-lg mx-auto">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-900">
-                <FileCheck2 className="size-6" />
-              </div>
-              <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                Tedavi Planınızı Onaylamak İster misiniz?
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Hazırlanan seans takvimini ve tutarı uygun buluyorsanız, planınızı dijital olarak onaylayabilir ve kliniğimizin sizin için hazırlıklara başlamasını sağlayabilirsiniz.
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowAcceptModal(true)}
-                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-slate-800 transition active:scale-95"
-              >
-                <Check className="size-4 text-emerald-400" />
-                <span>Tedavi Planını Onayla</span>
-              </button>
-            </div>
-          )}
-        </section>
       </main>
 
-      {/* 3D Viz Player Modal */}
+      {/* 3D Simulation Modal */}
       {show3DModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 sm:p-6 backdrop-blur-md">
-          <div className="relative w-full max-w-5xl h-[88vh] rounded-3xl bg-slate-900 border border-slate-800 flex flex-col overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-950/70">
-              <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
-                <Sparkles className="size-4" />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-2 sm:p-4 md:p-6 backdrop-blur-md"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShow3DModal(false);
+          }}
+        >
+          <div className="relative w-full max-w-6xl max-h-[94vh] rounded-3xl bg-slate-950 border border-slate-800 flex flex-col overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 bg-slate-950/90 shrink-0">
+              <div className="flex items-center gap-2.5 text-cyan-400 font-bold text-xs sm:text-sm uppercase tracking-wider">
+                <Sparkles className="size-4 text-cyan-400 shrink-0" />
                 <span>3D Parametrik Çene & Diş Simülasyonu</span>
               </div>
               <button
                 type="button"
                 onClick={() => setShow3DModal(false)}
                 className="flex size-8 cursor-pointer items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Kapat"
               >
                 <X className="size-4" />
               </button>
             </div>
-            <iframe
-              src={vizPlayerUrl}
-              title="3D Viz Player"
-              className="w-full flex-1 border-0"
-            />
-          </div>
-        </div>
-      )}
 
-      {/* Digital Acceptance Signature Modal */}
-      {showAcceptModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <div className="flex size-11 items-center justify-center rounded-2xl bg-slate-900 text-white mb-3.5">
-              <ShieldCheck className="size-6" />
-            </div>
-
-            <h3 className="text-base font-bold text-slate-900">
-              Tedavi Planını Onaylıyor musunuz?
-            </h3>
-            <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-              Sayın <strong>{patientDisplayName}</strong>, kliniğimiz tarafından hazırlanan <strong>{plan?.title || "Tedavi Planı"}</strong> içeriğini ve şartlarını kabul ettiğinizi teyit etmek için lütfen adınızı onaylayınız.
-            </p>
-
-            <div className="mt-4 space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-700">
-                Dijital Onay İmzası (Ad Soyad)
-              </label>
-              <input
-                type="text"
-                value={signatureInput}
-                onChange={(e) => setSignatureInput(e.target.value)}
-                placeholder="Adınız ve Soyadınız"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-hidden focus:border-slate-900"
+            {/* Modal Content with Interactive 3D Model */}
+            <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 bg-slate-950/50">
+              <SimulationModule
+                planItems={mappedPlanItems}
+                visits={mappedVisits}
+                darkMode
               />
-            </div>
-
-            {acceptError && (
-              <p className="mt-2 text-xs font-semibold text-rose-600">{acceptError}</p>
-            )}
-
-            <div className="mt-5 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setShowAcceptModal(false)}
-                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                Vazgeç
-              </button>
-              <button
-                type="button"
-                disabled={isAccepting}
-                onClick={handleConfirmAccept}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50"
-              >
-                {isAccepting ? (
-                  <>
-                    <Loader2 className="size-3.5 animate-spin" />
-                    <span>Kaydediliyor...</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="size-3.5 text-emerald-400" />
-                    <span>Onaylıyorum</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>

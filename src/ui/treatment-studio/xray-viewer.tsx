@@ -232,6 +232,7 @@ export function XRayViewer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wheelCleanupRef = useRef<(() => void) | null>(null);
 
   const currentFilm: FilmItem | undefined = filmList[activeFilmIndex] ?? filmList[0];
 
@@ -368,8 +369,9 @@ export function XRayViewer({
   // so zooming with mouse wheel NEVER scrolls the page!
   // ==============================================================
   const setContainerRef = useCallback((node: HTMLDivElement | null) => {
-    if (containerRef.current && (containerRef.current as any)._cleanupWheel) {
-      (containerRef.current as any)._cleanupWheel();
+    if (wheelCleanupRef.current) {
+      wheelCleanupRef.current();
+      wheelCleanupRef.current = null;
     }
 
     containerRef.current = node;
@@ -390,7 +392,7 @@ export function XRayViewer({
       };
 
       node.addEventListener("wheel", handleNativeWheel, { passive: false });
-      (node as any)._cleanupWheel = () => {
+      wheelCleanupRef.current = () => {
         node.removeEventListener("wheel", handleNativeWheel);
       };
     }

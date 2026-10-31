@@ -37,11 +37,12 @@ import { TreatmentCombobox } from "@/ui/treatment-combobox";
 import {
   TreatmentStudio,
   inferTreatmentType,
+  type PlanDiscount,
   type StudioPlanItem,
   type StudioVisit,
   type ToothCondition,
 } from "@/ui/treatment-studio";
-import { generatePdfAction, readyPlanAction,
+import { createShareLinkAction, generatePdfAction, readyPlanAction,
   reopenPlanAction, savePlanDetailsAction } from "../actions";
 import { PlanShareModal } from "../plan-share-modal";
 
@@ -146,15 +147,47 @@ export function ClassicPlanClient({
     plan.currency || clinicSettings?.currency || "TRY"
   );
   const [diagnoses] = useState<string[]>(plan.diagnoses ?? []);
-  const [viewMode, setViewMode] = useState<"studio" | "table">("studio");
+  const [viewMode, setViewModeState] = useState<"studio" | "table">("studio");
+
+  const setViewMode = React.useCallback(
+    (mode: "studio" | "table") => {
+      setViewModeState(mode);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`tp_plan_${plan.id}_view`, mode);
+          const url = new URL(window.location.href);
+          url.searchParams.set("view", mode);
+          window.history.replaceState(window.history.state, "", url.toString());
+        } catch (e) {}
+      }
+    },
+    [plan.id]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const urlView = new URLSearchParams(window.location.search).get("view");
+      if (urlView === "table" || urlView === "studio") {
+        setViewModeState(urlView);
+        return;
+      }
+      const stored = localStorage.getItem(`tp_plan_${plan.id}_view`);
+      if (stored === "table" || stored === "studio") {
+        setViewModeState(stored);
+        const url = new URL(window.location.href);
+        url.searchParams.set("view", stored);
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
+    } catch (e) {}
+  }, [plan.id]);
 
   // Visits state
   const [visits, setVisits] = useState(
     (plan.visits && plan.visits.length > 0
       ? plan.visits
       : [
-          { id: "v-temp-1", orderNum: 1, title: "1. Seans: Muayene & Hazırlık", phaseLabel: "1. Aşama", healingNote: "", chartTeeth: [] as string[] },
-          { id: "v-temp-2", orderNum: 2, title: "2. Seans: Tedavi & Simantasyon", phaseLabel: "2. Aşama", healingNote: "", chartTeeth: [] as string[] },
+          { id: "v-temp-1", orderNum: 1, title: "1. Seans: Muayene & Tedavi", phaseLabel: "1. Aşama", healingNote: "", chartTeeth: [] as string[] },
         ]
     ).map((v, i) => ({
       id: v.id ? String(v.id) : `v-temp-${i + 1}`,
@@ -192,7 +225,7 @@ export function ClassicPlanClient({
   );
 
   // Discounts state
-  const [discounts, setDiscounts] = useState(
+  const [discounts, setDiscounts] = useState<PlanDiscount[]>(
     (plan.discounts ?? []).map((d, i) => ({
       id: d.id ? String(d.id) : undefined,
       label: d.label || "İndirim",
@@ -200,6 +233,19 @@ export function ClassicPlanClient({
       order_num: d.orderNum || i + 1,
     }))
   );
+
+  // Diagnosis tooth findings state
+  const [conditions, setConditions] = useState<Record<string, ToothCondition>>(() => {
+    const map: Record<string, ToothCondition> = {};
+    if (initialPlan.situation?.toothFindings) {
+      initialPlan.situation.toothFindings.forEach((tf) => {
+        if (tf.tooth && tf.status) {
+          map[tf.tooth] = tf.status as ToothCondition;
+        }
+      });
+    }
+    return map;
+  });
 
   // Active tooth picking modal or inline selector state
   const [activeItemToothIndex, setActiveItemToothIndex] = useState<number | null>(null);
@@ -461,6 +507,12 @@ export function ClassicPlanClient({
           locale,
           currency,
           diagnoses,
+          situation: {
+            toothFindings: Object.entries(conditions).map(([tooth, cond]) => ({
+              tooth,
+              status: cond as any,
+            })),
+          },
           visits: visits.map((v, i) => ({
             id: v.id?.startsWith("v-temp-") ? undefined : v.id,
             order_num: i + 1,
@@ -539,6 +591,12 @@ export function ClassicPlanClient({
           locale,
           currency,
           diagnoses,
+          situation: {
+            toothFindings: Object.entries(conditions).map(([tooth, cond]) => ({
+              tooth,
+              status: cond as any,
+            })),
+          },
           visits: visits.map((v, i) => ({
             id: v.id?.startsWith("v-temp-") ? undefined : v.id,
             order_num: i + 1,
@@ -579,6 +637,18 @@ export function ClassicPlanClient({
 
       // Trigger background PDF generation
       generatePdfAction(String(plan.id)).catch(() => {});
+
+      // Ensure patient presentation share link is created and token saved
+      try {
+        const shareRes = await createShareLinkAction(String(plan.id), 720);
+        if (shareRes.success && shareRes.data?.token) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`tp_share_token_${plan.id}`, shareRes.data.token);
+          }
+        }
+      } catch (err) {
+        console.error("Error creating share link in classic ready:", err);
+      }
 
       setPlan(res.data);
       if (res.data.currency) {
@@ -674,7 +744,9 @@ export function ClassicPlanClient({
     conditions: Record<string, ToothCondition>;
     items: StudioPlanItem[];
     visits: StudioVisit[];
+    discounts?: PlanDiscount[];
   }) => {
+    const nextDiscounts = studioData.discounts || discounts;
     const res = await savePlanDetailsAction(String(plan.id), {
       workspaceId,
       title: title.trim(),
@@ -708,7 +780,7 @@ export function ClassicPlanClient({
         is_package: Boolean(it.isPackage),
         order_num: i + 1,
       })),
-      discounts: discounts.map((d, i) => ({
+      discounts: nextDiscounts.map((d, i) => ({
         id: d.id,
         label: d.label,
         amount: Number(d.amount) || 0,
@@ -719,9 +791,17 @@ export function ClassicPlanClient({
     if (res.success && res.data) {
       setPlan(res.data);
       if (res.data.currency) setCurrency(res.data.currency);
-      if (res.data.visits) {
-        setVisits(
-          res.data.visits.map((v, i) => ({
+      if (res.data.situation?.toothFindings) {
+        const map: Record<string, ToothCondition> = {};
+        res.data.situation.toothFindings.forEach((tf) => {
+          if (tf.tooth && tf.status) {
+            map[tf.tooth] = tf.status as ToothCondition;
+          }
+        });
+        setConditions(map);
+      }
+      const newVisits = res.data.visits
+        ? res.data.visits.map((v, i) => ({
             id: String(v.id),
             order_num: v.orderNum || i + 1,
             title: v.title || `${i + 1}. Seans`,
@@ -729,13 +809,15 @@ export function ClassicPlanClient({
             healing_note: v.healingNote || "",
             chart_teeth: v.chartTeeth || [],
           }))
-        );
+        : visits;
+      if (res.data.visits) {
+        setVisits(newVisits);
       }
-      if (res.data.items) {
-        setItems(
-          res.data.items.map((it, i) => ({
+      const firstVisitId = newVisits[0]?.id;
+      const newItems = res.data.items
+        ? res.data.items.map((it, i) => ({
             id: it.id ? String(it.id) : undefined,
-            visit_id: it.visitId ? String(it.visitId) : undefined,
+            visit_id: it.visitId ? String(it.visitId) : firstVisitId,
             treatment_id: it.treatmentId ? String(it.treatmentId) : undefined,
             treatment_name: it.treatmentName || "",
             animation_code: it.animationCode || "",
@@ -753,17 +835,29 @@ export function ClassicPlanClient({
             is_package: Boolean(it.isPackage),
             order_num: it.orderNum || i + 1,
           }))
-        );
+        : items;
+      if (res.data.items) {
+        setItems(newItems);
       }
+      const newDiscountsData: PlanDiscount[] = res.data.discounts
+        ? res.data.discounts.map((d, i) => ({
+            id: d.id ? String(d.id) : undefined,
+            label: d.label || "İndirim",
+            amount: Number(d.amount) || 0,
+            order_num: d.orderNum ?? i + 1,
+          }))
+        : nextDiscounts;
+      setDiscounts(newDiscountsData);
+
       setSavedSnapshot(
         createPlanSnapshot(
           res.data.title || title,
           res.data.locale || locale,
           res.data.currency || currency,
           res.data.diagnoses ?? diagnoses,
-          visits,
-          items,
-          discounts
+          newVisits,
+          newItems,
+          newDiscountsData
         )
       );
     }
@@ -777,12 +871,127 @@ export function ClassicPlanClient({
     }
 
     generatePdfAction(String(plan.id)).catch(() => {});
+
+    try {
+      const shareRes = await createShareLinkAction(String(plan.id), 720);
+      if (shareRes.success && shareRes.data?.token) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`tp_share_token_${plan.id}`, shareRes.data.token);
+        }
+      }
+    } catch (err) {
+      console.error("Error creating share link from studio ready:", err);
+    }
+
     setPlan(res.data);
     router.refresh();
     setMessage({
       text: "Plan başarıyla onaylandı ve hasta sunumuna hazırlandı! Düzenleme kilitlendi.",
       type: "ok",
     });
+  };
+
+  const handleStudioItemsChange = (newStudioItems: StudioPlanItem[]) => {
+    const convertedItems = newStudioItems.map((it, i) => {
+      const existing = items.find(
+        (ex) => ex.id === it.id || (ex.treatment_id && ex.treatment_id === it.treatmentId)
+      );
+      const visitIdToUse =
+        it.visitId && visits.some((v) => v.id === it.visitId)
+          ? it.visitId
+          : visits[0]?.id;
+
+      return {
+        id: it.id?.startsWith("it-") || it.id?.startsWith("tpl-") ? existing?.id : it.id,
+        visit_id: visitIdToUse,
+        treatment_id: it.treatmentId || existing?.treatment_id,
+        treatment_name: it.treatmentName,
+        animation_code: it.animationCode || existing?.animation_code || "",
+        tooth_number: it.teeth && it.teeth.length > 0 ? it.teeth.join(", ") : "",
+        teeth: it.teeth || [],
+        description: it.description || existing?.description || "",
+        quantity: Number(it.quantity) || 1,
+        unit_price: Math.round((Number(it.unitPrice) || 0) * 100),
+        is_package: Boolean(it.isPackage),
+        order_num: i + 1,
+      };
+    });
+    setItems(convertedItems);
+  };
+
+  const handleStudioVisitsChange = (newStudioVisits: StudioVisit[]) => {
+    const convertedVisits = newStudioVisits.map((v, i) => {
+      const existing = visits.find((ex) => ex.id === v.id);
+      return {
+        id: v.id || existing?.id || `v-temp-${i + 1}`,
+        order_num: v.orderNum || i + 1,
+        title: v.title || `${i + 1}. Seans`,
+        phase_label: v.phaseLabel || "",
+        healing_note: v.healingNote || "",
+        chart_teeth: v.chartTeeth || [],
+      };
+    });
+    setVisits(convertedVisits);
+  };
+
+  const handleSwitchToStudio = async () => {
+    if (isDirty && !isLocked) {
+      setIsAutoSaving(true);
+      try {
+        const res = await savePlanDetailsAction(String(plan.id), {
+          workspaceId,
+          title: title.trim(),
+          palette,
+          locale,
+          currency,
+          diagnoses,
+          situation: {
+            toothFindings: Object.entries(conditions).map(([tooth, cond]) => ({
+              tooth,
+              status: cond as any,
+            })),
+          },
+          visits: visits.map((v, i) => ({
+            id: v.id?.startsWith("v-temp-") ? undefined : v.id,
+            order_num: i + 1,
+            title: v.title,
+            phase_label: v.phase_label,
+            healing_note: v.healing_note,
+            chart_teeth: v.chart_teeth,
+          })),
+          items: items.map((it, i) => ({
+            id: it.id,
+            visit_id: it.visit_id?.startsWith("v-temp-") ? undefined : it.visit_id,
+            treatment_id: it.treatment_id,
+            treatment_name: it.treatment_name,
+            animation_code: it.animation_code,
+            tooth_number: it.tooth_number || undefined,
+            teeth: it.teeth,
+            description: it.description,
+            quantity: Number(it.quantity) || 1,
+            unit_price: Number(it.unit_price) || 0,
+            is_package: Boolean(it.is_package),
+            order_num: i + 1,
+          })),
+          discounts: discounts.map((d, i) => ({
+            id: d.id,
+            label: d.label,
+            amount: Number(d.amount) || 0,
+            order_num: i + 1,
+          })),
+        });
+
+        if (res.success && res.data) {
+          setPlan(res.data);
+          setSavedSnapshot(createPlanSnapshot(title, locale, currency, diagnoses, visits, items, discounts));
+        }
+      } catch (err) {
+        console.error("Error auto-saving before switching to studio:", err);
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }
+    setViewMode("studio");
   };
 
   if (viewMode === "studio") {
@@ -820,12 +1029,17 @@ export function ClassicPlanClient({
               happySmiles: "12,000+",
             },
           }}
-          initialConditions={studioConditions}
+          initialConditions={conditions}
           initialItems={studioItems}
           initialVisits={studioVisits}
+          initialDiscounts={discounts}
+          onDiscountsChange={setDiscounts}
           initialCurrency={currency === "TRY" ? "TRY" : currency === "USD" ? "USD" : "EUR"}
           initialLocale={locale}
           onSave={handleStudioSave}
+          onItemsChange={handleStudioItemsChange}
+          onVisitsChange={handleStudioVisitsChange}
+          onConditionsChange={setConditions}
           isSaving={isPending}
         />
 
@@ -846,7 +1060,7 @@ export function ClassicPlanClient({
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 pb-12">
+    <div className="w-full space-y-5 pb-12">
       {/* 1. Üst Araç Çubuğu (Treatment Studio ile Birebir Uyumlu Tasarım Dili) */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -862,7 +1076,7 @@ export function ClassicPlanClient({
 
             <button
               type="button"
-              onClick={() => setViewMode("studio")}
+              onClick={handleSwitchToStudio}
               className="group flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold px-3.5 py-2 text-xs border border-slate-800 shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer active:scale-95"
               title="Modern 3D Treatment Studio Görünümüne Geç"
             >
@@ -898,29 +1112,7 @@ export function ClassicPlanClient({
 
             {isLocked ? (
               <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-2xs ${
-                  plan.status?.toLowerCase() === "accepted"
-                    ? "border-emerald-300 bg-emerald-100/80 text-emerald-900"
-                    : plan.status?.toLowerCase() === "viewed"
-                    ? "border-cyan-200 bg-cyan-50 text-cyan-800"
-                    : plan.status?.toLowerCase() === "sent"
-                    ? "border-blue-200 bg-blue-50 text-blue-800"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-800"
-                }`}
-              >
-                <CheckCircle2 className="size-3.5 text-emerald-600" />
-                <span>
-                  {plan.status?.toLowerCase() === "accepted"
-                    ? "Hasta Onayladı"
-                    : plan.status?.toLowerCase() === "viewed"
-                    ? "Hasta İnceledi"
-                    : plan.status?.toLowerCase() === "sent"
-                    ? "Hastaya Gönderildi"
-                    : "Onaylandı (Hazır)"}
-                </span>
-              </span>
-              <button
+                <button
                 type="button"
                 onClick={handleUnlockPlan}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-2xs transition cursor-pointer"
@@ -929,7 +1121,7 @@ export function ClassicPlanClient({
                 <Unlock className="size-3.5 text-amber-700" />
                 <span>Kilidi Aç (Düzenle)</span>
               </button>
-            </div>
+              </div>
             ) : (
               <>
                 <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-2xs">
@@ -991,10 +1183,15 @@ export function ClassicPlanClient({
 
       {/* 4. Ana Bölüm: Seanslar & Tedaviler VS Hesap Özeti (Sidebar) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Sol 8 Kolon: Seanslar & İndirimler */}
-        <div className="space-y-5 lg:col-span-8">
-          {visits.map((visit) => {
-            const visitItems = items.filter((it) => it.visit_id === visit.id);
+        {/* Sol Kolonlar: Seanslar & İndirimler */}
+        <div className="space-y-5 lg:col-span-8 2xl:col-span-9">
+          {visits.map((visit, visitIdx) => {
+            const visitItems = items.filter(
+              (it) =>
+                it.visit_id === visit.id ||
+                (!it.visit_id && visitIdx === 0) ||
+                (!visits.some((v) => v.id === it.visit_id) && visitIdx === 0)
+            );
             const visitSubtotal = visitItems.reduce((acc, it) => {
               if (it.is_package) return acc;
               return acc + (Number(it.quantity) || 1) * (Number(it.unit_price) || 0);
@@ -1468,8 +1665,8 @@ export function ClassicPlanClient({
           </div>
         </div>
 
-        {/* Sağ 4 Kolon: Fiyatlandırma & Hesap Özeti (Sticky Sidebar) */}
-        <div className="space-y-5 lg:col-span-4">
+        {/* Sağ Kolonlar: Fiyatlandırma & Hesap Özeti (Sticky Sidebar) */}
+        <div className="space-y-5 lg:col-span-4 2xl:col-span-3">
           <div className="sticky top-6 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
             <div>
               <div className="flex items-center justify-between">
@@ -1698,47 +1895,14 @@ export function ClassicPlanClient({
                   </div>
                 </>
               ) : (
-                <div className="space-y-2.5">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-center">
-                    <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800">
-                      <CheckCircle2 className="size-4 text-emerald-600" />
-                      <span>
-                        {plan.status?.toLowerCase() === "accepted"
-                          ? "Hasta Onayladı"
-                          : plan.status?.toLowerCase() === "viewed"
-                          ? "Hasta Sunumu İnceledi"
-                          : plan.status?.toLowerCase() === "sent"
-                          ? "Hastaya Gönderildi"
-                          : "Plan Onaylandı & Paylaşıma Hazır"}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-[11px] text-emerald-700">
-                      {plan.status?.toLowerCase() === "accepted"
-                        ? "Hasta bu tedavi planını dijital olarak onaylamıştır."
-                        : plan.status?.toLowerCase() === "viewed"
-                        ? "Hasta dijital web sunumunu incelemiştir."
-                        : "Tedavi ve fiyat bilgileri resmi teklif olarak sabitlenmiştir."}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleUnlockPlan}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50/80 py-2.5 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition active:scale-98"
-                  >
-                    <Unlock className="size-3.5 text-amber-700" />
-                    <span>Plan Kilidini Aç & Düzenle</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowShareModal(true)}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition active:scale-98"
-                  >
-                    <FileText className="size-4" />
-                    <span>Sunumlar</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowShareModal(true)}
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition active:scale-98"
+                >
+                  <FileText className="size-4" />
+                  <span>Sunumlar</span>
+                </button>
               )}
             </div>
           </div>

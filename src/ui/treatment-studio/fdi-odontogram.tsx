@@ -106,10 +106,10 @@ export function FdiOdontogram({
               <div
                 key={tooth}
                 onClick={() => !readonly && onToggleTooth(tooth)}
-                className={`group relative flex flex-col items-center justify-end rounded-xl px-1 py-1.5 transition-all cursor-pointer ${
+                className={`group relative flex flex-col items-center justify-end rounded-xl px-1 py-1.5 transition-all ${readonly ? "cursor-default" : "cursor-pointer"} ${
                   isSelected
                     ? "bg-slate-900/10 ring-2 ring-slate-800 shadow-xs scale-105 z-10"
-                    : "hover:bg-slate-50 hover:shadow-2xs"
+                    : !readonly ? "hover:bg-slate-50 hover:shadow-2xs" : ""
                 }`}
                 title={`${tooth}: ${meta?.nameTr || ""} (${condition})`}
               >
@@ -182,10 +182,10 @@ export function FdiOdontogram({
               <div
                 key={tooth}
                 onClick={() => !readonly && onToggleTooth(tooth)}
-                className={`group relative flex flex-col items-center justify-start rounded-xl px-1 py-1.5 transition-all cursor-pointer ${
+                className={`group relative flex flex-col items-center justify-start rounded-xl px-1 py-1.5 transition-all ${readonly ? "cursor-default" : "cursor-pointer"} ${
                   isSelected
                     ? "bg-slate-900/10 ring-2 ring-slate-800 shadow-xs scale-105 z-10"
-                    : "hover:bg-slate-50 hover:shadow-2xs"
+                    : !readonly ? "hover:bg-slate-50 hover:shadow-2xs" : ""
                 }`}
                 title={`${tooth}: ${meta?.nameTr || ""} (${condition})`}
               >

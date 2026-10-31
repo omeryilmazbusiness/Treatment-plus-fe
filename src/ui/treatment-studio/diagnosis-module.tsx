@@ -126,6 +126,7 @@ export function DiagnosisModule({
   );
 
   const handleToggleTooth = (toothNumber: string) => {
+    if (isLocked) return;
     setSelectedTeeth((prev) =>
       prev.includes(toothNumber)
         ? prev.filter((t) => t !== toothNumber)
@@ -209,13 +210,7 @@ export function DiagnosisModule({
 
   return (
     <div className="space-y-6">
-      {/* Kilitli Plan Bilgilendirme Uyarısı */}
-      {isLocked && (
-        <div className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 font-semibold shadow-2xs">
-          <Lock className="size-4 text-amber-600 shrink-0" />
-          <span>Bu tedavi planı onaylanıp kilitlendiği için diş teşhisleri düzenlemeye kapatılmıştır (salt okunur mod).</span>
-        </div>
-      )}
+
 
       {/* ============================================================== */}
       {/* 1. Odontogram & Condition Selector Panel */}
@@ -228,6 +223,7 @@ export function DiagnosisModule({
             conditions={conditions}
             selectedTeeth={selectedTeeth}
             onToggleTooth={handleToggleTooth}
+            readonly={isLocked}
             className="w-full select-none rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all flex flex-col justify-between h-full"
           />
         </div>

@@ -2,15 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import {
-  AlertCircle,
   BadgePercent,
-  Calendar,
-  CheckCircle2,
-  CreditCard,
-  FileCheck2,
-  FileSpreadsheet,
-  Layers,
-  Lock,
   Minus,
   Plus,
   Receipt,
@@ -18,19 +10,28 @@ import {
   Search,
   Sparkles,
   Trash2,
-  Unlock,
   Wallet,
   X,
 } from "lucide-react";
 import { FdiOdontogram, TOOTH_METADATA } from "./fdi-odontogram";
 import {
   inferTreatmentType,
+  type PlanDiscount,
   type StudioPlanItem,
   type StudioVisit,
   type ToothCondition,
   type TreatmentType,
 } from "./types";
 import type { Treatment } from "@/modules/catalog/domain/catalog";
+import { PriceInput } from "@/ui/price-input";
+import { formatMoney, money, type Currency } from "@/shared/money";
+
+function generateStudioItemId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `it-${crypto.randomUUID()}`;
+  }
+  return `it-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
 
 interface TreatmentsModuleProps {
   conditions: Record<string, ToothCondition>;
@@ -43,6 +44,9 @@ interface TreatmentsModuleProps {
   onUnlockPlan?: () => Promise<boolean> | boolean;
   treatmentsCatalog?: Treatment[];
   priceMap?: Map<string, number>;
+  discounts?: PlanDiscount[];
+  onDiscountsChange?: (discounts: PlanDiscount[]) => void;
+  onLockReady?: () => Promise<void> | void;
 }
 
 export function TreatmentsModule({
@@ -56,13 +60,16 @@ export function TreatmentsModule({
   onUnlockPlan,
   treatmentsCatalog,
   priceMap,
+  discounts = [],
+  onDiscountsChange,
+  onLockReady,
 }: TreatmentsModuleProps) {
   const [selectedTeeth, setSelectedTeeth] = useState<string[]>([]);
-  const [paymentOption, setPaymentOption] = useState<"cash" | "card">("cash");
   const [note, setNote] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const handleToggleTooth = (toothNumber: string) => {
+    if (isLocked) return;
     setSelectedTeeth((prev) =>
       prev.includes(toothNumber)
         ? prev.filter((t) => t !== toothNumber)
@@ -119,27 +126,20 @@ export function TreatmentsModule({
   }, [clinicCatalog, searchQuery]);
 
   // Adding treatment procedure from catalog
-  const handleAddTreatmentItem = async (treatment: {
+  const handleAddTreatmentItem = (treatment: {
     id: string;
     code?: string;
     name: string;
     price: number;
     type: TreatmentType;
   }) => {
-    if (isLocked) {
-      if (onUnlockPlan) {
-        const ok = await onUnlockPlan();
-        if (!ok) return;
-      } else {
-        return;
-      }
-    }
+    if (isLocked) return;
 
     const targetTeeth = [...selectedTeeth];
     const targetVisitId = visits[0]?.id || "v-1";
 
     const newItem: StudioPlanItem = {
-      id: `it-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: generateStudioItemId(),
       treatmentId: treatment.id.startsWith("demo-") ? undefined : treatment.id,
       treatmentCode: treatment.code,
       treatmentType: treatment.type,
@@ -173,24 +173,54 @@ export function TreatmentsModule({
     );
   };
 
+  // Discount handlers
+  const handleAddDiscount = () => {
+    if (isLocked) return;
+    const nextDiscounts = [
+      ...discounts,
+      {
+        id: undefined,
+        label: "Nakit İndirimi",
+        amount: 20000,
+        order_num: discounts.length + 1,
+      },
+    ];
+    onDiscountsChange?.(nextDiscounts);
+  };
+
+  const handleUpdateDiscount = (idx: number, field: "label" | "amount", value: string | number) => {
+    if (isLocked) return;
+    const nextDiscounts = discounts.map((d, i) =>
+      i === idx ? { ...d, [field]: value } : d
+    );
+    onDiscountsChange?.(nextDiscounts);
+  };
+
+  const handleRemoveDiscount = (idx: number) => {
+    if (isLocked) return;
+    const nextDiscounts = discounts.filter((_, i) => i !== idx);
+    onDiscountsChange?.(nextDiscounts);
+  };
+
   // Pricing calculations
-  const subtotal = useMemo(() => {
+  const subtotalMinor = useMemo(() => {
     return items.reduce((acc, it) => {
-      return acc + (it.unitPrice || 0) * (it.quantity || 1);
+      if (it.isPackage) return acc;
+      return acc + (Number(it.quantity) || 1) * Math.round((Number(it.unitPrice) || 0) * 100);
     }, 0);
   }, [items]);
+
+  const totalDiscountMinor = useMemo(() => {
+    return discounts.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
+  }, [discounts]);
+
+  const grandTotalMinor = Math.max(0, subtotalMinor - totalDiscountMinor);
 
   const currSymbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "₺";
 
   return (
     <div className="space-y-6">
-      {/* Kilitli Plan Bilgilendirme Uyarısı */}
-      {isLocked && (
-        <div className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 font-semibold shadow-2xs">
-          <Lock className="size-4 text-amber-600 shrink-0" />
-          <span>Bu tedavi planı onaylanıp kilitlendiği için tedavi kalemleri ve seanslar düzenlemeye kapatılmıştır (salt okunur mod).</span>
-        </div>
-      )}
+
 
       {/* ============================================================== */}
       {/* 1. Odontogram & Treatment Action Panel                         */}
@@ -203,6 +233,7 @@ export function TreatmentsModule({
             selectedTeeth={selectedTeeth}
             onToggleTooth={handleToggleTooth}
             activeTreatments={activeTreatmentsMap}
+            readonly={isLocked}
             className="w-full select-none rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all flex flex-col justify-between h-full"
           />
         </div>
@@ -224,7 +255,7 @@ export function TreatmentsModule({
                   {clinicCatalog.length} İşlem
                 </span>
               </div>
-              {selectedTeeth.length > 0 && (
+              {selectedTeeth.length > 0 && !isLocked && (
                 <button
                   type="button"
                   onClick={() => setSelectedTeeth([])}
@@ -251,28 +282,7 @@ export function TreatmentsModule({
               </p>
             )}
 
-            {/* Kilitli Plan Bilgilendirme Bannerı */}
-            {isLocked && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 shadow-2xs space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                  <Lock className="size-3.5 text-amber-600 shrink-0" />
-                  <span>Plan Kilitli (Salt Okunur)</span>
-                </div>
-                <p className="text-[11px] text-amber-800 leading-tight">
-                  Tedavi eklemek veya değiştirmek için kilidi açabilirsiniz.
-                </p>
-                {onUnlockPlan && (
-                  <button
-                    type="button"
-                    onClick={onUnlockPlan}
-                    className="w-full mt-1 flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 text-xs shadow-2xs transition cursor-pointer"
-                  >
-                    <Unlock className="size-3.5" />
-                    <span>Kilidi Aç & Düzenle</span>
-                  </button>
-                )}
-              </div>
-            )}
+
 
             {/* Quick search input (only if > 6 treatments) */}
             {clinicCatalog.length > 6 && (
@@ -282,8 +292,9 @@ export function TreatmentsModule({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  disabled={isLocked}
                   placeholder="İşlem veya kod ara (TR01, Dolgu...)"
-                  className="w-full rounded-xl border border-slate-200/80 bg-white pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 shadow-2xs"
+                  className="w-full rounded-xl border border-slate-200/80 bg-white pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 {searchQuery && (
                   <button
@@ -310,9 +321,14 @@ export function TreatmentsModule({
                   <button
                     key={tr.id}
                     type="button"
+                    disabled={isLocked}
                     onClick={() => handleAddTreatmentItem(tr)}
-                    className="group w-full flex items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 text-left transition shadow-2xs hover:border-slate-400 hover:bg-slate-100/70 hover:shadow-xs active:scale-[0.99] cursor-pointer"
-                    title={`${tr.name} - ${currSymbol} ${tr.price.toLocaleString()}`}
+                    className="group w-full flex items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 text-left transition shadow-2xs hover:border-slate-400 hover:bg-slate-100/70 hover:shadow-xs active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-200/90 disabled:hover:bg-white disabled:active:scale-100"
+                    title={
+                      isLocked
+                        ? "Plan kilitli (Değişiklik yapmak için kilidi açın)"
+                        : `${tr.name} - ${currSymbol} ${tr.price.toLocaleString()}`
+                    }
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {tr.code && (
@@ -361,8 +377,10 @@ export function TreatmentsModule({
       {/* 2. Treatment Plan Table (Left) & Pricing + Notes (Right)       */}
       {/* ============================================================== */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-        {/* Left 8/9 Columns: Treatment Plan Table Card */}
-        <div className="xl:col-span-8 2xl:col-span-9 rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs space-y-4">
+        {/* Left 8/9 Columns: Treatment Plan Table Card + Discounts Card */}
+        <div className="xl:col-span-8 2xl:col-span-9 space-y-4">
+          {/* 1. Tedavi Planınız Tablo Kartı */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <div className="size-2 rounded-full bg-slate-900 ring-2 ring-slate-200" />
@@ -501,115 +519,342 @@ export function TreatmentsModule({
           )}
         </div>
 
-        {/* Right 4/3 Columns: Pricing Card + Note Card below it */}
-        <div className="xl:col-span-4 2xl:col-span-3 space-y-4">
-          {/* 1. Fiyat & Ödeme Seçenekleri Kartı */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs space-y-3.5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="size-2 rounded-full bg-slate-900 ring-2 ring-slate-200" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Toplam Tutar
+        {/* 2. İndirimler & İskontolar Kartı (Tedavi Planınız Kartının Altında) */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <BadgePercent className="size-4 text-slate-700" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                İndirimler & İskontolar
+              </h3>
+              {discounts.length > 0 && (
+                <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                  - {formatMoney(money(totalDiscountMinor, currency))}
                 </span>
-              </div>
-              <span className="text-xl font-black text-slate-900">
-                {currSymbol} {subtotal.toLocaleString()}
-              </span>
+              )}
             </div>
-
-            <div className="space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                ÖDEME SEÇENEKLERİ (PAYMENT OPTIONS)
-              </div>
-
-              {/* Cash option */}
-              <div
-                onClick={() => {
-                  if (!isLocked) setPaymentOption("cash");
-                }}
-                className={`flex items-center justify-between p-2.5 rounded-xl border transition ${
-                  isLocked ? "cursor-default" : "cursor-pointer"
-                } ${
-                  paymentOption === "cash"
-                    ? "bg-white border-slate-900 ring-2 ring-slate-900/10 shadow-xs"
-                    : "bg-slate-50/70 border-slate-200 hover:bg-white"
-                }`}
+            {!isLocked && (
+              <button
+                type="button"
+                onClick={handleAddDiscount}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs transition"
               >
-                <div className="flex items-center gap-2.5">
-                  <input
-                    type="radio"
-                    name="payment"
-                    disabled={isLocked}
-                    checked={paymentOption === "cash"}
-                    onChange={() => {
-                      if (!isLocked) setPaymentOption("cash");
-                    }}
-                    className="accent-slate-900"
-                  />
-                  <span className="text-xs font-bold text-slate-800">Cash (Nakit)</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-slate-900">
-                    {currSymbol} {subtotal.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Card option */}
-              <div
-                onClick={() => {
-                  if (!isLocked) setPaymentOption("card");
-                }}
-                className={`flex items-center justify-between p-2.5 rounded-xl border transition ${
-                  isLocked ? "cursor-default" : "cursor-pointer"
-                } ${
-                  paymentOption === "card"
-                    ? "bg-white border-slate-900 ring-2 ring-slate-900/10 shadow-xs"
-                    : "bg-slate-50/70 border-slate-200 hover:bg-white"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <input
-                    type="radio"
-                    name="payment"
-                    disabled={isLocked}
-                    checked={paymentOption === "card"}
-                    onChange={() => {
-                      if (!isLocked) setPaymentOption("card");
-                    }}
-                    className="accent-slate-900"
-                  />
-                  <span className="text-xs font-bold text-slate-800">Card (Kredi Kartı)</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-slate-900">
-                    {currSymbol} {subtotal.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
+                <Plus className="size-3.5" />
+                <span>İndirim Ekle</span>
+              </button>
+            )}
           </div>
 
-          {/* 2. Klinik Notu Kartı (Fiyat kartının hemen altında) */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs space-y-2.5">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="size-2 rounded-full bg-slate-900 ring-2 ring-slate-200" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Klinik Notu (Note)
-                </span>
-              </div>
-            </div>
-            <textarea
-              rows={4}
-              disabled={isLocked}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Örn: 1. faz cerrahi sonrası 7 gün antibiyotik kullanımı ve 6 ay osteointegrasyon beklenecektir."
-              className="w-full text-xs text-slate-700 leading-relaxed bg-slate-50/70 p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-900 transition resize-y shadow-2xs disabled:bg-slate-100/80 disabled:text-slate-500 disabled:cursor-not-allowed"
-            />
+          <div className="mt-3 space-y-2">
+            {discounts.length === 0 ? (
+              <p className="py-3 text-center text-xs text-slate-400">
+                Bu plana henüz özel indirim uygulanmadı.
+              </p>
+            ) : (
+              discounts.map((d, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-2 text-xs"
+                >
+                  <input
+                    type="text"
+                    disabled={isLocked}
+                    placeholder="İndirim Etiketi (Örn: Nakit İndirimi)"
+                    value={d.label}
+                    onChange={(e) => handleUpdateDiscount(idx, "label", e.target.value)}
+                    className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden"
+                  />
+                  <div className="w-32">
+                    <PriceInput
+                      disabled={isLocked}
+                      placeholder="Tutar"
+                      value={d.amount}
+                      onChange={(val) => handleUpdateDiscount(idx, "amount", val)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-right text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden"
+                    />
+                  </div>
+                  {!isLocked && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveDiscount(idx)}
+                      className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                      title="İndirimi Kaldır"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
+      </div>
+
+      {/* Right 4/3 Columns: Fatura & Hesap Özeti Card + Note Card below it */}
+      <div className="xl:col-span-4 2xl:col-span-3 space-y-4">
+        {/* Fatura & Hesap Özeti Kartı */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-slate-100 text-slate-800">
+                <Receipt className="size-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 leading-tight">
+                  Fatura & Hesap Özeti
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Resmi kuruş hassasiyetli tutarlar
+                </p>
+              </div>
+            </div>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+              {items.length} Kalem
+            </span>
+          </div>
+
+          {/* Fatura / Masraf Dökümü (Kasa Fişi & Fatura Formatı) */}
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-3">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-dashed border-slate-200 pb-2">
+              <span>Hizmet / İşlem</span>
+              <span>Tutar</span>
+            </div>
+
+            {items.length === 0 ? (
+              <div className="py-4 text-center text-xs text-slate-400">
+                Henüz tedavi kalemi eklenmedi.
+              </div>
+            ) : (
+              <div className="max-h-60 overflow-y-auto space-y-3 pr-1 text-xs">
+                {visits.length > 0 && visits.some((v) => items.some((it) => it.visitId === v.id)) ? (
+                  visits.map((visit) => {
+                    const visitItems = items.filter((it) => it.visitId === visit.id);
+                    if (visitItems.length === 0) return null;
+
+                    return (
+                      <div key={visit.id} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                          <span className="truncate">{visit.title}</span>
+                        </div>
+
+                        <div className="space-y-1.5 pl-2 border-l-2 border-slate-200">
+                          {visitItems.map((item, idx) => {
+                            const itemUnitMinor = Math.round((Number(item.unitPrice) || 0) * 100);
+                            const itemTotalMinor = item.isPackage
+                              ? 0
+                              : (Number(item.quantity) || 1) * itemUnitMinor;
+
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-start justify-between gap-2 text-xs"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate font-semibold text-slate-800">
+                                    {item.treatmentName || "Tedavi"}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                                    {item.teeth && item.teeth.length > 0 && (
+                                      <span className="rounded bg-slate-200/80 px-1 font-semibold text-slate-700">
+                                        Diş: {item.teeth.join(", ")}
+                                      </span>
+                                    )}
+                                    <span>
+                                      {item.quantity || 1} Adet ×{" "}
+                                      {formatMoney(money(itemUnitMinor, currency))}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  {item.isPackage ? (
+                                    <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                                      Paket İçi
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-slate-900">
+                                      {formatMoney(money(itemTotalMinor, currency))}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="space-y-1.5">
+                    {items.map((item, idx) => {
+                      const itemUnitMinor = Math.round((Number(item.unitPrice) || 0) * 100);
+                      const itemTotalMinor = item.isPackage
+                        ? 0
+                        : (Number(item.quantity) || 1) * itemUnitMinor;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-start justify-between gap-2 text-xs"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-semibold text-slate-800">
+                              {item.treatmentName || "Tedavi"}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                              {item.teeth && item.teeth.length > 0 && (
+                                <span className="rounded bg-slate-200/80 px-1 font-semibold text-slate-700">
+                                  Diş: {item.teeth.join(", ")}
+                                </span>
+                              )}
+                              <span>
+                                {item.quantity || 1} Adet ×{" "}
+                                {formatMoney(money(itemUnitMinor, currency))}
+                              </span>
+                            </div>
+                          </div>
+
+                            <div className="text-right shrink-0">
+                              {item.isPackage ? (
+                                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                                  Paket İçi
+                                </span>
+                              ) : (
+                                <span className="font-bold text-slate-900">
+                                  {formatMoney(money(itemTotalMinor, currency))}
+                                </span>
+                              )}
+                            </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Varsa seansı eşleşmeyen diğer kalemler */}
+                {visits.length > 0 &&
+                  items.filter((it) => !visits.some((v) => v.id === it.visitId)).length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <div className="text-[11px] font-bold text-slate-700">Diğer İşlemler</div>
+                      <div className="space-y-1.5 pl-2 border-l-2 border-slate-200">
+                        {items
+                          .filter((it) => !visits.some((v) => v.id === it.visitId))
+                          .map((item, idx) => {
+                            const itemUnitMinor = Math.round((Number(item.unitPrice) || 0) * 100);
+                            const itemTotalMinor = item.isPackage
+                              ? 0
+                              : (Number(item.quantity) || 1) * itemUnitMinor;
+
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-start justify-between gap-2 text-xs"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate font-semibold text-slate-800">
+                                    {item.treatmentName || "Tedavi"}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                                    {item.teeth && item.teeth.length > 0 && (
+                                      <span className="rounded bg-slate-200/80 px-1 font-semibold text-slate-700">
+                                        Diş: {item.teeth.join(", ")}
+                                      </span>
+                                    )}
+                                    <span>
+                                      {item.quantity || 1} Adet ×{" "}
+                                      {formatMoney(money(itemUnitMinor, currency))}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  {item.isPackage ? (
+                                    <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                                      Paket İçi
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-slate-900">
+                                      {formatMoney(money(itemTotalMinor, currency))}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Uygulanan İndirimler */}
+                {discounts.length > 0 && (
+                  <div className="pt-2 border-t border-dashed border-slate-200 space-y-1.5">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                      Uygulanan İndirimler
+                    </div>
+                    {discounts.map((d, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between text-xs text-rose-600"
+                      >
+                        <span className="truncate">{d.label || "İndirim"}</span>
+                        <span className="font-bold shrink-0">
+                          - {formatMoney(money(d.amount, currency))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Tutar Dökümü */}
+          <div className="space-y-2 border-y border-slate-100 py-3 text-xs">
+            <div className="flex items-center justify-between text-slate-600">
+              <span>Ara Toplam:</span>
+              <span className="font-bold text-slate-900 text-sm">
+                {formatMoney(money(subtotalMinor, currency))}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-slate-600">
+              <span>Toplam İndirim:</span>
+              <span className="font-bold text-rose-600 text-sm">
+                - {formatMoney(money(totalDiscountMinor, currency))}
+              </span>
+            </div>
+          </div>
+
+          {/* Genel Toplam Vurgulu Kartı */}
+          <div className="rounded-xl bg-slate-900 p-4 text-white shadow-xs">
+            <div className="text-[10px] font-bold tracking-wider uppercase text-slate-400">
+              Genel Toplam (KDV Dahil)
+            </div>
+            <div className="mt-1 text-2xl font-black tracking-tight">
+              {formatMoney(money(grandTotalMinor, currency))}
+            </div>
+          </div>
+        </div>
+
+        {/* Klinik Notu Kartı */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="size-2 rounded-full bg-slate-900 ring-2 ring-slate-200" />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Klinik Notu (Note)
+              </span>
+            </div>
+          </div>
+          <textarea
+            rows={4}
+            disabled={isLocked}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Örn: 1. faz cerrahi sonrası 7 gün antibiyotik kullanımı ve 6 ay osteointegrasyon beklenecektir."
+            className="w-full text-xs text-slate-700 leading-relaxed bg-slate-50/70 p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-900 transition resize-y shadow-2xs disabled:bg-slate-100/80 disabled:text-slate-500 disabled:cursor-not-allowed"
+          />
+        </div>
+      </div>
       </div>
     </div>
   );

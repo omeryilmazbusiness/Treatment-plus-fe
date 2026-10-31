@@ -216,7 +216,7 @@ export async function savePlanDetailsAction(
     );
 
     // 2. Put Visits
-    await runtime.plan.putVisits(
+    const updatedWithVisits = await runtime.plan.putVisits(
       planId as ID,
       payload.visits.map((v, i) => ({
         id: v.id,
@@ -229,23 +229,44 @@ export async function savePlanDetailsAction(
       session.accessToken
     );
 
+    // Map temporary or index-based visit IDs to real saved visit IDs
+    const visitIdMap = new Map<string, string>();
+    payload.visits.forEach((v, i) => {
+      const realVisit = updatedWithVisits.visits?.[i];
+      if (realVisit?.id) {
+        const realIdStr = String(realVisit.id);
+        if (v.id) visitIdMap.set(String(v.id), realIdStr);
+        visitIdMap.set(`v-${i + 1}`, realIdStr);
+        visitIdMap.set(`v-temp-${i + 1}`, realIdStr);
+        visitIdMap.set(String(i + 1), realIdStr);
+      }
+    });
+    const fallbackVisitId = updatedWithVisits.visits?.[0]?.id
+      ? String(updatedWithVisits.visits[0].id)
+      : undefined;
+
     // 3. Put Items (Server calculates subtotal)
     await runtime.plan.putItems(
       planId as ID,
-      payload.items.map((it, i) => ({
-        id: it.id,
-        visit_id: it.visit_id,
-        treatment_id: it.treatment_id,
-        treatment_name: it.treatment_name,
-        animation_code: it.animation_code,
-        tooth_number: it.tooth_number,
-        teeth: it.teeth,
-        description: it.description,
-        quantity: it.quantity,
-        unit_price: it.unit_price,
-        is_package: it.is_package,
-        order_num: it.order_num || i + 1,
-      })),
+      payload.items.map((it, i) => {
+        let assignedVisitId = it.visit_id
+          ? visitIdMap.get(String(it.visit_id)) || it.visit_id
+          : fallbackVisitId;
+        return {
+          id: it.id,
+          visit_id: assignedVisitId,
+          treatment_id: it.treatment_id,
+          treatment_name: it.treatment_name,
+          animation_code: it.animation_code,
+          tooth_number: it.tooth_number,
+          teeth: it.teeth,
+          description: it.description,
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          is_package: it.is_package,
+          order_num: it.order_num || i + 1,
+        };
+      }),
       session.accessToken
     );
 
@@ -335,12 +356,11 @@ export async function createPlanAction(
       session.accessToken
     );
 
-    // 2. Default 2 Visits
+    // 2. Default 1 Visit
     const updatedWithVisits = await runtime.plan.putVisits(
       newPlan.id,
       [
-        { order_num: 1, title: "1. Seans: Muayene & Hazırlık" },
-        { order_num: 2, title: "2. Seans: Tedavi & Simantasyon" },
+        { order_num: 1, title: "1. Seans: Muayene & Tedavi" },
       ],
       session.accessToken
     );
@@ -417,6 +437,27 @@ export async function readyPlanAction(
       planId as ID,
       session.accessToken
     );
+
+    // Automatically trigger PDF generation & web share link so the presentation is 100% prepared
+    runtime.backend
+      .request({
+        path: `/v1/plans/${planId}/pdf`,
+        method: "POST",
+        accessToken: session.accessToken,
+      })
+      .catch(() => {});
+
+    try {
+      await runtime.backend.request<ShareResult>({
+        path: `/v1/plans/${planId}/share`,
+        method: "POST",
+        body: { ttl_hours: 720 },
+        accessToken: session.accessToken,
+      });
+    } catch {
+      // ignore if already shared
+    }
+
     revalidatePath("/app/plans");
     revalidatePath(`/app/plans/${planId}`);
 

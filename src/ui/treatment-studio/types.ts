@@ -99,6 +99,13 @@ export interface StudioPlanItem {
   animationCode?: string;
 }
 
+export interface PlanDiscount {
+  id?: string;
+  label: string;
+  amount: number; // minor units (kuruş)
+  order_num?: number;
+}
+
 export interface StudioVisit {
   id: string;
   orderNum: number;
@@ -139,7 +146,17 @@ export interface AnimationTimelineStage {
   visitTitle: string;
   stageName: string;
   teeth: string[];
-  actionType: "extraction" | "implant" | "abutment" | "temporary_denture" | "healing" | "permanent_bridge" | "custom";
+  actionType:
+    | "extraction"
+    | "implant"
+    | "abutment"
+    | "temporary_denture"
+    | "healing"
+    | "permanent_bridge"
+    | "filling"
+    | "root_canal"
+    | "crown"
+    | "custom";
   durationSeconds: number;
   description: string;
   healingPeriod?: string;
