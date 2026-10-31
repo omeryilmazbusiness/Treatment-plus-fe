@@ -13,7 +13,7 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
-import { FdiOdontogram, TOOTH_METADATA } from "./fdi-odontogram";
+import { AnatomicalToothSvg, FdiOdontogram, TOOTH_METADATA } from "./fdi-odontogram";
 import { XRayViewer } from "./xray-viewer";
 import type { ToothCondition } from "./types";
 
@@ -266,32 +266,49 @@ export function DiagnosisModule({
 
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: "missing" as const, label: "Eksik Diş", tip: "Missing" },
-                { id: "intact" as const, label: "Sağlam", tip: "Intact" },
-                { id: "filled" as const, label: "Dolgulu", tip: "Filled" },
-                { id: "caries" as const, label: "Çürük", tip: "Caries" },
-                { id: "root_canal" as const, label: "Kanal Tedavili", tip: "Endo" },
-                { id: "implant" as const, label: "İmplant", tip: "Fixture" },
-                { id: "crown" as const, label: "Kuron", tip: "Crown" },
-                { id: "bridge" as const, label: "Köprü", tip: "Bridge" },
-              ].map((btn) => (
-                <button
-                  key={btn.id}
-                  type="button"
-                  disabled={isLocked || selectedTeeth.length === 0}
-                  onClick={() => handleApplyCondition(btn.id)}
-                  className={`flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white p-2 text-center text-xs font-semibold transition shadow-2xs ${
-                    isLocked || selectedTeeth.length === 0
-                      ? "opacity-40 cursor-not-allowed"
-                      : "hover:bg-slate-100 hover:border-slate-300 text-slate-700 cursor-pointer active:scale-95"
-                  }`}
-                >
-                  <span>{btn.label}</span>
-                  <span className="text-[9px] text-slate-400 font-normal">
-                    {btn.tip}
-                  </span>
-                </button>
-              ))}
+                { id: "missing" as const, label: "Eksik Diş", tip: "Missing", sampleType: "molar" as const },
+                { id: "intact" as const, label: "Sağlam", tip: "Intact", sampleType: "molar" as const },
+                { id: "filled" as const, label: "Dolgulu", tip: "Filled", sampleType: "molar" as const },
+                { id: "caries" as const, label: "Çürük", tip: "Caries", sampleType: "molar" as const },
+                { id: "root_canal" as const, label: "Kanal Tedavili", tip: "Endo", sampleType: "molar" as const },
+                { id: "implant" as const, label: "İmplant", tip: "Fixture", sampleType: "incisor" as const },
+                { id: "crown" as const, label: "Kuron", tip: "Crown", sampleType: "premolar" as const },
+                { id: "bridge" as const, label: "Köprü", tip: "Bridge", sampleType: "molar" as const },
+              ].map((btn) => {
+                const cfg = CONDITION_CONFIG[btn.id];
+                return (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    disabled={isLocked || selectedTeeth.length === 0}
+                    onClick={() => handleApplyCondition(btn.id)}
+                    className={`group flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white px-2.5 py-2 text-left text-xs font-semibold transition shadow-2xs ${
+                      isLocked || selectedTeeth.length === 0
+                        ? "opacity-45 cursor-not-allowed"
+                        : "hover:bg-slate-100/80 hover:border-slate-300 text-slate-800 cursor-pointer active:scale-95"
+                    }`}
+                  >
+                    <div className="h-9 w-6 shrink-0 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-100 p-0.5 group-hover:bg-white transition">
+                      <AnatomicalToothSvg
+                        fdi={`preview-${btn.id}`}
+                        jaw="upper"
+                        type={btn.sampleType}
+                        condition={btn.id}
+                        isSelected={false}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`size-1.5 rounded-full shrink-0 ${cfg.dotColor}`} />
+                        <span className="truncate leading-tight">{btn.label}</span>
+                      </div>
+                      <span className="block text-[9px] text-slate-400 font-normal truncate mt-0.5">
+                        {btn.tip}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
