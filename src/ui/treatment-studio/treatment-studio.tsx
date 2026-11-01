@@ -47,6 +47,7 @@ import { DiagnosisModule } from "./diagnosis-module";
 import { TreatmentsModule } from "./treatments-module";
 import { SimulationModule, DEFAULT_ANIMATION_STAGES } from "./simulation-module";
 import { OverviewModule } from "./overview-module";
+import { AiSummaryModule } from "./ai-summary-module";
 
 export type StudioTab = "diagnosis" | "treatments" | "animation" | "ai_summary" | "overview";
 const VALID_TABS: StudioTab[] = ["diagnosis", "treatments", "animation", "ai_summary", "overview"];
@@ -727,61 +728,15 @@ export function TreatmentStudio({
 
         {/* AI Summary Tab */}
         {activeTab === "ai_summary" && (
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xs max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-              <div className="size-12 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 text-white flex items-center justify-center shadow-xs">
-                <Bot className="size-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  AI Tedavi ve Prognoz Analizi
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Yapay zeka destekli klinik vaka raporu ve hasta bilgilendirme dokümanı
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <h4 className="font-bold text-slate-900 mb-1">
-                  Klinik Durum Değerlendirmesi:
-                </h4>
-                <p>
-                  Hastanın alt ve üst posterior bölgelerindeki edantulizm, çiğneme fonksiyonunda %65 kayba neden olmaktadır. Planlanan <strong>All-on-4 titanyum implant protokolü</strong>, kemik greftleme ihtiyacını minimize ederek aynı gün sabit geçici diş teslimine (Immediate Loading) olanak sağlamaktadır.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2">
-                  <div className="font-bold text-slate-800">Cerrahi Başarı Beklentisi</div>
-                  <div className="text-2xl font-black text-emerald-600">%98.7</div>
-                  <p className="text-slate-500 text-[11px]">
-                    Nobel Biocare kemik seviyesi titanyum fikstürlerin 5 yıllık klinik takip başarısı.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2">
-                  <div className="font-bold text-slate-800">Tahmini İyileşme Periyodu</div>
-                  <div className="text-2xl font-black text-slate-900">6 Ay</div>
-                  <p className="text-slate-500 text-[11px]">
-                    Daimi monolitik zirkonyum köprüler öncesi osteointegrasyon süresi.
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("overview")}
-                  className="flex items-center gap-2 rounded-xl bg-slate-900 text-white px-5 py-2.5 text-xs font-bold hover:bg-slate-800 transition shadow-sm cursor-pointer"
-                >
-                  <span>Hasta Sunumuna Geç (Overview)</span>
-                  <ArrowRight className="size-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <AiSummaryModule
+            patient={patient}
+            clinic={clinic}
+            items={items}
+            conditions={conditions}
+            visits={visits}
+            currency={currency}
+            onNavigateToOverview={() => setActiveTab("overview")}
+          />
         )}
 
         {/* Module 4: Hasta Sunumu (Overview / Patient Microsite) */}

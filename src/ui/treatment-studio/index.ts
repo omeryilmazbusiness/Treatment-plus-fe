@@ -6,6 +6,7 @@ export * from "./three-mouth-canvas";
 export * from "./simulation-module";
 export * from "./diagnosis-module";
 export * from "./treatments-module";
+export * from "./ai-summary-module";
 export * from "./overview-module";
 export * from "./treatment-studio";
 
