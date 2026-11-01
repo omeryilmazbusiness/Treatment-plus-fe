@@ -284,35 +284,10 @@ export function TreatmentStudio({
         ]
   );
 
-  // Synchronize internal state when props update
-  useEffect(() => {
-    if (initialConditions !== undefined) {
-      setConditions(initialConditions);
-    }
-  }, [initialConditions]);
-
-  useEffect(() => {
-    if (initialVisits !== undefined && initialVisits.length > 0) {
-      setVisits(initialVisits);
-    }
-  }, [initialVisits]);
-
-  useEffect(() => {
-    if (initialItems !== undefined) {
-      setItems(initialItems);
-    }
-  }, [initialItems]);
-
   // Discounts state
   const [discounts, setDiscounts] = useState<PlanDiscount[]>(
     initialDiscounts && initialDiscounts.length > 0 ? initialDiscounts : []
   );
-
-  useEffect(() => {
-    if (initialDiscounts !== undefined) {
-      setDiscounts(initialDiscounts);
-    }
-  }, [initialDiscounts]);
 
   const handleDiscountsChange = (newDiscounts: PlanDiscount[]) => {
     setDiscounts(newDiscounts);
@@ -331,9 +306,10 @@ export function TreatmentStudio({
     d?: PlanDiscount[]
   ) =>
     JSON.stringify({
-      t: t ?? currentTitle,
+      t: (t ?? currentTitle ?? "").trim(),
       c,
       it: it.map((x) => ({
+        treatmentId: x.treatmentId,
         name: x.treatmentName,
         teeth: [...(x.teeth || [])].sort(),
         qty: x.quantity || 1,
@@ -353,25 +329,10 @@ export function TreatmentStudio({
       })),
     });
 
-  // Baseline snapshot of saved state
+  // Baseline snapshot of saved state (server state)
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string>(() =>
     serializeState(conditions, items, visits, currentTitle, discounts)
   );
-
-  // Synchronize baseline snapshot if initial props change externally
-  useEffect(() => {
-    if (initialConditions || initialItems || initialVisits || planTitle || initialDiscounts) {
-      const snap = serializeState(
-        initialConditions || conditions,
-        initialItems && initialItems.length > 0 ? initialItems : items,
-        initialVisits || visits,
-        planTitle || currentTitle,
-        initialDiscounts || discounts
-      );
-      setLastSavedSnapshot(snap);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialConditions, initialItems, initialVisits, planTitle, initialDiscounts]);
 
   // Current state snapshot
   const currentSnapshot = useMemo(
@@ -382,24 +343,85 @@ export function TreatmentStudio({
   // Dirty check: Are there any unsaved modifications?
   const hasUnsavedChanges = currentSnapshot !== lastSavedSnapshot;
 
+  // Only reset baseline snapshot if planId changes to a different plan
+  const initialPlanIdRef = React.useRef(planId);
+  useEffect(() => {
+    if (planId && planId !== initialPlanIdRef.current) {
+      initialPlanIdRef.current = planId;
+      if (initialConditions) setConditions(initialConditions);
+      if (initialItems) setItems(initialItems);
+      if (initialVisits) setVisits(initialVisits);
+      if (initialDiscounts) setDiscounts(initialDiscounts);
+      setLastSavedSnapshot(
+        serializeState(
+          initialConditions || {},
+          initialItems || [],
+          initialVisits || [],
+          planTitle,
+          initialDiscounts || []
+        )
+      );
+    }
+  }, [planId, initialConditions, initialItems, initialVisits, initialDiscounts, planTitle]);
+
+  // Synchronize internal state when props update ONLY if there are no pending unsaved changes
+  useEffect(() => {
+    if (initialConditions !== undefined && !hasUnsavedChanges) {
+      setConditions(initialConditions);
+    }
+  }, [initialConditions, hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (initialVisits !== undefined && initialVisits.length > 0 && !hasUnsavedChanges) {
+      setVisits(initialVisits);
+    }
+  }, [initialVisits, hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (initialItems !== undefined && !hasUnsavedChanges) {
+      setItems(initialItems);
+    }
+  }, [initialItems, hasUnsavedChanges]);
+
+  // Warn user if navigating away or refreshing with unsaved changes
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   const [isLocalSaving, setIsLocalSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const isSavingActive = isSaving || isLocalSaving;
 
   const handleSave = React.useCallback(async () => {
     if (isPlanLocked || !onSave) return;
     setIsLocalSaving(true);
+    setSaveError(null);
     try {
       const snap = currentSnapshot;
       await onSave({ conditions, items, visits, discounts });
       setLastSavedSnapshot(snap);
       setSaveSuccessMsg(true);
       setTimeout(() => setSaveSuccessMsg(false), 2000);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Studio save error:", e);
+      const msg = e instanceof Error ? e.message : "Plan kaydedilemedi";
+      setSaveError(msg);
     } finally {
       setIsLocalSaving(false);
     }
   }, [isPlanLocked, onSave, currentSnapshot, conditions, items, visits, discounts]);
+
+  // Keep handleSave accessible to tab switches
+  const handleSaveRef = React.useRef(handleSave);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
 
   // Debounced Auto-save (1200ms)
   useEffect(() => {
@@ -544,25 +566,44 @@ export function TreatmentStudio({
                   <span>Kilidi Aç & Düzenle</span>
                 </button>
               )
+            ) : saveError ? (
+              <button
+                type="button"
+                onClick={handleSave}
+                className="flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-700 shadow-2xs transition cursor-pointer"
+                title={`Kayıt hatası: ${saveError}. Tekrar denemek için tıklayın.`}
+              >
+                <AlertCircle className="size-3.5 text-rose-500" />
+                <span>Kayıt Başarısız (Tekrar Dene)</span>
+              </button>
+            ) : hasUnsavedChanges ? (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSavingActive}
+                className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 shadow-2xs transition cursor-pointer"
+                title="Değişiklikler algılandı. Şimdi kaydetmek için tıklayabilirsiniz."
+              >
+                {isSavingActive ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin text-amber-700" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Kaydediliyor... (Şimdi Kaydet)</span>
+                  </>
+                )}
+              </button>
             ) : (
               <div
                 className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 select-none shadow-2xs"
-                title={
-                  isSavingActive
-                    ? "Değişiklikler sunucuya kaydediliyor..."
-                    : hasUnsavedChanges
-                    ? "Değişiklikler algılandı, otomatik kaydediliyor..."
-                    : "Tüm değişiklikler otomatik olarak kaydedildi"
-                }
+                title="Tüm değişiklikler otomatik olarak kaydedildi"
               >
                 {isSavingActive ? (
                   <>
                     <Loader2 className="size-3.5 animate-spin text-cyan-600" />
-                    <span>Kaydediliyor...</span>
-                  </>
-                ) : hasUnsavedChanges ? (
-                  <>
-                    <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
                     <span>Kaydediliyor...</span>
                   </>
                 ) : (
@@ -675,13 +716,14 @@ export function TreatmentStudio({
           />
         )}
 
-        {/* Module 3: 3D Animasyon (Simulation) */}
-        {activeTab === "animation" && (
+        {/* Module 3: 3D Animasyon (Simulation) - Preloaded and kept alive */}
+        <div className={activeTab === "animation" ? "block" : "hidden"}>
           <SimulationModule
             planItems={items}
             visits={visits}
+            isActive={activeTab === "animation"}
           />
-        )}
+        </div>
 
         {/* AI Summary Tab */}
         {activeTab === "ai_summary" && (

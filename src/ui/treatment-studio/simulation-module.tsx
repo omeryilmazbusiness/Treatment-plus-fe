@@ -210,7 +210,7 @@ export function buildTimelineStagesFromPlan(
       const teeth = Array.isArray(item.teeth) ? item.teeth : [];
 
       stages.push({
-        id: `stage-${visit.id}-${item.id || itemIdx}`,
+        id: `stage-${visit.id}-${item.id || itemIdx}-${itemIdx}`,
         visitTitle: visit.title || `${visit.orderNum}. Seans`,
         stageName: item.treatmentName || "Tedavi Uygulaması",
         teeth,
@@ -264,7 +264,7 @@ export function buildTimelineStagesFromPlan(
       const teeth = Array.isArray(item.teeth) ? item.teeth : [];
 
       stages.push({
-        id: `stage-rem-${item.id || itemIdx}`,
+        id: `stage-rem-${item.id || itemIdx}-${itemIdx}`,
         visitTitle: fallbackVisit.title || `${fallbackVisit.orderNum}. Seans`,
         stageName: item.treatmentName || "Tedavi Uygulaması",
         teeth,
@@ -283,6 +283,13 @@ interface SimulationModuleProps {
   planItems?: StudioPlanItem[];
   visits?: StudioVisit[];
   darkMode?: boolean;
+  isActive?: boolean;
+}
+
+function formatTime(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
 export function SimulationModule({
@@ -290,6 +297,7 @@ export function SimulationModule({
   planItems,
   visits,
   darkMode = false,
+  isActive = true,
 }: SimulationModuleProps) {
   const stages = useMemo(() => {
     if (planItems && planItems.length > 0) {
@@ -299,50 +307,113 @@ export function SimulationModule({
     return buildTimelineStagesFromPlan(visits, planItems);
   }, [customStages, visits, planItems]);
 
-  const [currentStageIndex, setCurrentStageIndex] = useState(0);
+  const stageTimeline = useMemo(() => {
+    let acc = 0;
+    const items = stages.map((st) => {
+      const dur = st.durationSeconds || 3.5;
+      const start = acc;
+      const end = acc + dur;
+      acc = end;
+      return { stage: st, start, end, duration: dur };
+    });
+    return { items, totalDuration: Math.max(acc, 0.1) };
+  }, [stages]);
+
+  const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+  const [resetSignal, setResetSignal] = useState(0);
 
-  // Keep index within bounds
-  useEffect(() => {
-    if (currentStageIndex >= stages.length) {
-      setCurrentStageIndex(0);
+  const currentStageIndex = useMemo(() => {
+    const found = stageTimeline.items.findIndex(
+      (it) => currentTime >= it.start && currentTime < it.end
+    );
+    if (found !== -1) return found;
+    if (currentTime >= stageTimeline.totalDuration) {
+      return stageTimeline.items.length - 1;
     }
-  }, [stages.length, currentStageIndex]);
+    return 0;
+  }, [currentTime, stageTimeline]);
+
+  // When active changes to true (opening the simulation tab), always start from the beginning
+  useEffect(() => {
+    if (isActive) {
+      setCurrentTime(0);
+      setIsPlaying(false);
+      setResetSignal((s) => s + 1);
+    }
+  }, [isActive]);
 
   const activeStage: AnimationTimelineStage =
     stages[currentStageIndex] || stages[0] || DEFAULT_ANIMATION_STAGES[0]!;
 
-  // Auto-play timer
+  // Smooth continuous video playback ticker
   useEffect(() => {
     if (!isPlaying) return;
 
-    const intervalTime = (activeStage.durationSeconds * 1000) / playbackSpeed;
-    const timer = setTimeout(() => {
-      if (currentStageIndex < stages.length - 1) {
-        setCurrentStageIndex((prev) => prev + 1);
-      } else {
-        setIsPlaying(false);
-      }
-    }, intervalTime);
+    let lastTime = performance.now();
+    let animId: number;
 
-    return () => clearTimeout(timer);
-  }, [isPlaying, currentStageIndex, stages, activeStage, playbackSpeed]);
+    const tick = (now: number) => {
+      const delta = (now - lastTime) / 1000;
+      lastTime = now;
+
+      setCurrentTime((prev) => {
+        const next = prev + delta * playbackSpeed;
+        if (next >= stageTimeline.totalDuration) {
+          setIsPlaying(false);
+          return stageTimeline.totalDuration;
+        }
+        return next;
+      });
+
+      animId = requestAnimationFrame(tick);
+    };
+
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying, playbackSpeed, stageTimeline.totalDuration]);
+
+  const handleRestart = () => {
+    setCurrentTime(0);
+    setIsPlaying(false);
+    setResetSignal((s) => s + 1);
+  };
 
   const handlePrev = () => {
-    setCurrentStageIndex((prev) => Math.max(0, prev - 1));
+    if (currentStageIndex > 0) {
+      setCurrentTime(stageTimeline.items[currentStageIndex - 1]!.start);
+    } else {
+      setCurrentTime(0);
+      setResetSignal((s) => s + 1);
+    }
   };
 
   const handleNext = () => {
-    setCurrentStageIndex((prev) => Math.min(stages.length - 1, prev + 1));
+    if (currentStageIndex < stageTimeline.items.length - 1) {
+      setCurrentTime(stageTimeline.items[currentStageIndex + 1]!.start);
+    } else {
+      setCurrentTime(stageTimeline.totalDuration);
+      setIsPlaying(false);
+    }
   };
 
   const handleTogglePlay = () => {
-    if (!isPlaying && currentStageIndex === stages.length - 1) {
-      setCurrentStageIndex(0);
+    if (!isPlaying) {
+      if (currentTime >= stageTimeline.totalDuration - 0.1) {
+        setCurrentTime(0);
+        setResetSignal((s) => s + 1);
+      }
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
     }
-    setIsPlaying(!isPlaying);
   };
+
+  const progressPercent = Math.min(
+    100,
+    Math.max(0, (currentTime / stageTimeline.totalDuration) * 100)
+  );
 
   // Group stages by Visit Title for the timeline list (Matching Image 5)
   const groupedStages: Record<string, AnimationTimelineStage[]> = {};
@@ -362,6 +433,8 @@ export function SimulationModule({
           allStages={stages}
           isPlaying={isPlaying}
           onStepComplete={handleNext}
+          isActive={isActive}
+          resetSignal={resetSignal}
         />
 
         {/* Media Player Controls */}
@@ -387,6 +460,20 @@ export function SimulationModule({
 
             {/* Playback Buttons */}
             <div className="flex items-center gap-2 self-center">
+              <button
+                type="button"
+                onClick={handleRestart}
+                disabled={currentStageIndex === 0}
+                className={`rounded-xl border p-2.5 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer shadow-2xs ${
+                  darkMode
+                    ? "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                }`}
+                title="En Başa Dön (1. Aşama)"
+              >
+                <RotateCcw className="size-4" />
+              </button>
+
               <button
                 type="button"
                 onClick={handlePrev}
@@ -462,8 +549,12 @@ export function SimulationModule({
 
           {/* Timeline progress scrubber */}
           <div className={`mt-3.5 pt-3 border-t ${darkMode ? "border-slate-800" : "border-slate-100"}`}>
+            <div className="flex items-center justify-between text-[11px] font-mono font-medium text-slate-400 mb-1.5 px-0.5">
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(stageTimeline.totalDuration)}</span>
+            </div>
             <div
-              className={`relative w-full h-2.5 rounded-full overflow-hidden cursor-pointer group ${
+              className={`relative w-full h-2.5 rounded-full cursor-pointer group select-none ${
                 darkMode ? "bg-slate-800" : "bg-slate-100"
               }`}
               title="Aşamalara atlamak için tıklayın"
@@ -471,18 +562,42 @@ export function SimulationModule({
                 const rect = e.currentTarget.getBoundingClientRect();
                 const clickX = e.clientX - rect.left;
                 const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-                const targetIdx = Math.min(stages.length - 1, Math.floor(ratio * stages.length));
-                setCurrentStageIndex(targetIdx);
-                setIsPlaying(false);
+                setCurrentTime(ratio * stageTimeline.totalDuration);
               }}
             >
+              {/* Visual stage tick dividers */}
+              {stageTimeline.items.map((it, idx) => {
+                if (idx === 0) return null;
+                const leftPercent = (it.start / stageTimeline.totalDuration) * 100;
+                return (
+                  <div
+                    key={idx}
+                    className={`absolute top-0 bottom-0 w-0.5 z-10 ${
+                      darkMode ? "bg-slate-900/80" : "bg-white/80"
+                    }`}
+                    style={{ left: `${leftPercent}%` }}
+                  />
+                );
+              })}
+
+              {/* Filled progress bar */}
               <div
-                className={`h-full transition-all duration-300 ${
+                className={`h-full rounded-full ${
                   darkMode ? "bg-cyan-400 group-hover:bg-cyan-300" : "bg-slate-900 group-hover:bg-blue-600"
                 }`}
                 style={{
-                  width: `${((currentStageIndex + 1) / stages.length) * 100}%`,
+                  width: `${progressPercent}%`,
                 }}
+              />
+
+              {/* Scrubber thumb circle */}
+              <div
+                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-3.5 rounded-full border-2 shadow-sm transition-transform group-hover:scale-125 ${
+                  darkMode
+                    ? "bg-cyan-400 border-slate-900 ring-2 ring-cyan-400/40"
+                    : "bg-white border-slate-900 ring-2 ring-slate-900/20"
+                }`}
+                style={{ left: `${progressPercent}%` }}
               />
             </div>
           </div>
@@ -529,17 +644,22 @@ export function SimulationModule({
 
               {/* Stages under this visit */}
               <div className="space-y-1 pl-1">
-                {vStages.map((st) => {
-                  const stageIndex = stages.findIndex((s) => s.id === st.id);
+                {vStages.map((st, sIdx) => {
+                  const stageIndex = stages.indexOf(st);
                   const isActive = stageIndex === currentStageIndex;
                   const isPassed = stageIndex < currentStageIndex;
 
                   return (
                     <div
-                      key={st.id}
+                      key={st.id ? `${st.id}-${sIdx}` : `stage-${stageIndex >= 0 ? stageIndex : sIdx}`}
                       onClick={() => {
-                        setCurrentStageIndex(stageIndex);
-                        setIsPlaying(false);
+                        if (stageIndex >= 0) {
+                          const target = stageTimeline.items[stageIndex];
+                          if (target) {
+                            setCurrentTime(target.start);
+                          }
+                          setIsPlaying(false);
+                        }
                       }}
                       title={st.description}
                       className={`group flex items-center justify-between rounded-xl px-3 py-2.5 transition cursor-pointer border ${

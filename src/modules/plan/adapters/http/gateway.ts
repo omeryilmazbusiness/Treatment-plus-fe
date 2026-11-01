@@ -18,6 +18,17 @@ type RawPatient = {
   created_at?: string;
 };
 
+type RawSituation = {
+  xray_key?: string;
+  chart_teeth?: string[];
+  tooth_findings?: { tooth: string; status: string; note?: string }[];
+  general_diagnoses?: string[];
+  xrayKey?: string;
+  chartTeeth?: string[];
+  toothFindings?: { tooth: string; status: string; note?: string }[];
+  generalDiagnoses?: string[];
+};
+
 type RawPlan = {
   id: string;
   workspace_id?: string;
@@ -29,7 +40,7 @@ type RawPlan = {
   palette?: "navy" | "forest" | "rose" | "slate";
   locale?: "tr" | "en";
   diagnoses: string[];
-  situation?: Situation;
+  situation?: RawSituation;
   totals_subtotal: number;
   totals_discount: number;
   totals_grand: number;
@@ -138,11 +149,31 @@ export class PlanHttpGateway
     },
     accessToken?: string
   ): Promise<Plan> {
+    const rawSituation = input.situation
+      ? {
+          xray_key: input.situation.xrayKey,
+          chart_teeth: input.situation.chartTeeth,
+          tooth_findings: input.situation.toothFindings?.map((tf) => ({
+            tooth: tf.tooth,
+            status: tf.status,
+            note: tf.note,
+          })),
+          general_diagnoses: input.situation.generalDiagnoses,
+        }
+      : undefined;
+
     const res = await this.http.request<RawPlan>({
       path: `/v1/plans/${id}`,
       method: "PATCH",
       accessToken,
-      body: input,
+      body: {
+        title: input.title,
+        diagnoses: input.diagnoses,
+        palette: input.palette,
+        locale: input.locale,
+        currency: input.currency,
+        situation: rawSituation,
+      },
     });
     return toPlanDomain(res);
   }
@@ -288,7 +319,7 @@ function toPlanDomain(raw: RawPlan): Plan {
     palette: raw.palette ?? "navy",
     locale: raw.locale ?? "tr",
     diagnoses: raw.diagnoses ?? [],
-    situation: raw.situation,
+    situation: toSituationDomain(raw.situation),
     totalsSubtotal: raw.totals_subtotal ?? 0,
     totalsDiscount: raw.totals_discount ?? 0,
     totalsGrand: raw.totals_grand ?? 0,
@@ -339,5 +370,20 @@ function toDiscountDomain(raw: RawDiscount): Discount {
     label: raw.label ?? "",
     amount: raw.amount ?? 0,
     orderNum: raw.order_num,
+  };
+}
+
+function toSituationDomain(raw?: RawSituation): Situation | undefined {
+  if (!raw) return undefined;
+  const findings = (raw.tooth_findings ?? raw.toothFindings ?? []).map((tf) => ({
+    tooth: tf.tooth,
+    status: tf.status as any,
+    note: tf.note,
+  }));
+  return {
+    xrayKey: raw.xray_key ?? raw.xrayKey,
+    chartTeeth: raw.chart_teeth ?? raw.chartTeeth,
+    toothFindings: findings,
+    generalDiagnoses: raw.general_diagnoses ?? raw.generalDiagnoses,
   };
 }

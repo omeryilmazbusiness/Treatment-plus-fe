@@ -426,10 +426,10 @@ export function TreatmentsModule({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {items.map((item) => {
+                  {items.map((item, idx) => {
                     const lineTotal = (item.quantity || 1) * (item.unitPrice || 0);
                     return (
-                      <tr key={item.id} className="hover:bg-slate-50/70 transition">
+                      <tr key={item.id ? `${item.id}-${idx}` : `item-${idx}`} className="hover:bg-slate-50/70 transition">
                         <td className="py-3 px-3 font-semibold text-slate-800">
                           <div className="flex items-center gap-2">
                             {item.isPackage && (

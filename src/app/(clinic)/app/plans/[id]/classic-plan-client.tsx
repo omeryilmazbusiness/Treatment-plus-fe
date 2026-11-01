@@ -709,10 +709,17 @@ export function ClassicPlanClient({
   }, [visits]);
 
   const studioItems: StudioPlanItem[] = useMemo(() => {
+    const seenIds = new Set<string>();
     return items.map((it, idx) => {
       const tr = treatmentsCatalog.find((t) => String(t.id) === it.treatment_id);
+      let itemId = it.id;
+      if (!itemId || seenIds.has(itemId)) {
+        itemId = `it-temp-${idx}`;
+      } else {
+        seenIds.add(itemId);
+      }
       return {
-        id: it.id || `it-${idx}`,
+        id: itemId,
         treatmentId: it.treatment_id,
         treatmentCode: tr?.code,
         treatmentType: inferTreatmentType(it.treatment_name || tr?.name || "", tr?.code),
@@ -761,7 +768,7 @@ export function ClassicPlanClient({
         })),
       },
       visits: studioData.visits.map((v, i) => ({
-        id: v.id.startsWith("v-temp-") || v.id.startsWith("v-allon4-") ? undefined : v.id,
+        id: v.id.startsWith("v-temp-") || v.id.startsWith("v-allon4-") || v.id.startsWith("v-") ? undefined : v.id,
         order_num: i + 1,
         title: v.title,
         phase_label: v.phaseLabel,
@@ -788,8 +795,11 @@ export function ClassicPlanClient({
       })),
     });
 
-    if (res.success && res.data) {
-      setPlan(res.data);
+    if (!res.success || !res.data) {
+      throw new Error(res.error || "Plan kaydedilemedi");
+    }
+
+    setPlan(res.data);
       if (res.data.currency) setCurrency(res.data.currency);
       if (res.data.situation?.toothFindings) {
         const map: Record<string, ToothCondition> = {};
@@ -860,7 +870,6 @@ export function ClassicPlanClient({
           newDiscountsData
         )
       );
-    }
   };
 
   const handleStudioLockReady = async () => {
@@ -892,17 +901,23 @@ export function ClassicPlanClient({
   };
 
   const handleStudioItemsChange = (newStudioItems: StudioPlanItem[]) => {
+    const assignedIds = new Set<string>();
     const convertedItems = newStudioItems.map((it, i) => {
-      const existing = items.find(
-        (ex) => ex.id === it.id || (ex.treatment_id && ex.treatment_id === it.treatmentId)
-      );
+      let itemId: string | undefined = it.id || undefined;
+      if (itemId && assignedIds.has(itemId)) {
+        itemId = `${itemId}-${i}`;
+      }
+      if (itemId) {
+        assignedIds.add(itemId);
+      }
+      const existing = itemId ? items.find((ex) => ex.id === itemId) : undefined;
       const visitIdToUse =
         it.visitId && visits.some((v) => v.id === it.visitId)
           ? it.visitId
           : visits[0]?.id;
 
       return {
-        id: it.id?.startsWith("it-") || it.id?.startsWith("tpl-") ? existing?.id : it.id,
+        id: itemId,
         visit_id: visitIdToUse,
         treatment_id: it.treatmentId || existing?.treatment_id,
         treatment_name: it.treatmentName,
