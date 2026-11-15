@@ -5,7 +5,7 @@ import { LogOut } from "lucide-react";
 
 import { logoutClinicAction } from "@/app/login/actions";
 import { getRuntime } from "@/bootstrap";
-import { resolveActiveSession } from "@/platform/auth/session";
+import { readRawSession } from "@/platform/auth/session";
 import { Mark } from "@/ui/mark";
 import { ClinicNav } from "./clinic-nav";
 
@@ -76,8 +76,8 @@ export default function ClinicLayout({ children }: { children: ReactNode }) {
 
 async function SessionChip() {
   await connection();
-  const { config, backend } = getRuntime();
-  const session = await resolveActiveSession(config, backend);
+  const { config } = getRuntime();
+  const session = await readRawSession(config);
 
   return (
     <div className="flex items-center gap-3">

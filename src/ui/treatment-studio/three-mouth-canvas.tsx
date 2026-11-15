@@ -6,20 +6,34 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import gsap from "gsap";
-import { RotateCcw } from "lucide-react";
-import type { AnimationTimelineStage } from "./types";
+import { RotateCcw, Video } from "lucide-react";
+import type { AnimationTimelineStage, ToothCondition } from "./types";
+import {
+  clearSceneProps,
+  DEFAULT_OPEN_ANGLE,
+  initMouthCinematics,
+  playTreatmentStage,
+  restoreMats,
+  type MouthCinematicController,
+  type MouthSceneContext,
+} from "./treatment-cinematics";
 
 interface ThreeMouthCanvasProps {
   currentStage: AnimationTimelineStage;
   allStages?: AnimationTimelineStage[];
+  stageIndex?: number;
+  conditions?: Record<string, ToothCondition>;
   isPlaying?: boolean;
+  playbackSpeed?: number;
+  stageElapsedSeconds?: number;
   onStepComplete?: () => void;
   isActive?: boolean;
   resetSignal?: number;
+  isRecording?: boolean;
+  onAfterRender?: (canvas: HTMLCanvasElement) => void;
 }
 
 const HINGE_NAME = "jaw_hinge_pivot";
-const OPEN_ANGLE = 0.16;
 
 function boxOf(obj: THREE.Object3D) {
   const box = new THREE.Box3().setFromObject(obj);
@@ -85,30 +99,18 @@ function createHinge(jaw: THREE.Object3D) {
   return pivot;
 }
 
-function fdiMeta(fdi: string) {
-  const n = Number(fdi) || 16;
-  return {
-    n,
-    upper: n < 30,
-    right: (n >= 11 && n <= 18) || (n >= 41 && n <= 48),
-    distal: Math.max(0, Math.min(1, ((n % 10) - 1) / 7)),
-  };
-}
-
-function calculateFdiPoint(mesh: THREE.Object3D, fdi: string) {
-  const { box, center, size } = boxOf(mesh);
-  const { upper, right, distal } = fdiMeta(fdi);
-  const p = new THREE.Vector3();
-  p.x = center.x + (right ? -1 : 1) * (0.18 + 0.38 * distal) * size.x;
-  p.y = upper ? box.min.y + size.y * 0.12 : box.max.y - size.y * 0.12;
-  p.z = box.max.z - Math.pow(distal, 0.82) * size.z * 0.96;
-  return p;
-}
-
 export function ThreeMouthCanvas({
   currentStage,
+  allStages = [],
+  stageIndex,
+  conditions,
+  isPlaying = false,
+  playbackSpeed = 1,
+  stageElapsedSeconds,
   isActive = true,
   resetSignal,
+  isRecording = false,
+  onAfterRender,
 }: ThreeMouthCanvasProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -117,13 +119,24 @@ export function ThreeMouthCanvas({
   const controlsRef = useRef<OrbitControls | null>(null);
   const modelRootRef = useRef<THREE.Group | null>(null);
   const pivotHingeRef = useRef<THREE.Group | null>(null);
+  const cinematicsRef = useRef<MouthCinematicController | null>(null);
+  const baseTimeScaleRef = useRef<number>(1);
   const defaultCamTarget = useRef<THREE.Vector3>(new THREE.Vector3());
   const defaultCamPos = useRef<THREE.Vector3>(new THREE.Vector3());
+
   const isActiveRef = useRef(isActive);
-  isActiveRef.current = isActive;
+  const isRecordingRef = useRef(isRecording);
+  const onAfterRenderRef = useRef(onAfterRender);
+
+  useEffect(() => {
+    isActiveRef.current = isActive;
+    isRecordingRef.current = isRecording;
+    onAfterRenderRef.current = onAfterRender;
+  }, [isActive, isRecording, onAfterRender]);
 
   const [loading, setLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
+  const [modelReadyTick, setModelReadyTick] = useState(0);
 
   // Initialize Three.js scene & load mouth.glb
   useEffect(() => {
@@ -139,7 +152,7 @@ export function ThreeMouthCanvas({
     sceneRef.current = scene;
 
     // 2. Camera
-    const camera = new THREE.PerspectiveCamera(39.6, width / height, 0.05, 100);
+    const camera = new THREE.PerspectiveCamera(39.6, width / height, 0.01, 100);
     cameraRef.current = camera;
 
     // 3. Renderer with high clinical quality
@@ -164,7 +177,7 @@ export function ThreeMouthCanvas({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
-    controls.minDistance = 0.05;
+    controls.minDistance = 0.035;
     controls.maxDistance = 3.0;
     controlsRef.current = controls;
 
@@ -195,9 +208,7 @@ export function ThreeMouthCanvas({
         const root = gltf.scene;
         modelRootRef.current = root;
 
-        // Process authored lights inside the GLB: Blender lights are calibrated
-        // for distant cameras and have huge candela (54,000+). Scale them down
-        // so they don't blow out / overexpose the teeth.
+        // Scale down high-candela Blender lights
         root.traverse((o) => {
           if ((o as THREE.Light).isLight) {
             const light = o as THREE.Light;
@@ -216,7 +227,6 @@ export function ThreeMouthCanvas({
             mesh.receiveShadow = true;
 
             const name = (mesh.name || "").toLowerCase();
-            // Saliva translucency
             if (name.includes("saliva")) {
               const salivaMat = new THREE.MeshPhysicalMaterial({
                 color: new THREE.Color(0xdbeafe),
@@ -239,8 +249,6 @@ export function ThreeMouthCanvas({
                 srcMat.envMapIntensity = 1.15;
                 srcMat.metalness = 0.0;
 
-                // Blender exports glossiness in the roughness slot for this model.
-                // Invert gloss map to true perceptual roughness so it doesn't create blinding white specular blowout.
                 if (srcMat.roughnessMap && !srcMat.userData.glossInverted) {
                   srcMat.roughnessMap = invertTexture(srcMat.roughnessMap);
                   srcMat.roughness = 1.0;
@@ -255,19 +263,29 @@ export function ThreeMouthCanvas({
           }
         });
 
-        // Setup TMJ lower jaw open hinge
+        // Setup TMJ lower jaw open hinge (first at 0 rotation so arch bounds are sampled cleanly)
         const jawLower =
           root.getObjectByName("jawLower_midres") ||
           root.getObjectByName("jawLower");
         if (jawLower) {
           const hinge = createHinge(jawLower);
           if (hinge && hinge.rotation) {
-            hinge.rotation.x = OPEN_ANGLE;
+            hinge.rotation.x = 0;
             pivotHingeRef.current = hinge as THREE.Group;
           }
         }
 
         scene.add(root);
+        root.updateMatrixWorld(true);
+
+        // Initialize unified 3D shader & island controller (attaches shader to both Teeth and Saliva!)
+        const controller = initMouthCinematics(root, pivotHingeRef.current);
+        cinematicsRef.current = controller;
+
+        if (pivotHingeRef.current) {
+          pivotHingeRef.current.rotation.x = DEFAULT_OPEN_ANGLE;
+          root.updateMatrixWorld(true);
+        }
 
         // Frame camera cleanly on mouth
         const focus =
@@ -291,6 +309,7 @@ export function ThreeMouthCanvas({
         defaultCamTarget.current.copy(center);
 
         setLoading(false);
+        setModelReadyTick((t) => t + 1);
       },
       (progress) => {
         if (progress.total > 0) {
@@ -303,13 +322,17 @@ export function ThreeMouthCanvas({
       }
     );
 
-    // 7. Render Loop
+    // 7. Render Loop with immediate post-render video capture callback (Requirement 3)
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      if (isActiveRef.current) {
+      if (isActiveRef.current || isRecordingRef.current) {
+        controls.enabled = !isRecordingRef.current;
         controls.update();
         renderer.render(scene, camera);
+        if (onAfterRenderRef.current) {
+          onAfterRenderRef.current(renderer.domElement);
+        }
       }
     };
     animate();
@@ -331,6 +354,10 @@ export function ThreeMouthCanvas({
       isCancelled = true;
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", handleResize);
+      if (cinematicsRef.current?.activeTimeline) {
+        cinematicsRef.current.activeTimeline.kill();
+      }
+      clearSceneProps(scene, "prop_");
       renderer.dispose();
       pmrem.dispose();
     };
@@ -355,71 +382,79 @@ export function ThreeMouthCanvas({
     }
   }, [isActive]);
 
-  // React to currentStage changes and frame camera towards active teeth
+  // Execute 4-phase procedural choreography for currentStage & preserve prior stage states
   useEffect(() => {
+    const scene = sceneRef.current;
     const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    const renderer = rendererRef.current;
     const model = modelRootRef.current;
-    if (!camera || !model || !controlsRef.current) return;
+    const controller = cinematicsRef.current;
 
-    const activeTeeth = currentStage.teeth || [];
-    const teethUpper = model.getObjectByName("TeethUpper_midres");
-    const teethLower = model.getObjectByName("TeethLower_midres");
-
-    if (activeTeeth.length > 0 && activeTeeth[0] && (teethUpper || teethLower)) {
-      const firstFdi = activeTeeth[0];
-      const isUpper = Number(firstFdi) < 30;
-      const hostMesh = isUpper ? teethUpper : teethLower;
-
-      if (hostMesh) {
-        const pt = calculateFdiPoint(hostMesh, firstFdi);
-        const { upper, right } = fdiMeta(firstFdi);
-        const buccalX = right ? -1 : 1;
-        const occlusalY = upper ? 1 : -1;
-
-        const elev = THREE.MathUtils.degToRad(38);
-        const yaw = THREE.MathUtils.degToRad(34);
-        const dir = new THREE.Vector3(
-          buccalX * Math.cos(elev) * 0.88,
-          occlusalY * Math.sin(elev),
-          Math.cos(elev) * Math.sin(yaw)
-        ).normalize();
-
-        const camPos = pt.clone().addScaledVector(dir, 0.08);
-
-        gsap.to(camera.position, {
-          x: camPos.x,
-          y: camPos.y,
-          z: camPos.z,
-          duration: 1.1,
-          ease: "power2.out",
-        });
-
-        gsap.to(controlsRef.current.target, {
-          x: pt.x,
-          y: pt.y,
-          z: pt.z,
-          duration: 1.1,
-          ease: "power2.out",
-        });
-      }
-    } else {
-      // Return to overall natural clinical view
-      gsap.to(camera.position, {
-        x: defaultCamPos.current.x,
-        y: defaultCamPos.current.y,
-        z: defaultCamPos.current.z,
-        duration: 1.0,
-        ease: "power2.out",
-      });
-      gsap.to(controlsRef.current.target, {
-        x: defaultCamTarget.current.x,
-        y: defaultCamTarget.current.y,
-        z: defaultCamTarget.current.z,
-        duration: 1.0,
-        ease: "power2.out",
-      });
+    if (!scene || !camera || !controls || !renderer || !model || !controller) {
+      return;
     }
-  }, [currentStage]);
+
+    const resolvedStageIndex =
+      stageIndex !== undefined
+        ? stageIndex
+        : Math.max(
+            0,
+            allStages.findIndex((s) => s.id === currentStage.id)
+          );
+
+    const ctx: MouthSceneContext = {
+      scene,
+      camera,
+      controls,
+      renderer,
+      root: model,
+      pivotHinge: pivotHingeRef.current,
+      defaultCamPos: defaultCamPos.current,
+      defaultCamTarget: defaultCamTarget.current,
+      controller,
+    };
+
+    const tl = playTreatmentStage(
+      currentStage,
+      ctx,
+      allStages,
+      resolvedStageIndex,
+      undefined,
+      conditions
+    );
+
+    baseTimeScaleRef.current = tl.timeScale();
+    tl.timeScale(baseTimeScaleRef.current * (playbackSpeed || 1));
+  }, [currentStage, stageIndex, allStages, conditions, modelReadyTick]);
+
+  // Keep timeline playback speed synchronized with user speed toggle (1x / 1.5x / 2x)
+  useEffect(() => {
+    const tl = cinematicsRef.current?.activeTimeline;
+    if (!tl) return;
+    tl.timeScale(baseTimeScaleRef.current * (playbackSpeed || 1));
+  }, [playbackSpeed]);
+
+  // Pause / resume active GSAP timeline when isPlaying toggles
+  useEffect(() => {
+    const tl = cinematicsRef.current?.activeTimeline;
+    if (!tl) return;
+    if (isPlaying) {
+      tl.play();
+    }
+  }, [isPlaying]);
+
+  // Synchronize manual scrubber jumps when paused
+  useEffect(() => {
+    if (isPlaying || stageElapsedSeconds === undefined) return;
+    const tl = cinematicsRef.current?.activeTimeline;
+    if (!tl) return;
+    const dur = Math.max(0.1, currentStage.durationSeconds || 8.0);
+    const ratio = Math.max(0, Math.min(1, stageElapsedSeconds / dur));
+    if (ratio > 0.02) {
+      tl.progress(ratio, false);
+    }
+  }, [stageElapsedSeconds, isPlaying, currentStage.durationSeconds]);
 
   const handleResetCamera = () => {
     if (!cameraRef.current || !controlsRef.current) return;
@@ -439,10 +474,35 @@ export function ThreeMouthCanvas({
     });
   };
 
-  // Reset camera when external resetSignal triggers
+  // Full restore when resetSignal fires
   useEffect(() => {
     if (resetSignal !== undefined && resetSignal > 0) {
-      handleResetCamera();
+      if (sceneRef.current && cinematicsRef.current && cameraRef.current && controlsRef.current && rendererRef.current && modelRootRef.current) {
+        restoreMats(cinematicsRef.current);
+        clearSceneProps(sceneRef.current, "prop_");
+        const ctx: MouthSceneContext = {
+          scene: sceneRef.current,
+          camera: cameraRef.current,
+          controls: controlsRef.current,
+          renderer: rendererRef.current,
+          root: modelRootRef.current,
+          pivotHinge: pivotHingeRef.current,
+          defaultCamPos: defaultCamPos.current,
+          defaultCamTarget: defaultCamTarget.current,
+          controller: cinematicsRef.current,
+        };
+        const tl = playTreatmentStage(
+          currentStage,
+          ctx,
+          allStages,
+          0,
+          undefined,
+          conditions
+        );
+        baseTimeScaleRef.current = tl.timeScale();
+      } else {
+        handleResetCamera();
+      }
     }
   }, [resetSignal]);
 
@@ -472,11 +532,19 @@ export function ThreeMouthCanvas({
       {/* Top Left: Active Step Badge & Tooth Numbers */}
       <div className="absolute top-4 left-4 z-10">
         <div className="flex items-center gap-2.5 rounded-xl bg-slate-900/85 backdrop-blur-md border border-slate-700/80 px-3.5 py-2 shadow-lg">
-          <div className="size-2 rounded-full bg-blue-400 animate-ping shrink-0"></div>
+          <div
+            className={`size-2 rounded-full animate-ping shrink-0 ${
+              isRecording ? "bg-rose-500" : "bg-blue-400"
+            }`}
+          />
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
-                Aktif Aşama
+              <span
+                className={`text-[10px] font-bold uppercase tracking-wider ${
+                  isRecording ? "text-rose-400" : "text-blue-400"
+                }`}
+              >
+                {isRecording ? "Video Kaydediliyor (1080p)" : "Aktif Aşama"}
               </span>
               {currentStage.teeth && currentStage.teeth.length > 0 && (
                 <div className="flex items-center gap-1 flex-wrap">
@@ -498,12 +566,19 @@ export function ThreeMouthCanvas({
         </div>
       </div>
 
-      {/* Top Right Controls (Reset View) */}
+      {/* Top Right Controls (Reset View & Recording Indicator) */}
       <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5">
+        {isRecording && (
+          <div className="flex items-center gap-1.5 rounded-xl bg-rose-500/20 backdrop-blur-md border border-rose-500/50 px-3 py-1.5 text-xs font-semibold text-rose-200">
+            <Video className="size-3.5 text-rose-400 animate-pulse" />
+            <span>REC 60fps</span>
+          </div>
+        )}
         <button
           type="button"
           onClick={handleResetCamera}
-          className="flex items-center gap-1.5 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+          disabled={isRecording}
+          className="flex items-center gap-1.5 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 transition cursor-pointer"
           title="Kamera Açısını Sıfırla"
         >
           <RotateCcw className="size-3.5" />

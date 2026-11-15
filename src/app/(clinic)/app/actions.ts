@@ -8,7 +8,7 @@ import type { ClinicSettings, WorkspaceProducts } from "@/modules/clinic/domain/
 import type { Patient, Plan } from "@/modules/plan/domain/plan";
 import { resolveActiveSession } from "@/platform/auth/session";
 import type { ID } from "@/shared/id";
-import { seedDefaultCatalog } from "./plans/actions";
+import { ensureStandard3DTreatments, seedDefaultCatalog } from "./plans/actions";
 
 export type ActionResult<T> = {
   success: boolean;
@@ -114,6 +114,12 @@ export async function fetchClinicSettingsDataAction(): Promise<
 
     if (treatments.length === 0) {
       await seedDefaultCatalog(session.accessToken);
+      [treatments, priceLists] = await Promise.all([
+        runtime.catalog.listTreatments(session.accessToken),
+        runtime.catalog.listPriceLists(session.accessToken),
+      ]);
+    } else if (treatments.length <= 5 && !treatments.some((t) => t.code === "TR06")) {
+      await ensureStandard3DTreatments(session.accessToken, treatments, priceLists);
       [treatments, priceLists] = await Promise.all([
         runtime.catalog.listTreatments(session.accessToken),
         runtime.catalog.listPriceLists(session.accessToken),
@@ -264,19 +270,24 @@ export async function createTreatmentWithPriceAction(data: {
 
     // List existing treatments to auto-generate code if needed
     const existingTreatments = await runtime.catalog.listTreatments(session.accessToken);
+    const existingCodes = new Set(existingTreatments.map((t) => (t.code || "").trim().toUpperCase()));
     let finalCode = (data.code || "").trim().toUpperCase();
-    if (!finalCode) {
-      let maxNum = existingTreatments.length;
+    if (!finalCode || existingCodes.has(finalCode)) {
+      let nextNum = Math.max(1, existingTreatments.length + 1);
       for (const t of existingTreatments) {
-        const match = t.code.match(/^TR(\d+)$/i);
+        const match = (t.code || "").match(/^TR(\d+)$/i);
         if (match && match[1]) {
           const num = parseInt(match[1], 10);
-          if (!isNaN(num) && num > maxNum) {
-            maxNum = num;
+          if (!isNaN(num) && num >= nextNum) {
+            nextNum = num + 1;
           }
         }
       }
-      finalCode = `TR${String(maxNum + 1).padStart(2, "0")}`;
+      finalCode = `TR${String(nextNum).padStart(2, "0")}`;
+      while (existingCodes.has(finalCode)) {
+        nextNum += 1;
+        finalCode = `TR${String(nextNum).padStart(2, "0")}`;
+      }
     }
 
     const newTreatment = await runtime.catalog.createTreatment(

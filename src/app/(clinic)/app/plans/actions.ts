@@ -94,6 +94,12 @@ export async function fetchPlanDetailAction(planId: string): Promise<
         runtime.catalog.listTreatments(tok),
         runtime.catalog.listPriceLists(tok),
       ]);
+    } else if (treatments.length <= 5 && !treatments.some((t) => t.code === "TR06")) {
+      await ensureStandard3DTreatments(tok, treatments, priceLists);
+      [treatments, priceLists] = await Promise.all([
+        runtime.catalog.listTreatments(tok),
+        runtime.catalog.listPriceLists(tok),
+      ]);
     }
 
     // Load items for default price list so treatment prices populate per workspace
@@ -249,7 +255,7 @@ export async function savePlanDetailsAction(
     await runtime.plan.putItems(
       planId as ID,
       payload.items.map((it, i) => {
-        let assignedVisitId = it.visit_id
+        const assignedVisitId = it.visit_id
           ? visitIdMap.get(String(it.visit_id)) || it.visit_id
           : fallbackVisitId;
         return {
@@ -504,6 +510,66 @@ export async function createPatientAction(
   }
 }
 
+const ADDITIONAL_3D_CATALOG_ITEMS: { code: string; name: string; amount: number }[] = [
+  { code: "TR06", name: "Diş Çekimi (Cerrahi Ekstraksiyon)", amount: 180000 },
+  { code: "TR07", name: "Multi-Unit Abutment & İyileşme Başlığı", amount: 320000 },
+  { code: "TR08", name: "Fissür Örtücü (Koruyucu Sealant)", amount: 90000 },
+  { code: "TR09", name: "Lamina Veneer (Yaprak Porselen)", amount: 650000 },
+  { code: "TR10", name: "Kalıcı Zirkonyum Köprü Protezi", amount: 1440000 },
+  { code: "TR11", name: "Diş Taşı Temizliği (Detertraj & Polisaj)", amount: 160000 },
+];
+
+export async function ensureStandard3DTreatments(
+  accessToken: string,
+  existingTreatments: Treatment[],
+  existingPriceLists: PriceList[]
+): Promise<void> {
+  try {
+    const runtime = getRuntime();
+    const existingCodes = new Set(existingTreatments.map((t) => (t.code || "").toUpperCase()));
+    const missingSpecs = ADDITIONAL_3D_CATALOG_ITEMS.filter((item) => !existingCodes.has(item.code));
+    if (missingSpecs.length === 0) return;
+
+    const created = await Promise.all(
+      missingSpecs.map((spec) =>
+        runtime.catalog.createTreatment({ code: spec.code, name: spec.name }, accessToken)
+      )
+    );
+
+    let defaultPl = existingPriceLists.find((pl) => pl.isDefault) || existingPriceLists[0];
+    if (!defaultPl) {
+      defaultPl = await runtime.catalog.createPriceList(
+        { name: "2026 Standart Tarife", currency: "TRY", isDefault: true },
+        accessToken
+      );
+    }
+
+    let existingItems: { treatmentId: string; amount: number }[] = [];
+    try {
+      const plDetail = await runtime.catalog.getPriceList(defaultPl.id, accessToken);
+      existingItems = (plDetail.items || []).map((i) => ({
+        treatmentId: String(i.treatmentId),
+        amount: i.amount,
+      }));
+    } catch {
+      // ignore
+    }
+
+    const newPriceItems = created.map((tr, idx) => ({
+      treatmentId: String(tr.id),
+      amount: missingSpecs[idx]?.amount ?? 150000,
+    }));
+
+    await runtime.catalog.setPriceItems(
+      defaultPl.id,
+      [...existingItems, ...newPriceItems],
+      accessToken
+    );
+  } catch {
+    // Non-fatal if concurrent seed happens
+  }
+}
+
 export async function seedDefaultCatalog(accessToken: string): Promise<void> {
   const runtime = getRuntime();
 
@@ -527,8 +593,8 @@ export async function seedDefaultCatalog(accessToken: string): Promise<void> {
     ),
   ]);
 
-  // Create treatments
-  const [t1, t2, t3, t4, t5] = await Promise.all([
+  // Create treatments (all 10 3D-supported treatments + Panoramik Röntgen)
+  const [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11] = await Promise.all([
     runtime.catalog.createTreatment(
       { code: "TR01", name: "Kompozit Dolgu (Estetik)" },
       accessToken
@@ -549,6 +615,30 @@ export async function seedDefaultCatalog(accessToken: string): Promise<void> {
       { code: "TR05", name: "Panoramik Röntgen (Paket İçi)" },
       accessToken
     ),
+    runtime.catalog.createTreatment(
+      { code: "TR06", name: "Diş Çekimi (Cerrahi Ekstraksiyon)" },
+      accessToken
+    ),
+    runtime.catalog.createTreatment(
+      { code: "TR07", name: "Multi-Unit Abutment & İyileşme Başlığı" },
+      accessToken
+    ),
+    runtime.catalog.createTreatment(
+      { code: "TR08", name: "Fissür Örtücü (Koruyucu Sealant)" },
+      accessToken
+    ),
+    runtime.catalog.createTreatment(
+      { code: "TR09", name: "Lamina Veneer (Yaprak Porselen)" },
+      accessToken
+    ),
+    runtime.catalog.createTreatment(
+      { code: "TR10", name: "Kalıcı Zirkonyum Köprü Protezi" },
+      accessToken
+    ),
+    runtime.catalog.createTreatment(
+      { code: "TR11", name: "Diş Taşı Temizliği (Detertraj & Polisaj)" },
+      accessToken
+    ),
   ]);
 
   // Create default price list
@@ -566,6 +656,12 @@ export async function seedDefaultCatalog(accessToken: string): Promise<void> {
       { treatmentId: t3.id, amount: 480000 }, // 4,800.00 TL
       { treatmentId: t4.id, amount: 1400000 }, // 14,000.00 TL
       { treatmentId: t5.id, amount: 60000 }, // 600.00 TL
+      { treatmentId: t6.id, amount: 180000 }, // 1,800.00 TL
+      { treatmentId: t7.id, amount: 320000 }, // 3,200.00 TL
+      { treatmentId: t8.id, amount: 90000 }, // 900.00 TL
+      { treatmentId: t9.id, amount: 650000 }, // 6,500.00 TL
+      { treatmentId: t10.id, amount: 1440000 }, // 14,400.00 TL
+      { treatmentId: t11.id, amount: 160000 }, // 1,600.00 TL
     ],
     accessToken
   );

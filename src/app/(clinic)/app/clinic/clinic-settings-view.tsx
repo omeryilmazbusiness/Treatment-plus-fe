@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import React, { useEffect, useId, useMemo, useState, useTransition } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertCircle,
   Building2,
@@ -232,6 +232,25 @@ export function ClinicSettingsView({
   const [newTreatCode, setNewTreatCode] = useState("");
   const [newTreatPrice, setNewTreatPrice] = useState(0);
   const [isAddingTreatment, setIsAddingTreatment] = useState(false);
+  const treatNameInputRef = useRef<HTMLInputElement | null>(null);
+
+  const QUICK_TREATMENT_TEMPLATES = useMemo(
+    () => [
+      { code: "TR01", name: "Kompozit Dolgu (Estetik)", priceMinor: 150000 },
+      { code: "TR02", name: "Kanal Tedavisi (Endodonti)", priceMinor: 350000 },
+      { code: "TR03", name: "Zirkonyum Porselen Kron", priceMinor: 480000 },
+      { code: "TR04", name: "Dental İmplant Tedavisi", priceMinor: 1400000 },
+      { code: "TR06", name: "Diş Çekimi (Cerrahi Ekstraksiyon)", priceMinor: 180000 },
+      { code: "TR07", name: "Multi-Unit Abutment & İyileşme Başlığı", priceMinor: 320000 },
+      { code: "TR08", name: "Fissür Örtücü (Koruyucu Sealant)", priceMinor: 90000 },
+      { code: "TR09", name: "Lamina Veneer (Yaprak Porselen)", priceMinor: 650000 },
+      { code: "TR10", name: "Kalıcı Zirkonyum Köprü Protezi", priceMinor: 1440000 },
+      { code: "TR11", name: "Diş Taşı Temizliği (Detertraj & Polisaj)", priceMinor: 160000 },
+      { code: "TR12", name: "Ofis Tipi Diş Beyazlatma (Bleaching)", priceMinor: 420000 },
+      { code: "TR13", name: "Sinüs Lifting & Kemik Grefti", priceMinor: 850000 },
+    ],
+    []
+  );
 
   const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null);
   const [editingTreatmentName, setEditingTreatmentName] = useState("");
@@ -251,11 +270,18 @@ export function ClinicSettingsView({
     );
   }, [treatmentsList, searchQuery]);
 
-  const handleAddTreatment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = newTreatName.trim();
+  const submitNewTreatment = async (params: {
+    name: string;
+    code?: string;
+    priceMinor: number;
+  }) => {
+    const name = params.name.trim();
     if (!name) {
-      setPricingStatus({ type: "error", message: "Lütfen bir tedavi işlemi adı yazın." });
+      setPricingStatus({
+        type: "error",
+        message: "Lütfen eklenecek tedavi işleminin adını yazın veya aşağıdaki hazır şablonlardan birine tıklayın.",
+      });
+      treatNameInputRef.current?.focus();
       return;
     }
     setIsAddingTreatment(true);
@@ -263,8 +289,8 @@ export function ClinicSettingsView({
     try {
       const res = await createTreatmentWithPriceAction({
         name,
-        code: newTreatCode.trim() || undefined,
-        priceMinor: newTreatPrice,
+        code: params.code?.trim() || undefined,
+        priceMinor: params.priceMinor,
       });
       if (!res.success || !res.data) {
         setPricingStatus({ type: "error", message: res.error || "İşlem eklenemedi." });
@@ -278,7 +304,7 @@ export function ClinicSettingsView({
       setNewTreatPrice(0);
       setPricingStatus({
         type: "success",
-        message: `"${newTr.name}" başarıyla kaydedildi ve tedavi planlarında kullanıma açıldı.`,
+        message: `"${newTr.name}" (${newTr.code}) başarıyla kaydedildi ve tedavi planlarında kullanıma açıldı.`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Bir hata oluştu.";
@@ -286,6 +312,15 @@ export function ClinicSettingsView({
     } finally {
       setIsAddingTreatment(false);
     }
+  };
+
+  const handleAddTreatment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitNewTreatment({
+      name: newTreatName,
+      code: newTreatCode,
+      priceMinor: newTreatPrice,
+    });
   };
 
   const handlePriceChange = (treatId: string, newMinorAmount: number) => {
@@ -1639,15 +1674,15 @@ export function ClinicSettingsView({
               </div>
             </div>
 
-            <form onSubmit={handleAddTreatment} className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-end">
+            <form onSubmit={handleAddTreatment} noValidate className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-end">
               {/* İşlem Adı */}
               <div className="sm:col-span-5">
                 <label className="block text-[11px] font-bold tracking-wider text-slate-400 uppercase mb-1.5">
                   Tedavi / İşlem Adı <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  ref={treatNameInputRef}
                   type="text"
-                  required
                   placeholder="Örn: Zirkonyum Kaplama, Diş Beyazlatma, Gece Plağı..."
                   value={newTreatName}
                   onChange={(e) => setNewTreatName(e.target.value)}
@@ -1691,8 +1726,8 @@ export function ClinicSettingsView({
               <div className="sm:col-span-2">
                 <button
                   type="submit"
-                  disabled={isAddingTreatment || !newTreatName.trim()}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  disabled={isAddingTreatment}
+                  className="w-full cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   {isAddingTreatment ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -1703,6 +1738,68 @@ export function ClinicSettingsView({
                 </button>
               </div>
             </form>
+
+            {/* Hazır 3D Destekli Klinik Tedavi Şablonları (Tek Tıkla Ekle) */}
+            <div className="mt-5 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Hazır 3D Klinik İşlem Şablonları (Tek Tıkla Hemen Ekle):
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Listede olmayan işlemlere tıklayarak doğrudan ekleyebilirsiniz
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_TREATMENT_TEMPLATES.map((tpl) => {
+                  const alreadyExists = treatmentsList.some(
+                    (t) =>
+                      t.name.toLowerCase() === tpl.name.toLowerCase() ||
+                      (t.code && t.code.toUpperCase() === tpl.code)
+                  );
+                  return (
+                    <button
+                      key={tpl.code}
+                      type="button"
+                      disabled={isAddingTreatment}
+                      onClick={() => {
+                        if (alreadyExists) {
+                          setNewTreatName(tpl.name);
+                          setNewTreatPrice(tpl.priceMinor);
+                          treatNameInputRef.current?.focus();
+                          return;
+                        }
+                        void submitNewTreatment({
+                          name: tpl.name,
+                          code: tpl.code,
+                          priceMinor: tpl.priceMinor,
+                        });
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                        alreadyExists
+                          ? "border-emerald-200 bg-emerald-50/60 text-emerald-800 hover:bg-emerald-100/70"
+                          : "border-slate-200 bg-slate-50/80 text-slate-800 hover:border-slate-900 hover:bg-slate-900 hover:text-white shadow-2xs"
+                      }`}
+                      title={
+                        alreadyExists
+                          ? "Bu işlem zaten kayıtlı (Formu doldurmak için tıklayın)"
+                          : `${tpl.name} işlemini tek tıkla ekle`
+                      }
+                    >
+                      {alreadyExists ? (
+                        <Check className="size-3.5 text-emerald-600" />
+                      ) : (
+                        <Plus className="size-3.5" />
+                      )}
+                      <span>{tpl.name}</span>
+                      <span className="opacity-70 font-mono text-[10px]">
+                        ({currencySymbol}
+                        {(tpl.priceMinor / 100).toLocaleString("tr-TR")})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* 2. KART: MEVCUT TEDAVİLER VE FİYAT LİSTESİ */}

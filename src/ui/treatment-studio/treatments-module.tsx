@@ -3,6 +3,8 @@
 import React, { useMemo, useState } from "react";
 import {
   BadgePercent,
+  Check,
+  Loader2,
   Minus,
   Plus,
   Receipt,
@@ -10,9 +12,11 @@ import {
   Search,
   Sparkles,
   Trash2,
+  Unlock,
   Wallet,
   X,
 } from "lucide-react";
+import { createTreatmentWithPriceAction } from "@/app/(clinic)/app/actions";
 import { FdiOdontogram, TOOTH_METADATA } from "./fdi-odontogram";
 import {
   inferTreatmentType,
@@ -67,9 +71,24 @@ export function TreatmentsModule({
   const [selectedTeeth, setSelectedTeeth] = useState<string[]>([]);
   const [note, setNote] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [extraTreatments, setExtraTreatments] = useState<
+    { id: string; code: string; name: string; price: number; type: TreatmentType }[]
+  >([]);
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [quickName, setQuickName] = useState("");
+  const [quickPriceMinor, setQuickPriceMinor] = useState(0);
+  const [isQuickCreating, setIsQuickCreating] = useState(false);
+  const [quickFeedback, setQuickFeedback] = useState<string | null>(null);
 
-  const handleToggleTooth = (toothNumber: string) => {
-    if (isLocked) return;
+  const handleToggleTooth = async (toothNumber: string) => {
+    if (isLocked) {
+      if (onUnlockPlan) {
+        const unlocked = await onUnlockPlan();
+        if (!unlocked) return;
+      } else {
+        return;
+      }
+    }
     setSelectedTeeth((prev) =>
       prev.includes(toothNumber)
         ? prev.filter((t) => t !== toothNumber)
@@ -88,31 +107,65 @@ export function TreatmentsModule({
     return map;
   }, [items]);
 
-  // Strictly treatments registered in Clinic Settings (Ayarlar > Tedavi & Fiyat Listesi)
+  // Strictly treatments registered in Clinic Settings + Standard 10 3D Treatments + Quick Created
   const clinicCatalog = useMemo(() => {
-    if (treatmentsCatalog) {
-      return treatmentsCatalog
-        .filter((t) => t.isActive !== false)
-        .map((t) => {
-          const minor = priceMap?.get(String(t.id)) ?? 0;
-          const price = minor > 0 ? minor / 100 : 0;
-          return {
-            id: String(t.id),
-            code: t.code || "",
-            name: t.name,
-            price,
-            type: inferTreatmentType(t.name, t.code),
-          };
-        });
-    }
-    // Standalone demo fallback only when no clinic session is available
-    return [
-      { id: "demo-tr01", code: "TR01", name: "Kompozit Dolgu (Estetik)", price: 1500, type: "filling" as const },
-      { id: "demo-tr02", code: "TR02", name: "Kanal Tedavisi (Endodonti)", price: 3500, type: "root_canal" as const },
-      { id: "demo-tr03", code: "TR03", name: "Zirkonyum Porselen Kron", price: 4800, type: "crown" as const },
-      { id: "demo-tr04", code: "TR04", name: "Dental İmplant Tedavisi", price: 14000, type: "implant" as const },
+    const baseList = treatmentsCatalog
+      ? treatmentsCatalog
+          .filter((t) => t.isActive !== false)
+          .map((t) => {
+            const minor = priceMap?.get(String(t.id)) ?? 0;
+            const price = minor > 0 ? minor / 100 : 0;
+            return {
+              id: String(t.id),
+              code: t.code || "",
+              name: t.name,
+              price,
+              type: inferTreatmentType(t.name, t.code),
+            };
+          })
+      : [
+          { id: "demo-tr01", code: "TR01", name: "Kompozit Dolgu (Estetik)", price: 1500, type: "filling" as const },
+          { id: "demo-tr02", code: "TR02", name: "Kanal Tedavisi (Endodonti)", price: 3500, type: "root_canal" as const },
+          { id: "demo-tr03", code: "TR03", name: "Zirkonyum Porselen Kron", price: 4800, type: "crown" as const },
+          { id: "demo-tr04", code: "TR04", name: "Dental İmplant Tedavisi", price: 14000, type: "implant" as const },
+        ];
+
+    const standard3DFallbacks: {
+      id: string;
+      code: string;
+      name: string;
+      price: number;
+      type: TreatmentType;
+    }[] = [
+      { id: "demo-tr06", code: "TR06", name: "Diş Çekimi (Cerrahi Ekstraksiyon)", price: 1800, type: "extraction" },
+      { id: "demo-tr07", code: "TR07", name: "Multi-Unit Abutment & İyileşme Başlığı", price: 3200, type: "abutment" },
+      { id: "demo-tr08", code: "TR08", name: "Fissür Örtücü (Koruyucu Sealant)", price: 900, type: "fissure" },
+      { id: "demo-tr09", code: "TR09", name: "Lamina Veneer (Yaprak Porselen)", price: 6500, type: "veneer" },
+      { id: "demo-tr10", code: "TR10", name: "Kalıcı Zirkonyum Köprü Protezi", price: 14400, type: "bridge" },
+      { id: "demo-tr11", code: "TR11", name: "Diş Taşı Temizliği (Detertraj & Polisaj)", price: 1600, type: "scaling" },
     ];
-  }, [treatmentsCatalog, priceMap]);
+
+    const merged = [...baseList];
+    const seenNames = new Set(merged.map((m) => m.name.toLowerCase()));
+    const seenCodes = new Set(merged.map((m) => (m.code || "").toUpperCase()));
+
+    for (const std of standard3DFallbacks) {
+      if (!seenCodes.has(std.code) && !seenNames.has(std.name.toLowerCase())) {
+        merged.push(std);
+        seenCodes.add(std.code);
+        seenNames.add(std.name.toLowerCase());
+      }
+    }
+
+    for (const ext of extraTreatments) {
+      if (!seenNames.has(ext.name.toLowerCase())) {
+        merged.push(ext);
+        seenNames.add(ext.name.toLowerCase());
+      }
+    }
+
+    return merged;
+  }, [treatmentsCatalog, priceMap, extraTreatments]);
 
   // Filtered clinic treatments
   const filteredClinicTreatments = useMemo(() => {
@@ -126,14 +179,21 @@ export function TreatmentsModule({
   }, [clinicCatalog, searchQuery]);
 
   // Adding treatment procedure from catalog
-  const handleAddTreatmentItem = (treatment: {
+  const handleAddTreatmentItem = async (treatment: {
     id: string;
     code?: string;
     name: string;
     price: number;
     type: TreatmentType;
   }) => {
-    if (isLocked) return;
+    if (isLocked) {
+      if (onUnlockPlan) {
+        const unlocked = await onUnlockPlan();
+        if (!unlocked) return;
+      } else {
+        return;
+      }
+    }
 
     const targetTeeth = [...selectedTeeth];
     const targetVisitId = visits[0]?.id || "v-1";
@@ -152,6 +212,47 @@ export function TreatmentsModule({
 
     onItemsChange([...items, newItem]);
     setSelectedTeeth([]);
+  };
+
+  const handleQuickCreateTreatment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = quickName.trim();
+    if (!trimmed) return;
+    setIsQuickCreating(true);
+    setQuickFeedback(null);
+    try {
+      const res = await createTreatmentWithPriceAction({
+        name: trimmed,
+        priceMinor: quickPriceMinor,
+      });
+      const priceMajor = quickPriceMinor > 0 ? quickPriceMinor / 100 : 0;
+      const createdObj =
+        res.success && res.data
+          ? {
+              id: String(res.data.treatment.id),
+              code: res.data.treatment.code || "",
+              name: res.data.treatment.name,
+              price: res.data.amount > 0 ? res.data.amount / 100 : priceMajor,
+              type: inferTreatmentType(res.data.treatment.name, res.data.treatment.code),
+            }
+          : {
+              id: `demo-custom-${Date.now()}`,
+              code: `TR${clinicCatalog.length + 1}`,
+              name: trimmed,
+              price: priceMajor,
+              type: inferTreatmentType(trimmed),
+            };
+
+      setExtraTreatments((prev) => [...prev, createdObj]);
+      await handleAddTreatmentItem(createdObj);
+      setQuickName("");
+      setQuickPriceMinor(0);
+      setShowQuickCreate(false);
+      setQuickFeedback(`"${createdObj.name}" eklendi`);
+      setTimeout(() => setQuickFeedback(null), 3000);
+    } finally {
+      setIsQuickCreating(false);
+    }
   };
 
   const handleRemoveItem = (id: string) => {
@@ -255,16 +356,104 @@ export function TreatmentsModule({
                   {clinicCatalog.length} İşlem
                 </span>
               </div>
-              {selectedTeeth.length > 0 && !isLocked && (
+              <div className="flex items-center gap-1.5">
+                {selectedTeeth.length > 0 && !isLocked && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTeeth([])}
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 transition flex items-center gap-1 px-2 py-0.5 rounded-lg hover:bg-slate-200/60 cursor-pointer"
+                  >
+                    Seçimi Kaldır
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setSelectedTeeth([])}
-                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 transition flex items-center gap-1 px-2 py-0.5 rounded-lg hover:bg-slate-200/60 cursor-pointer"
+                  onClick={() => setShowQuickCreate((v) => !v)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-2xs hover:bg-slate-800 transition cursor-pointer"
+                  title="Yeni tedavi işlemi tanımla ve plana ekle"
                 >
-                  Seçimi Kaldır
+                  <Plus className="size-3" />
+                  <span>İşlem Ekle</span>
                 </button>
-              )}
+              </div>
             </div>
+
+            {quickFeedback && (
+              <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-800">
+                <Check className="size-3.5 text-emerald-600 shrink-0" />
+                <span>{quickFeedback}</span>
+              </div>
+            )}
+
+            {isLocked && onUnlockPlan && (
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <span className="text-[11px] font-medium">
+                  Plan kilitli. İşlem eklemek için kilidi açın:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onUnlockPlan()}
+                  className="inline-flex items-center gap-1 rounded-lg bg-amber-900 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-800 transition cursor-pointer shrink-0"
+                >
+                  <Unlock className="size-3" />
+                  <span>Kilidi Aç</span>
+                </button>
+              </div>
+            )}
+
+            {/* Inline Quick-Create Treatment Box */}
+            {showQuickCreate && (
+              <form
+                onSubmit={handleQuickCreateTreatment}
+                className="space-y-2.5 rounded-xl border border-slate-300 bg-white p-3 shadow-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-800">
+                    Yeni İşlem Tanımla & Plana Ekle
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickCreate(false)}
+                    className="rounded p-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                  placeholder="İşlem adı (Örn: Lamina Veneer, Gece Plağı...)"
+                  autoFocus
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50/60 focus:bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden"
+                />
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <PriceInput
+                      value={quickPriceMinor}
+                      onChange={(val) => setQuickPriceMinor(val)}
+                      placeholder="Birim Fiyat"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50/60 focus:bg-white px-2.5 py-1.5 pr-7 text-right text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden"
+                    />
+                    <span className="pointer-events-none absolute right-2.5 top-1.5 text-xs font-bold text-slate-400">
+                      {currSymbol}
+                    </span>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isQuickCreating || !quickName.trim()}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 cursor-pointer transition shrink-0"
+                  >
+                    {isQuickCreating ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="size-3.5" />
+                    )}
+                    <span>Kaydet & Ekle</span>
+                  </button>
+                </div>
+              </form>
+            )}
 
             {/* Selected teeth notification */}
             {selectedTeeth.length > 0 ? (
@@ -321,14 +510,9 @@ export function TreatmentsModule({
                   <button
                     key={tr.id}
                     type="button"
-                    disabled={isLocked}
-                    onClick={() => handleAddTreatmentItem(tr)}
-                    className="group w-full flex items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 text-left transition shadow-2xs hover:border-slate-400 hover:bg-slate-100/70 hover:shadow-xs active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-200/90 disabled:hover:bg-white disabled:active:scale-100"
-                    title={
-                      isLocked
-                        ? "Plan kilitli (Değişiklik yapmak için kilidi açın)"
-                        : `${tr.name} - ${currSymbol} ${tr.price.toLocaleString()}`
-                    }
+                    onClick={() => void handleAddTreatmentItem(tr)}
+                    className="group w-full flex items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 text-left transition shadow-2xs hover:border-slate-400 hover:bg-slate-100/70 hover:shadow-xs active:scale-[0.99] cursor-pointer"
+                    title={`${tr.name} - ${currSymbol} ${tr.price.toLocaleString()}`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {tr.code && (

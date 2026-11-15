@@ -36,7 +36,7 @@ import {
 import type { UltimatePlanDTO } from "@/modules/share/domain/share";
 import { recordPublicEventAction } from "@/app/(clinic)/app/plans/actions";
 import { SimulationModule } from "@/ui/treatment-studio/simulation-module";
-import type { StudioPlanItem, StudioVisit } from "@/ui/treatment-studio/types";
+import type { StudioPlanItem, StudioVisit, ToothCondition } from "@/ui/treatment-studio/types";
 
 interface Props {
   data: UltimatePlanDTO;
@@ -1213,6 +1213,12 @@ export function PatientPresentationClient({ data, token }: Props) {
               <SimulationModule
                 planItems={mappedPlanItems}
                 visits={mappedVisits}
+                conditions={Object.fromEntries(
+                  Object.entries(toothFindingsMap).map(([t, f]) => [
+                    t,
+                    (f.status as ToothCondition) || "intact",
+                  ])
+                )}
                 darkMode
               />
             </div>

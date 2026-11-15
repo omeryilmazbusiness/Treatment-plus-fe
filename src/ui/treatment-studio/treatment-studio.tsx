@@ -399,6 +399,10 @@ export function TreatmentStudio({
   const [saveError, setSaveError] = useState<string | null>(null);
   const isSavingActive = isSaving || isLocalSaving;
 
+  useEffect(() => {
+    setSaveError(null);
+  }, [currentSnapshot]);
+
   const handleSave = React.useCallback(async () => {
     if (isPlanLocked || !onSave) return;
     setIsLocalSaving(true);
@@ -410,7 +414,6 @@ export function TreatmentStudio({
       setSaveSuccessMsg(true);
       setTimeout(() => setSaveSuccessMsg(false), 2000);
     } catch (e: unknown) {
-      console.error("Studio save error:", e);
       const msg = e instanceof Error ? e.message : "Plan kaydedilemedi";
       setSaveError(msg);
     } finally {
@@ -426,14 +429,14 @@ export function TreatmentStudio({
 
   // Debounced Auto-save (1200ms)
   useEffect(() => {
-    if (isPlanLocked || !hasUnsavedChanges || isSavingActive) return;
+    if (isPlanLocked || !hasUnsavedChanges || isSavingActive || saveError) return;
 
     const timer = setTimeout(() => {
       handleSave();
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [hasUnsavedChanges, isPlanLocked, isSavingActive, handleSave]);
+  }, [hasUnsavedChanges, isPlanLocked, isSavingActive, saveError, handleSave]);
 
   const handleStudioLockAndReady = async () => {
     if (onSave) {
@@ -722,6 +725,7 @@ export function TreatmentStudio({
           <SimulationModule
             planItems={items}
             visits={visits}
+            conditions={conditions}
             isActive={activeTab === "animation"}
           />
         </div>

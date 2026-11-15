@@ -12,17 +12,33 @@ export type TreatmentType =
   | "extraction"
   | "prosthesis_removal"
   | "filling"
+  | "fissure"
   | "dentures"
   | "root_canal"
   | "implant"
+  | "abutment"
   | "crown"
+  | "veneer"
   | "bridge"
+  | "scaling"
   | "general"
   | "other";
 
 export function inferTreatmentType(name: string, code?: string): TreatmentType {
   const s = `${code || ""} ${name || ""}`.toLowerCase();
+  if (s.includes("abutment") || s.includes("multi-unit") || s.includes("iyileşme başlığı") || s.includes("dayanak")) {
+    return "abutment";
+  }
   if (s.includes("implant")) return "implant";
+  if (s.includes("fissür") || s.includes("fissur") || s.includes("sealant")) {
+    return "fissure";
+  }
+  if (s.includes("lamina") || s.includes("veneer") || s.includes("yaprak")) {
+    return "veneer";
+  }
+  if (s.includes("detertraj") || s.includes("scaling") || s.includes("diş taşı") || s.includes("dis tasi") || s.includes("polisaj")) {
+    return "scaling";
+  }
   if (
     s.includes("dolgu") ||
     s.includes("kompozit") ||
@@ -48,8 +64,6 @@ export function inferTreatmentType(name: string, code?: string): TreatmentType {
     s.includes("crown") ||
     s.includes("zirkon") ||
     s.includes("kaplama") ||
-    s.includes("lamina") ||
-    s.includes("veneer") ||
     s.includes("e-max") ||
     s.includes("emax")
   ) {
@@ -67,8 +81,6 @@ export function inferTreatmentType(name: string, code?: string): TreatmentType {
     s.includes("xray") ||
     s.includes("bakım") ||
     s.includes("profilaksi") ||
-    s.includes("detertraj") ||
-    s.includes("scaling") ||
     s.includes("muayene") ||
     s.includes("beyazlatma") ||
     s.includes("plak")
@@ -141,22 +153,28 @@ export interface XRaySettings {
   rotation: number; // degrees 0, 90, 180, 270
 }
 
+export type AnimationActionType =
+  | "extraction"
+  | "implant"
+  | "abutment"
+  | "temporary_denture"
+  | "healing"
+  | "permanent_bridge"
+  | "filling"
+  | "sealant"
+  | "root_canal"
+  | "crown"
+  | "veneer"
+  | "scaling"
+  | "cleaning"
+  | "custom";
+
 export interface AnimationTimelineStage {
   id: string;
   visitTitle: string;
   stageName: string;
   teeth: string[];
-  actionType:
-    | "extraction"
-    | "implant"
-    | "abutment"
-    | "temporary_denture"
-    | "healing"
-    | "permanent_bridge"
-    | "filling"
-    | "root_canal"
-    | "crown"
-    | "custom";
+  actionType: AnimationActionType;
   durationSeconds: number;
   description: string;
   healingPeriod?: string;
