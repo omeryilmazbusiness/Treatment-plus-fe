@@ -950,17 +950,34 @@ export function attachDirectorMat(
             gl_FragColor.rgb = mix(gl_FragColor.rgb, cariesCore, coreMask * effCaries * 0.92);
           }
 
-          // 1b. Cervical Calculus / Tartar & Plaque stain (negative vCariesSpot for Scaling / Detertraj)
+          // 1b. Cervical Calculus / Tartar & Plaque stain (negative vCariesSpot for Scaling / Detertraj & Whitening)
           if (vCariesSpot < -0.01) {
             float tartarAmt = clamp(-vCariesSpot, 0.0, 1.0);
-            float distFromCrownZ = abs(vLocalPos.z - vToothCenterLocal.z) / max(vToothRadiusLocal, 0.25);
-            float cervicalBand = smoothstep(0.18, 0.52, distFromCrownZ) * (1.0 - smoothstep(0.85, 1.25, distFromCrownZ));
-            float interproxBand = smoothstep(0.32, 0.78, length(vLocalPos.xy - vToothCenterLocal.xy) / max(vToothRadiusLocal, 0.25));
-            float plaqueMask = clamp(cervicalBand * 1.15 + interproxBand * 0.55, 0.0, 1.0);
-            vec3 tartarCol = vec3(0.74, 0.61, 0.31);
-            vec3 stainCol = vec3(0.88, 0.81, 0.62);
-            gl_FragColor.rgb = mix(gl_FragColor.rgb, stainCol, tartarAmt * 0.42);
-            gl_FragColor.rgb = mix(gl_FragColor.rgb, tartarCol, plaqueMask * tartarAmt * 0.88);
+            bool isUpperArch = ${cacheKey.includes("upper") ? "true" : "false"};
+            float towardGumZ = isUpperArch ? (vToothCenterLocal.z - vLocalPos.z) : (vLocalPos.z - vToothCenterLocal.z);
+            float cervicalDist = max(0.0, towardGumZ) / max(vToothRadiusLocal, 0.25);
+            float cervicalBand = smoothstep(0.08, 0.42, cervicalDist) * (1.0 - smoothstep(0.85, 1.25, cervicalDist));
+            float interproxBand = smoothstep(0.35, 0.80, length(vLocalPos.xy - vToothCenterLocal.xy) / max(vToothRadiusLocal, 0.25)) * smoothstep(0.0, 0.32, cervicalDist);
+            float plaqueMask = clamp(cervicalBand * 1.25 + interproxBand * 0.65, 0.0, 1.0);
+            vec3 tartarCol = vec3(0.72, 0.58, 0.30);
+
+            if (vCariesSpot <= -0.85) {
+              // Scaling / Diş Taşı Temizliği:
+              // Diş taşı sadece diş etiyle birleştiği servikal sınırda ve diş aralarında yer alır.
+              // Dişin geri kalanına kesinlikle leke veya renk değişimi uygulanmaz; dişin geri kalanı doğal rengini korur.
+              // Temizlenen bölge de yapay bir beyazlığa bürünmez, doğrudan dişin kendi doğal mine rengine döner.
+              gl_FragColor.rgb = mix(gl_FragColor.rgb, tartarCol, plaqueMask * tartarAmt * 0.88);
+            } else {
+              // Whitening / Diş Beyazlatma:
+              // Diş etinde kesinlikle diş taşı (tartar) bulunmaz!
+              // Tedavi öncesinde dişlerin ön/labial yüzeyinde yarı saydam (transparan) çay/kahve/sigara sararması bulunur.
+              // Dişin alttaki doğal dokusu ve parlaklığı saydam leke katmanının altından hissedilir.
+              // Mavi LED ışık taramasıyla bu saydam koyu tabaka kademeli olarak çözülür ve dişin temiz doğal minesi ortaya çıkar.
+              float stainFactor = clamp(-vCariesSpot / 0.75, 0.0, 1.0);
+              vec3 darkToothStain = vec3(0.68, 0.56, 0.36);
+              float labialFace = clamp(buccalCoord * 0.7 + 0.65, 0.35, 1.0);
+              gl_FragColor.rgb = mix(gl_FragColor.rgb, darkToothStain, stainFactor * 0.52 * labialFace);
+            }
           }
 
           // 2. Crown / Veneer prep dentin tint when shaved into abutment stump
@@ -1772,6 +1789,58 @@ export function makeAnatomicalToothMesh(
   return g;
 }
 
+/**
+ * Creates a monolithic zirconia interproximal connector strut between two adjacent
+ * bridge units (`islA` and `islB`) so a multi-unit bridge (`permanent_bridge` / `temporary_denture`)
+ * visually forms a single rigid 1-piece block rather than separate individual crowns.
+ */
+export function makeBridgeConnectorMesh(
+  islA: ToothIslandMeta,
+  islB: ToothIslandMeta,
+  mode: "crown" | "temp" = "crown",
+  isPermanent = true
+): THREE.Mesh {
+  const pA = islA.localCrownCenter;
+  const pB = islB.localCrownCenter;
+  const delta = pB.clone().sub(pA);
+  const spanLen = Math.max(0.01, delta.length() * 0.72);
+  const radius = Math.min(islA.localRadius, islB.localRadius) * 0.36;
+
+  const geo = new THREE.CylinderGeometry(radius, radius, spanLen, 14);
+  geo.scale(1.0, 1.0, 0.78);
+
+  let mat: THREE.MeshStandardMaterial;
+  if (islA.baseToothMaterial) {
+    mat = islA.baseToothMaterial.clone();
+    mat.side = THREE.DoubleSide;
+    mat.color = new THREE.Color(mode === "temp" ? 0xf6ebd4 : 0xfdfaf4);
+    mat.needsUpdate = true;
+  } else {
+    mat = new THREE.MeshPhysicalMaterial({
+      color: mode === "temp" ? 0xeee2c8 : 0xe6dcc8,
+      roughness: 0.3,
+      metalness: 0.0,
+      clearcoat: 0.5,
+      clearcoatRoughness: 0.14,
+      side: THREE.DoubleSide,
+    });
+  }
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(pA).lerp(pB, 0.5);
+  if (delta.lengthSq() > 1e-6) {
+    mesh.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      delta.clone().normalize()
+    );
+  }
+  mesh.name = isPermanent
+    ? `prop_perm_bridge_conn_${islA.fdi}_${islB.fdi}`
+    : `prop_tool_bridge_conn_${islA.fdi}_${islB.fdi}`;
+  mesh.renderOrder = 3;
+  return mesh;
+}
+
 export function makeUltrasonicScaler(scale: number): THREE.Group {
   const g = new THREE.Group();
   g.name = "prop_tool_ultrasonic_scaler";
@@ -1841,6 +1910,228 @@ export function makeUltrasonicScaler(scale: number): THREE.Group {
   return g;
 }
 
+export function makeGingivalBarrierMesh(
+  frames: ResolvedFdiFrame[]
+): THREE.Mesh | null {
+  if (frames.length < 2) return null;
+  const sorted = [...frames].sort(
+    (a, b) => a.island.localCenter.x - b.island.localCenter.x
+  );
+  const pts: THREE.Vector3[] = [];
+  sorted.forEach((f) => {
+    const out = new THREE.Vector3(
+      f.island.localCervical.x,
+      f.island.localCervical.y - 5.2,
+      0
+    ).normalize();
+    const pt = f.island.localCervical
+      .clone()
+      .addScaledVector(out, f.island.localRadius * 0.18);
+    pts.push(pt);
+  });
+  if (pts.length < 2) return null;
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(
+    curve,
+    frames.length * 8,
+    frames[0]!.island.localRadius * 0.08,
+    10,
+    false
+  );
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x0284c7, // Dental blue gingival dam
+    roughness: 0.28,
+    metalness: 0.12,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = "prop_tool_gingival_barrier";
+  mesh.renderOrder = 4;
+  return mesh;
+}
+
+export function makeBleachingGelMesh(isl: ToothIslandMeta): THREE.Mesh {
+  const geo = isl.veneerOnlyGeo;
+  const gelMat = new THREE.MeshPhysicalMaterial({
+    color: 0x38bdf8,
+    transmission: 0.84,
+    transparent: true,
+    opacity: 0.76,
+    roughness: 0.08,
+    metalness: 0.02,
+    ior: 1.35,
+    thickness: 0.35,
+    emissive: new THREE.Color(0x0284c7),
+    emissiveIntensity: 0.1,
+  });
+  const mesh = new THREE.Mesh(geo, gelMat);
+  mesh.name = `prop_tool_bleach_gel_${isl.fdi}`;
+  mesh.position.copy(isl.localCenter);
+  mesh.scale.set(1.035, 1.035, 1.05);
+  mesh.renderOrder = 4;
+  mesh.userData.gelMat = gelMat;
+  return mesh;
+}
+
+export function makeGelSyringe(scale: number): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "prop_tool_gel_syringe";
+
+  const barrelMat = new THREE.MeshPhysicalMaterial({
+    color: 0xf1f5f9,
+    transmission: 0.88,
+    transparent: true,
+    opacity: 0.65,
+    roughness: 0.12,
+    metalness: 0.05,
+    ior: 1.42,
+  });
+  const plungerMat = new THREE.MeshStandardMaterial({
+    color: 0x0284c7,
+    roughness: 0.3,
+  });
+  const steelMat = new THREE.MeshStandardMaterial({
+    color: 0xe2e8f0,
+    metalness: 0.92,
+    roughness: 0.18,
+  });
+
+  const barrel = new THREE.Mesh(
+    new THREE.CylinderGeometry(scale * 0.14, scale * 0.14, scale * 1.8, 16),
+    barrelMat
+  );
+  barrel.position.set(0, scale * 1.1, 0);
+
+  const gelInside = new THREE.Mesh(
+    new THREE.CylinderGeometry(scale * 0.12, scale * 0.12, scale * 1.2, 14),
+    new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2 })
+  );
+  gelInside.position.set(0, scale * 0.9, 0);
+
+  const plunger = new THREE.Mesh(
+    new THREE.CylinderGeometry(scale * 0.08, scale * 0.08, scale * 1.6, 12),
+    plungerMat
+  );
+  plunger.position.set(0, scale * 2.2, 0);
+
+  const tipCurve = [
+    new THREE.Vector3(0, scale * 0.32, 0),
+    new THREE.Vector3(scale * 0.08, scale * 0.14, 0),
+    new THREE.Vector3(0, 0, 0),
+  ];
+  const tip = new THREE.Mesh(
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(tipCurve),
+      16,
+      scale * 0.032,
+      8,
+      false
+    ),
+    steelMat
+  );
+
+  g.add(barrel, gelInside, plunger, tip);
+  g.renderOrder = 5;
+  return g;
+}
+
+export function makeBleachingArcLamp(scale: number): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "prop_tool_bleaching_arc_lamp";
+
+  const casingMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.25,
+    metalness: 0.65,
+  });
+  const emitterMat = new THREE.MeshStandardMaterial({
+    color: 0x38bdf8,
+    emissive: new THREE.Color(0x0284c7),
+    emissiveIntensity: 1.4,
+    roughness: 0.1,
+  });
+
+  // Wide curved head spanning the anterior smile arch
+  const arcBody = new THREE.Mesh(
+    new THREE.TorusGeometry(scale * 1.7, scale * 0.26, 12, 32, Math.PI * 0.65),
+    casingMat
+  );
+  arcBody.rotation.z = -Math.PI * 0.825;
+  arcBody.rotation.y = Math.PI;
+  arcBody.position.set(0, 0, -scale * 0.35);
+
+  // 4 circular LED emitter lenses inside the arc
+  for (let i = -2; i <= 2; i++) {
+    if (i === 0) continue;
+    const lens = new THREE.Mesh(
+      new THREE.CylinderGeometry(scale * 0.18, scale * 0.18, scale * 0.08, 16),
+      emitterMat
+    );
+    const angle = i * 0.28;
+    lens.position.set(
+      Math.sin(angle) * scale * 1.6,
+      0,
+      Math.cos(angle) * scale * 0.35
+    );
+    lens.rotation.x = Math.PI / 2;
+    g.add(lens);
+  }
+
+  // Broad conical blue light beam fan pointing at the smile arch
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0x0284c7,
+    transparent: true,
+    opacity: 0.0,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const beam = new THREE.Mesh(
+    new THREE.ConeGeometry(scale * 2.2, scale * 3.2, 32, 1, true),
+    beamMat
+  );
+  beam.rotation.x = -Math.PI / 2;
+  beam.position.set(0, 0, -scale * 1.5);
+
+  const light = new THREE.SpotLight(0x38bdf8, 0, scale * 14, Math.PI / 3, 0.45, 1.2);
+  light.position.set(0, 0, 0);
+
+  g.add(arcBody, beam, light);
+  g.userData.beam = beam;
+  g.userData.light = light;
+  g.renderOrder = 5;
+  return g;
+}
+
+export function makeSuctionCannula(scale: number): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "prop_tool_suction_cannula";
+
+  const plasticMat = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc,
+    roughness: 0.3,
+    metalness: 0.1,
+  });
+  const gripMat = new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    roughness: 0.4,
+  });
+
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(scale * 0.12, scale * 0.16, scale * 2.8, 16),
+    plasticMat
+  );
+  body.position.set(0, scale * 1.5, 0);
+
+  const tip = new THREE.Mesh(
+    new THREE.CylinderGeometry(scale * 0.08, scale * 0.12, scale * 0.45, 14),
+    gripMat
+  );
+  tip.position.set(0, scale * 0.22, 0);
+
+  g.add(body, tip);
+  g.renderOrder = 5;
+  return g;
+}
+
 // ============================================================================
 // PERSISTENT STATE SYNCHRONIZER ACROSS STAGES (Requirement 1)
 // ============================================================================
@@ -1887,12 +2178,37 @@ export function normalizeActionType(
       : "crown";
   }
   if (
+    raw.includes("whitening") ||
+    raw.includes("bleach") ||
+    raw.includes("beyazlatma")
+  ) {
+    return "whitening";
+  }
+  if (
+    raw.includes("xray") ||
+    raw.includes("röntgen") ||
+    raw.includes("rontgen") ||
+    raw.includes("panoramik") ||
+    raw.includes("tomografi")
+  ) {
+    return "xray";
+  }
+  if (
+    raw.includes("sinus") ||
+    raw.includes("sinüs") ||
+    raw.includes("greft") ||
+    raw.includes("graft") ||
+    raw.includes("kemik tozu")
+  ) {
+    return "sinus_graft";
+  }
+  if (
     raw.includes("scaling") ||
     raw.includes("cleaning") ||
     raw.includes("detertraj") ||
     raw.includes("diş taşı") ||
     raw.includes("temiz") ||
-    raw.includes("beyazlatma")
+    raw.includes("polisaj")
   ) {
     return "scaling";
   }
@@ -2060,7 +2376,7 @@ export function syncCompletedStateBeforeStage(
         prostheticMode.set(fdi, "crown");
       } else if (act === "filling" || act === "sealant" || act === "root_canal") {
         cariesAmount.delete(fdi);
-      } else if (act === "scaling" || act === "cleaning") {
+      } else if (act === "scaling" || act === "cleaning" || act === "whitening") {
         cariesAmount.delete(fdi);
       }
     }
@@ -2139,6 +2455,8 @@ function computeStageCameraFrame(
     const f = frames[0]!;
     const buccalX = f.right ? -1 : 1;
     const occlusalY = f.upper ? -1 : 1; // -1 for upper (camera below looking up), +1 for lower
+    const toothIdx = Math.abs(Number(f.fdi)) % 10;
+    const isPosteriorSide = toothIdx >= 4;
     const elev = THREE.MathUtils.degToRad(
       mode === "extraction"
         ? f.upper
@@ -2148,15 +2466,22 @@ function computeStageCameraFrame(
           ? 28
           : mode === "facial"
             ? 14
-            : 34
+            : 30
     );
     const yaw = THREE.MathUtils.degToRad(
-      mode === "facial" ? 18 : mode === "extraction" ? 28 : 34
+      isPosteriorSide
+        ? 78
+        : mode === "facial"
+          ? 18
+          : mode === "extraction"
+            ? 28
+            : 34
     );
     const verticalSign =
       mode === "extraction" ? (f.upper ? -1 : -0.35) : occlusalY;
+    const lateralWeight = isPosteriorSide ? 0.98 : 0.82;
     const dir = new THREE.Vector3(
-      buccalX * Math.cos(elev) * 0.82,
+      buccalX * Math.cos(elev) * lateralWeight,
       verticalSign * Math.sin(elev),
       Math.cos(elev) * Math.cos(yaw)
     ).normalize();
@@ -2183,6 +2508,37 @@ function computeStageCameraFrame(
   const center = box.getCenter(new THREE.Vector3());
   const span = box.getSize(new THREE.Vector3()).length();
   const isUpper = frames[0]!.upper;
+
+  // Check if all teeth in this stage are on one lateral side (e.g. 14-15-16 bridge on the right)
+  const allSameSide = frames.every((f) => f.right === frames[0]!.right);
+  const avgToothIdx =
+    frames.reduce((sum, f) => sum + (Math.abs(Number(f.fdi)) % 10), 0) /
+    frames.length;
+
+  if (allSameSide && avgToothIdx >= 3) {
+    const buccalX = frames[0]!.right ? -1 : 1;
+    const sideDist = THREE.MathUtils.clamp(span * 1.45 + 0.056, 0.078, 0.118);
+    const verticalTilt =
+      mode === "extraction"
+        ? isUpper
+          ? -0.38
+          : -0.14
+        : isUpper
+          ? -0.18
+          : 0.18;
+    const sideDir = new THREE.Vector3(
+      buccalX * 0.97,
+      verticalTilt,
+      0.18
+    ).normalize();
+
+    return {
+      pos: center.clone().addScaledVector(sideDir, sideDist),
+      target: center,
+      jawAngle: 0.34,
+    };
+  }
+
   const dist = THREE.MathUtils.clamp(span * 1.65 + 0.055, 0.078, 0.135);
   const yOffset =
     mode === "extraction"
@@ -2195,7 +2551,7 @@ function computeStageCameraFrame(
 
   return {
     pos: new THREE.Vector3(
-      center.x * 1.15 + dist * 0.22,
+      center.x * 1.35,
       center.y + yOffset,
       center.z + dist * 0.92
     ),
@@ -2235,15 +2591,17 @@ export function playTreatmentStage(
 
   const action = normalizeActionType(stage.actionType, stage.stageName);
   const defaultActionTeeth =
-    action === "healing"
+    action === "healing" || action === "xray"
       ? []
-      : action === "veneer"
+      : action === "veneer" || action === "whitening"
         ? ["13", "12", "11", "21", "22", "23"]
         : action === "scaling" || action === "cleaning"
           ? ["33", "32", "31", "41", "42", "43"]
           : action === "permanent_bridge" || action === "temporary_denture"
-            ? ["14", "13", "12", "11", "21", "22", "23", "24"]
-            : ["16"];
+            ? ["14", "15", "16"]
+            : action === "sinus_graft"
+              ? ["16", "26"]
+              : ["16"];
 
   const baseTeeth =
     stage.teeth && stage.teeth.length > 0 ? stage.teeth : defaultActionTeeth;
@@ -2251,9 +2609,12 @@ export function playTreatmentStage(
 
   // Ensure jaw is at target angle before sampling world-space camera targets so lower jaw points match!
   const targetJawAngle =
-    action === "healing"
-      ? 0.18
-      : action === "veneer" || action === "scaling" || action === "cleaning"
+    action === "healing" || action === "xray"
+      ? 0.22
+      : action === "veneer" ||
+          action === "whitening" ||
+          action === "scaling" ||
+          action === "cleaning"
         ? 0.18
         : action === "crown"
           ? 0.24
@@ -2279,9 +2640,12 @@ export function playTreatmentStage(
       ? "extraction"
       : action === "root_canal"
         ? "section"
-        : action === "veneer" || action === "scaling" || action === "cleaning"
+        : action === "veneer" ||
+            action === "whitening" ||
+            action === "scaling" ||
+            action === "cleaning"
           ? "facial"
-          : action === "healing"
+          : action === "healing" || action === "xray"
             ? "arch"
             : "occlusal";
 
@@ -2382,6 +2746,15 @@ export function playTreatmentStage(
     case "cleaning":
       buildScalingChoreography(tl, frames, camera, controls);
       break;
+    case "whitening":
+      buildWhiteningChoreography(tl, frames, controller, camera, controls);
+      break;
+    case "xray":
+      buildXRayChoreography(tl, controller, camera, defaultCamPos);
+      break;
+    case "sinus_graft":
+      buildSinusGraftChoreography(tl, frames, camera, controls, camMode);
+      break;
     case "healing":
     default:
       buildHealingChoreography(tl, controller, camera, defaultCamPos);
@@ -2443,6 +2816,8 @@ function focusCameraOnTooth(
 ) {
   const buccalX = f.right ? -1 : 1;
   const occlusalY = f.upper ? -1 : 1;
+  const toothIdx = Math.abs(Number(f.fdi)) % 10;
+  const isPosteriorSide = toothIdx >= 4;
   const elev = THREE.MathUtils.degToRad(
     mode === "extraction"
       ? f.upper
@@ -2452,15 +2827,22 @@ function focusCameraOnTooth(
         ? 26
         : mode === "facial"
           ? 14
-          : 34
+          : 28
   );
   const yaw = THREE.MathUtils.degToRad(
-    mode === "facial" ? 18 : mode === "extraction" ? 28 : 32
+    isPosteriorSide
+      ? 78
+      : mode === "facial"
+        ? 18
+        : mode === "extraction"
+          ? 28
+          : 32
   );
   const verticalSign =
     mode === "extraction" ? (f.upper ? -1 : -0.35) : occlusalY;
+  const lateralWeight = isPosteriorSide ? 0.98 : 0.8;
   const dir = new THREE.Vector3(
-    buccalX * Math.cos(elev) * 0.8,
+    buccalX * Math.cos(elev) * lateralWeight,
     verticalSign * Math.sin(elev),
     Math.cos(elev) * Math.cos(yaw)
   ).normalize();
@@ -3733,15 +4115,49 @@ function buildProstheticChoreography(
   }
 
   // Multi-unit Bridge (`permanent_bridge` / `temporary_denture`):
-  // Phase 1: Diamond bur sequentially preps every intact abutment tooth one by one
+  // Clinically, a bridge spans across one or more MISSING (extracted) teeth (pontics)
+  // supported by intact abutment teeth on the ends.
+  // If none of the teeth in a given arch span are currently extracted (`st.x < 0.5`),
+  // automatically set the interior tooth/teeth (pontics) to missing (`st.x = 1.0`) at t=0
+  // while keeping the outer pillar teeth intact (`st.x = 0.0`) as abutment teeth!
+  const upperBridgeFrames = frames.filter((f) => f.upper);
+  const lowerBridgeFrames = frames.filter((f) => !f.upper);
+
+  [upperBridgeFrames, lowerBridgeFrames].forEach((archFrames) => {
+    if (archFrames.length < 2) return;
+    const anyAlreadyMissing = archFrames.some((f) => {
+      const st = f.arch.uniforms.uToothState.value[f.island.slot];
+      return Boolean(st && st.x >= 0.5);
+    });
+    if (!anyAlreadyMissing) {
+      archFrames.forEach((f, idx) => {
+        const isTerminalAbutment =
+          idx === 0 ||
+          idx === archFrames.length - 1 ||
+          (archFrames.length >= 6 &&
+            (idx === Math.floor(archFrames.length / 2) - 1 ||
+              idx === Math.floor(archFrames.length / 2)));
+        if (!isTerminalAbutment && archFrames.length >= 3) {
+          const st = f.arch.uniforms.uToothState.value[f.island.slot];
+          if (st) {
+            st.x = 1.0; // Missing pontic gap in the middle of the bridge
+            st.y = 0.0;
+            st.z = 0.0;
+          }
+        }
+      });
+    }
+  });
+
+  // Phase 1: Diamond bur sequentially preps ONLY the intact supporting abutment teeth
   const intactFrames = frames.filter((f) => {
     const st = f.arch.uniforms.uToothState.value[f.island.slot];
     return Boolean(st && st.x < 0.5 && st.y < 0.35);
   });
 
-  let bridgeStartAt = 0.55;
+  let bridgeStartAt = 0.65;
   if (intactFrames.length > 0) {
-    const prepStep = Math.max(0.22, Math.min(0.55, 2.2 / intactFrames.length));
+    const prepStep = Math.max(0.32, Math.min(0.75, 2.6 / intactFrames.length));
     tl.add(() => {
       bur.visible = true;
     }, 0.4);
@@ -3761,6 +4177,15 @@ function buildProstheticChoreography(
     intactFrames.forEach((f, idx) => {
       const at = 0.42 + idx * prepStep;
       const st = f.arch.uniforms.uToothState.value[f.island.slot];
+      focusCameraOnTooth(
+        tl,
+        f,
+        camera,
+        controls,
+        camMode,
+        at,
+        Math.min(0.32, prepStep * 0.45)
+      );
       tl.add(() => {
         if (bur.parent !== f.arch.anchorGroup) {
           f.arch.anchorGroup.add(bur);
@@ -3786,69 +4211,143 @@ function buildProstheticChoreography(
       }
     });
 
-    bridgeStartAt = 0.5 + intactFrames.length * prepStep;
+    bridgeStartAt = 0.55 + intactFrames.length * prepStep;
     tl.add(() => {
       bur.visible = false;
     }, bridgeStartAt - 0.05);
   }
 
-  // Phase 2: Sequential seating of each bridge unit across the arch
-  const unitStep = Math.max(0.14, Math.min(0.38, 2.6 / Math.max(1, frames.length)));
-  frames.forEach((f, idx) => {
-    const sign = f.upper ? 1 : -1;
-    const crown = makeAnatomicalToothMesh(f.island, mode, true);
-    const offsetZ = sign * f.island.localRadius * 2.3;
+  // Pull camera to lateral/buccal view of the bridge span right as the 1-piece bridge seats
+  const bridgeCamFrame = computeStageCameraFrame(
+    frames,
+    camera.position,
+    controls.target,
+    camMode
+  );
+  tl.to(
+    camera.position,
+    {
+      x: bridgeCamFrame.pos.x,
+      y: bridgeCamFrame.pos.y,
+      z: bridgeCamFrame.pos.z,
+      duration: 0.38,
+      ease: "power2.out",
+    },
+    Math.max(0, bridgeStartAt - 0.12)
+  );
+  tl.to(
+    controls.target,
+    {
+      x: bridgeCamFrame.target.x,
+      y: bridgeCamFrame.target.y,
+      z: bridgeCamFrame.target.z,
+      duration: 0.38,
+      ease: "power2.out",
+    },
+    Math.max(0, bridgeStartAt - 0.12)
+  );
 
-    crown.position.set(
-      f.island.localCenter.x,
-      f.island.localCenter.y,
-      f.island.localCenter.z + offsetZ
-    );
-    crown.visible = false;
-    f.arch.anchorGroup.add(crown);
+  // Phase 2: Seat the ENTIRE multi-unit bridge as ONE single monolithic connected block (`at = bridgeStartAt`)!
+  const seatDur = 1.05;
+  [upperBridgeFrames, lowerBridgeFrames].forEach((archFrames) => {
+    if (!archFrames.length) return;
+    const sign = archFrames[0]!.upper ? 1 : -1;
+    const avgRadius =
+      archFrames.reduce((s, f) => s + f.island.localRadius, 0) / archFrames.length;
+    const offsetZ = sign * avgRadius * 2.35;
 
-    const at = bridgeStartAt + idx * unitStep;
-    tl.add(() => {
-      crown.visible = true;
-    }, at);
-
-    tl.to(
-      crown.position,
-      {
-        x: f.island.localCenter.x,
-        y: f.island.localCenter.y,
-        z: f.island.localCenter.z,
-        duration: 0.75,
-        ease: "power3.out",
-      },
-      at
-    );
-
-    tl.add(() => {
-      const imp = f.arch.anchorGroup.getObjectByName(`prop_perm_implant_${f.fdi}`);
-      const abut = f.arch.anchorGroup.getObjectByName(`prop_perm_abutment_${f.fdi}`);
-      if (imp) imp.visible = false;
-      if (abut) abut.visible = false;
-    }, at + 0.54);
-
-    const mat = crown.userData.crownMat as THREE.MeshPhysicalMaterial | undefined;
-    if (mat) {
-      tl.to(
-        mat,
-        {
-          emissiveIntensity: 0.45,
-          duration: 0.2,
-          yoyo: true,
-          repeat: 1,
-        },
-        at + 0.68
+    // 2a. Spawn interproximal zirconia connectors between adjacent bridge units so they form a 1-piece block
+    for (let i = 0; i < archFrames.length - 1; i++) {
+      const curr = archFrames[i]!;
+      const next = archFrames[i + 1]!;
+      const prevConn = curr.arch.anchorGroup.getObjectByName(
+        `prop_perm_bridge_conn_${curr.fdi}_${next.fdi}`
       );
+      if (prevConn) {
+        curr.arch.anchorGroup.remove(prevConn);
+        disposeObject3D(prevConn);
+      }
+      const distBetween = curr.island.localCrownCenter.distanceTo(
+        next.island.localCrownCenter
+      );
+      if (distBetween <= Math.max(curr.island.localRadius, next.island.localRadius) * 4.2) {
+        const conn = makeBridgeConnectorMesh(curr.island, next.island, mode, true);
+        const targetPos = conn.position.clone();
+        conn.position.set(targetPos.x, targetPos.y, targetPos.z + offsetZ);
+        conn.visible = false;
+        curr.arch.anchorGroup.add(conn);
+
+        tl.add(() => {
+          conn.visible = true;
+        }, bridgeStartAt);
+
+        tl.to(
+          conn.position,
+          {
+            x: targetPos.x,
+            y: targetPos.y,
+            z: targetPos.z,
+            duration: seatDur,
+            ease: "power3.out",
+          },
+          bridgeStartAt
+        );
+      }
     }
 
-    const st = f.arch.uniforms.uToothState.value[f.island.slot];
-    if (st) {
-      tl.to(st, { w: 0.0, duration: 0.3 }, at + 0.72);
-    }
+    // 2b. All bridge units descend TOGETHER simultaneously at `bridgeStartAt` as one solid connected bridge
+    archFrames.forEach((f) => {
+      const crown = makeAnatomicalToothMesh(f.island, mode, true);
+      crown.position.set(
+        f.island.localCenter.x,
+        f.island.localCenter.y,
+        f.island.localCenter.z + offsetZ
+      );
+      crown.visible = false;
+      f.arch.anchorGroup.add(crown);
+
+      tl.add(() => {
+        crown.visible = true;
+      }, bridgeStartAt);
+
+      tl.to(
+        crown.position,
+        {
+          x: f.island.localCenter.x,
+          y: f.island.localCenter.y,
+          z: f.island.localCenter.z,
+          duration: seatDur,
+          ease: "power3.out",
+        },
+        bridgeStartAt
+      );
+
+      tl.add(() => {
+        const imp = f.arch.anchorGroup.getObjectByName(`prop_perm_implant_${f.fdi}`);
+        const abut = f.arch.anchorGroup.getObjectByName(`prop_perm_abutment_${f.fdi}`);
+        if (imp) imp.visible = false;
+        if (abut) abut.visible = false;
+      }, bridgeStartAt + seatDur * 0.72);
+
+      const mat = crown.userData.crownMat as THREE.MeshPhysicalMaterial | undefined;
+      if (mat) {
+        tl.to(
+          mat,
+          {
+            emissiveIntensity: 0.45,
+            duration: 0.22,
+            yoyo: true,
+            repeat: 1,
+          },
+          bridgeStartAt + seatDur * 0.88
+        );
+      }
+
+      const st = f.arch.uniforms.uToothState.value[f.island.slot];
+      if (st) {
+        tl.to(st, { w: 0.0, duration: 0.3 }, bridgeStartAt + seatDur * 0.9);
+      }
+    });
   });
 }
 
@@ -4040,8 +4539,8 @@ function buildScalingChoreography(
     f.arch.uniforms.uScanColor.value.setHex(0x38bdf8);
     const st = f.arch.uniforms.uToothState.value[f.island.slot];
     if (st) {
-      st.z = -0.95; // Negative vCariesSpot renders yellowish-amber cervical tartar/calculus band
-      st.w = 0.55;
+      st.z = -0.95; // Negative vCariesSpot renders localized cervical tartar/calculus at gingival margin
+      st.w = 0.0;   // Keep scan glow off so teeth strictly preserve their natural shade
     }
   }
 
@@ -4190,4 +4689,498 @@ function buildHealingChoreography(
     },
     0.5
   );
+}
+
+/**
+ * 11. OFİS TİPİ DİŞ BEYAZLATMA (`whitening` / 3-Fazlı Klinik Bleaching Protokolü):
+ * Faz 1: Diş eti sınırına koruyucu gingival barrier (mavi sıvı baraj) çekilir ve
+ *        ön dişlerin yüzeyine şeffaf/parıltılı hidrojen peroksit beyazlatma jeli sürülür.
+ * Faz 2: Geniş açılı ark tipi mavi LED bleaching lambası devreye girerek jeli aktive eder,
+ *        jel oksijen köpürmesiyle ışıldarken alttaki sarı lekeler çözülür (st.z: -0.75 -> 0.0).
+ * Faz 3: Cerrahi aspiratör kanülü jeli aspire ederek temizler, koruyucu baraj sökülür ve
+ *        dişlerin tertemiz, doğal ve ışıltılı mine tonu ortaya çıkar.
+ */
+function buildWhiteningChoreography(
+  tl: gsap.core.Timeline,
+  frames: ResolvedFdiFrame[],
+  controller: MouthCinematicController,
+  camera: THREE.PerspectiveCamera,
+  controls: { target: THREE.Vector3 }
+) {
+  const targetFrames =
+    frames.length > 0
+      ? frames
+      : ["13", "12", "11", "21", "22", "23"]
+          .map((t) => calculateLocalFdiFrame(controller, t))
+          .filter((f): f is ResolvedFdiFrame => f !== null);
+  if (!targetFrames.length) return;
+
+  const sortedFrames = [...targetFrames].sort(
+    (a, b) => a.island.localCenter.x - b.island.localCenter.x
+  );
+  const primary = sortedFrames[0]!;
+
+  // 1. Initial State: Pre-treatment warm yellowish tea/coffee stain baseline
+  for (const f of sortedFrames) {
+    const st = f.arch.uniforms.uToothState.value[f.island.slot];
+    if (st) {
+      st.z = -0.75;
+      st.w = 0.0;
+    }
+  }
+
+  // Local center for lamp positioning
+  const localBox = new THREE.Box3();
+  sortedFrames.forEach((f) => localBox.expandByPoint(f.island.localCenter));
+  const smileCenterLocal = localBox.getCenter(new THREE.Vector3());
+
+  // =========================================================================
+  // FAZ 1a: Diş Eti Koruyucu Barajı (Gingival Barrier) Uygulaması
+  // =========================================================================
+  const barrier = makeGingivalBarrierMesh(sortedFrames);
+  if (barrier) {
+    barrier.visible = false;
+    primary.arch.anchorGroup.add(barrier);
+
+    tl.add(() => {
+      if (barrier) barrier.visible = true;
+    }, 0.45);
+
+    tl.fromTo(
+      barrier.scale,
+      { x: 1, y: 0.01, z: 0.01 },
+      { x: 1, y: 1, z: 1, duration: 0.6, ease: "power2.out" },
+      0.45
+    );
+  }
+
+  // =========================================================================
+  // FAZ 1b: Hidrojen Peroksit Beyazlatma Jelinin Sürülmesi
+  // =========================================================================
+  const gelMeshes: THREE.Mesh[] = [];
+  sortedFrames.forEach((f) => {
+    const gel = makeBleachingGelMesh(f.island);
+    gel.scale.set(0.01, 0.01, 0.01);
+    gel.visible = false;
+    f.arch.anchorGroup.add(gel);
+    gelMeshes.push(gel);
+  });
+
+  const syringe = makeGelSyringe(primary.island.localRadius * 1.15);
+  syringe.visible = false;
+  primary.arch.anchorGroup.add(syringe);
+
+  tl.add(() => {
+    syringe.visible = true;
+  }, 1.1);
+
+  const applyStep = 2.4 / sortedFrames.length;
+  sortedFrames.forEach((f, idx) => {
+    const at = 1.15 + idx * applyStep;
+    const gel = gelMeshes[idx];
+    const outDir = new THREE.Vector3(
+      f.island.localCrownCenter.x,
+      f.island.localCrownCenter.y - 5.2,
+      0
+    ).normalize();
+    const tipPos = f.island.localCrownCenter
+      .clone()
+      .addScaledVector(outDir, f.island.localRadius * 0.32);
+
+    tl.add(() => {
+      syringe.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), outDir);
+    }, at);
+
+    tl.to(
+      syringe.position,
+      {
+        x: tipPos.x,
+        y: tipPos.y,
+        z: tipPos.z,
+        duration: applyStep * 0.72,
+        ease: "power2.out",
+      },
+      at
+    );
+
+    if (gel) {
+      tl.add(() => {
+        gel.visible = true;
+      }, at + applyStep * 0.15);
+      tl.to(
+        gel.scale,
+        {
+          x: 1.035,
+          y: 1.035,
+          z: 1.05,
+          duration: applyStep * 0.68,
+          ease: "back.out(1.2)",
+        },
+        at + applyStep * 0.15
+      );
+    }
+  });
+
+  const syringeEndAt = 1.15 + sortedFrames.length * applyStep + 0.1;
+  tl.add(() => {
+    syringe.visible = false;
+  }, syringeEndAt);
+
+  // =========================================================================
+  // FAZ 2: Geniş Ark Tipi Mavi Bleaching Lambası Aktivasyonu
+  // =========================================================================
+  const lamp = makeBleachingArcLamp(primary.island.localRadius * 1.25);
+  lamp.visible = false;
+  primary.arch.anchorGroup.add(lamp);
+
+  const lampInPos = smileCenterLocal
+    .clone()
+    .add(new THREE.Vector3(0, 0, primary.island.localRadius * 3.6));
+  const lampOutPos = smileCenterLocal
+    .clone()
+    .add(new THREE.Vector3(0, 0, primary.island.localRadius * 7.5));
+  lamp.position.copy(lampOutPos);
+
+  const lampStartAt = syringeEndAt + 0.15;
+  tl.add(() => {
+    lamp.visible = true;
+  }, lampStartAt);
+
+  tl.to(
+    lamp.position,
+    {
+      x: lampInPos.x,
+      y: lampInPos.y,
+      z: lampInPos.z,
+      duration: 0.6,
+      ease: "power3.out",
+    },
+    lampStartAt
+  );
+
+  const activateAt = lampStartAt + 0.6;
+  const lampDur = 2.6;
+
+  tl.add(() => {
+    lamp.userData.light.intensity = 2.8;
+    lamp.userData.beam.material.opacity = 0.36;
+  }, activateAt);
+
+  // Gel active oxygen effervescence shimmer under blue light
+  gelMeshes.forEach((gel) => {
+    const mat = gel.userData.gelMat as THREE.MeshPhysicalMaterial | undefined;
+    if (mat) {
+      tl.to(
+        mat,
+        {
+          emissiveIntensity: 0.52,
+          duration: lampDur * 0.45,
+          yoyo: true,
+          repeat: 1,
+          ease: "sine.inOut",
+        },
+        activateAt
+      );
+    }
+  });
+
+  // Dissolve dark yellow stain simultaneously across all teeth under the blue light
+  sortedFrames.forEach((f) => {
+    const st = f.arch.uniforms.uToothState.value[f.island.slot];
+    if (st) {
+      tl.to(
+        st,
+        { z: 0.0, w: 0.0, duration: lampDur * 0.78, ease: "power2.inOut" },
+        activateAt + 0.15
+      );
+    }
+  });
+
+  const lampEndAt = activateAt + lampDur;
+  tl.add(() => {
+    lamp.userData.light.intensity = 0.0;
+    lamp.userData.beam.material.opacity = 0.0;
+  }, lampEndAt);
+
+  tl.to(
+    lamp.position,
+    {
+      x: lampOutPos.x,
+      y: lampOutPos.y,
+      z: lampOutPos.z,
+      duration: 0.5,
+      ease: "power2.in",
+    },
+    lampEndAt
+  );
+
+  tl.add(() => {
+    lamp.visible = false;
+  }, lampEndAt + 0.5);
+
+  // =========================================================================
+  // FAZ 3: Jelin Aspiratörle Temizlenmesi & Estetik Gülüşün Açığa Çıkması
+  // =========================================================================
+  const suction = makeSuctionCannula(primary.island.localRadius * 1.15);
+  suction.visible = false;
+  primary.arch.anchorGroup.add(suction);
+
+  const suctionStartAt = lampEndAt + 0.55;
+  tl.add(() => {
+    suction.visible = true;
+  }, suctionStartAt);
+
+  const suctionStep = 1.6 / sortedFrames.length;
+  sortedFrames.forEach((f, idx) => {
+    const at = suctionStartAt + idx * suctionStep;
+    const gel = gelMeshes[idx];
+    const outDir = new THREE.Vector3(
+      f.island.localCrownCenter.x,
+      f.island.localCrownCenter.y - 5.2,
+      0
+    ).normalize();
+    const suctionPos = f.island.localCrownCenter
+      .clone()
+      .addScaledVector(outDir, f.island.localRadius * 0.36);
+
+    tl.to(
+      suction.position,
+      {
+        x: suctionPos.x,
+        y: suctionPos.y,
+        z: suctionPos.z,
+        duration: suctionStep * 0.72,
+        ease: "power2.out",
+      },
+      at
+    );
+
+    if (gel) {
+      tl.to(
+        gel.scale,
+        {
+          x: 0.01,
+          y: 0.01,
+          z: 0.01,
+          duration: suctionStep * 0.55,
+          ease: "power2.in",
+        },
+        at + suctionStep * 0.15
+      );
+      tl.add(() => {
+        gel.visible = false;
+      }, at + suctionStep * 0.72);
+    }
+  });
+
+  const cleanEndAt = suctionStartAt + sortedFrames.length * suctionStep + 0.1;
+  tl.add(() => {
+    suction.visible = false;
+  }, cleanEndAt);
+
+  // Peel off / remove gingival barrier
+  if (barrier) {
+    tl.to(
+      barrier.scale,
+      { x: 1, y: 0.01, z: 0.01, duration: 0.45, ease: "power2.in" },
+      cleanEndAt
+    );
+    tl.add(() => {
+      if (barrier) barrier.visible = false;
+    }, cleanEndAt + 0.45);
+  }
+}
+
+/**
+ * 12. PANORAMİK RÖNTGEN (`xray` / Dijital Radyografi Tarama):
+ * Full-arch digital X-Ray scan wave across upper and lower arches, temporarily revealing
+ * longitudinal internal root canal & bone cross-sections across the dentition.
+ */
+function buildXRayChoreography(
+  tl: gsap.core.Timeline,
+  controller: MouthCinematicController,
+  camera: THREE.PerspectiveCamera,
+  defaultCamPos: THREE.Vector3
+) {
+  [controller.upperArch, controller.lowerArch].forEach((arch) => {
+    if (!arch) return;
+    arch.uniforms.uScanColor.value.setHex(0x38bdf8);
+    arch.uniforms.uClean.value = 1.0;
+
+    tl.to(
+      arch.uniforms.uSection,
+      { value: 0.85, duration: 1.2, ease: "power2.inOut" },
+      0.5
+    );
+    arch.islands.forEach((isl) => {
+      const st = arch.uniforms.uToothState.value[isl.slot];
+      if (st) {
+        tl.to(
+          st,
+          { w: 0.95, duration: 0.65, yoyo: true, repeat: 1, ease: "sine.inOut" },
+          0.55 + isl.slot * 0.14
+        );
+      }
+    });
+    tl.to(
+      arch.uniforms.uPulse,
+      { value: 3.0, duration: 3.6, ease: "sine.inOut" },
+      0.5
+    );
+    tl.to(
+      arch.uniforms.uSection,
+      { value: 0.0, duration: 1.1, ease: "power2.inOut" },
+      3.8
+    );
+  });
+
+  tl.to(
+    camera.position,
+    {
+      x: defaultCamPos.x * 0.55,
+      y: defaultCamPos.y * 0.98,
+      z: defaultCamPos.z * 0.92,
+      duration: 2.1,
+      yoyo: true,
+      repeat: 1,
+      ease: "sine.inOut",
+    },
+    0.5
+  );
+}
+
+/**
+ * 13. SİNÜS LİFTİNG & KEMİK GREFTİ (`sinus_graft` / Kemik Tozu Uygulaması):
+ * Posterior upper molar site is prepared with osteotomy drill, then bio-active bone graft
+ * granules (`makeDroplet` warm ivory matrix) are packed into the maxillary sinus floor / alveolar socket.
+ */
+function buildSinusGraftChoreography(
+  tl: gsap.core.Timeline,
+  frames: ResolvedFdiFrame[],
+  camera: THREE.PerspectiveCamera,
+  controls: { target: THREE.Vector3 },
+  camMode: "occlusal" | "extraction" | "section" | "facial" | "arch"
+) {
+  if (!frames.length) return;
+  const primary = frames[0]!;
+
+  // Mark target posterior sites as edentulous sockets needing sinus floor augmentation
+  for (const f of frames) {
+    f.arch.uniforms.uScanColor.value.setHex(0x2dd4bf);
+    const st = f.arch.uniforms.uToothState.value[f.island.slot];
+    if (st) {
+      st.x = 1.0;
+      st.w = 0.7;
+    }
+  }
+
+  const drill = makeSurgicalDrill(primary.island.localRadius * 1.2);
+  drill.visible = false;
+  primary.arch.anchorGroup.add(drill);
+
+  const toothStep = frames.length === 1 ? 3.4 : Math.max(2.0, Math.min(3.2, 9.5 / frames.length));
+
+  frames.forEach((f, idx) => {
+    const seqStart = 0.5 + idx * toothStep;
+    const isl = f.island;
+    const r = isl.localRadius;
+
+    if (frames.length > 1) {
+      focusCameraOnTooth(
+        tl,
+        f,
+        camera,
+        controls,
+        camMode,
+        seqStart,
+        Math.min(0.35, toothStep * 0.22)
+      );
+    }
+
+    // Step 1: Sinus floor window / osteotomy preparation
+    const drillStart = isl.localCervical
+      .clone()
+      .addScaledVector(isl.localCrownAxis, r * 2.1);
+    const drillDepth = isl.localCervical
+      .clone()
+      .addScaledVector(isl.localCrownAxis, -r * 0.45);
+
+    tl.add(() => {
+      if (drill.parent !== f.arch.anchorGroup) {
+        f.arch.anchorGroup.add(drill);
+      }
+      drill.visible = true;
+      drill.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), isl.localCrownAxis);
+      drill.position.copy(drillStart);
+    }, seqStart);
+
+    if (drill.userData.spinner) {
+      tl.to(
+        drill.userData.spinner.rotation,
+        { y: `+=${Math.PI * 16}`, duration: toothStep * 0.34, ease: "none" },
+        seqStart
+      );
+    }
+
+    tl.to(
+      drill.position,
+      {
+        x: drillDepth.x,
+        y: drillDepth.y,
+        z: drillDepth.z,
+        duration: toothStep * 0.17,
+        yoyo: true,
+        repeat: 1,
+        ease: "power2.inOut",
+      },
+      seqStart + toothStep * 0.02
+    );
+
+    // Step 2: Bio-active bone graft granules (`graft`) packed into the sinus / alveolar socket
+    const graftAt = seqStart + toothStep * 0.38;
+    const graft = makeDroplet(r * 0.38);
+    const graftMat = graft.material as THREE.MeshPhysicalMaterial;
+    graftMat.color.setHex(0xe8dec8);
+    graftMat.roughness = 0.48;
+
+    const gStart = isl.localCervical
+      .clone()
+      .addScaledVector(isl.localCrownAxis, r * 1.8);
+    graft.position.copy(gStart);
+    graft.scale.setScalar(0.01);
+    graft.visible = false;
+    f.arch.anchorGroup.add(graft);
+
+    tl.add(() => {
+      drill.visible = false;
+      graft.visible = true;
+    }, graftAt);
+
+    tl.to(
+      graft.scale,
+      { x: 1.45, y: 0.55, z: 1.35, duration: toothStep * 0.22, ease: "power2.out" },
+      graftAt
+    );
+    tl.to(
+      graft.position,
+      {
+        x: isl.localCervical.x,
+        y: isl.localCervical.y,
+        z: isl.localCervical.z,
+        duration: toothStep * 0.24,
+        ease: "power2.out",
+      },
+      graftAt + toothStep * 0.02
+    );
+    tl.to(
+      graftMat,
+      { opacity: 0.0, duration: toothStep * 0.2, ease: "power1.out" },
+      seqStart + toothStep * 0.76
+    );
+    tl.add(() => {
+      graft.visible = false;
+      const st = f.arch.uniforms.uToothState.value[isl.slot];
+      if (st) st.w = 0.0;
+    }, seqStart + toothStep * 0.96);
+  });
 }

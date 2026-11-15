@@ -726,6 +726,7 @@ export function TreatmentStudio({
             planItems={items}
             visits={visits}
             conditions={conditions}
+            treatmentsCatalog={treatmentsCatalog}
             isActive={activeTab === "animation"}
           />
         </div>

@@ -196,12 +196,12 @@ export const TEN_TREATMENT_SHOWCASE_STAGES: AnimationTimelineStage[] = [
   {
     id: "showcase-9-bridge",
     visitTitle: "9. Çok Üniteli Protetik Köprü",
-    stageName: "Kalıcı Zirkonyum Köprü & Geçici Protez",
-    teeth: ["14", "13", "12", "11", "21", "22", "23", "24"],
+    stageName: "Kalıcı Zirkonyum Köprü Protezi",
+    teeth: ["14", "15", "16"],
     actionType: "permanent_bridge",
-    durationSeconds: 13.5,
+    durationSeconds: 12.5,
     description:
-      "Destek dişlerin sırayla prepare edilmesi ve çok üniteli monolitik zirkonyum ark köprüsünün tek tek simante edilmesi.",
+      "Ortadaki eksik diş boşluğunun (#15) iki yanındaki sağlam destek dişlerin (#14 ve #16) kesilerek hazırlanması ve 3 üniteli birbirine bağlı tek parça (monolitik) zirkonyum köprü bloğunun tek seferde yerleştirilmesi.",
   },
   {
     id: "showcase-10-scaling",
@@ -213,6 +213,39 @@ export const TEN_TREATMENT_SHOWCASE_STAGES: AnimationTimelineStage[] = [
     description:
       "Diş eti sınırındaki diş taşı (kalkulus) ve plak birikimlerinin ultrasonik kavitron ucu ve su spreyi ile her bir dişte sırayla temizlenmesi.",
   },
+  {
+    id: "showcase-11-whitening",
+    visitTitle: "11. Estetik Diş Hekimliği",
+    stageName: "Ofis Tipi Diş Beyazlatma (Bleaching)",
+    teeth: ["13", "12", "11", "21", "22", "23"],
+    actionType: "whitening",
+    durationSeconds: 9.5,
+    description:
+      "Estetik bölgedeki diş yüzeylerine hidrojen peroksit beyazlatma jeli uygulanması ve mavi LED lazer aktivasyonu ile diş tonunun açılması.",
+  },
+  {
+    id: "showcase-12-xray",
+    visitTitle: "12. Radyolojik Görüntüleme",
+    stageName: "Panoramik Röntgen (Paket İçi)",
+    teeth: [
+      "16", "14", "11", "21", "24", "26",
+      "36", "34", "31", "41", "44", "46",
+    ],
+    actionType: "xray",
+    durationSeconds: 8.5,
+    description:
+      "Alt ve üst çene arkının dijital panoramik X-Ray sensörü ile 360° taranması ve kemik/kök anatomisinin radyografik görüntülenmesi.",
+  },
+  {
+    id: "showcase-13-sinus-graft",
+    visitTitle: "13. İleri İmplant Cerrahisi",
+    stageName: "Sinüs Lifting & Kemik Grefti",
+    teeth: ["16", "26"],
+    actionType: "sinus_graft",
+    durationSeconds: 11.0,
+    description:
+      "Üst çene arka bölgede sarkık sinüs membranının cerrahi olarak yükseltilmesi ve oluşan boşluğa biyouyumlu kemik grefti (kemik tozu) uygulanması.",
+  },
 ];
 
 function classifyPlanItemAction(
@@ -223,6 +256,37 @@ function classifyPlanItemAction(
   const n = `${name} ${treatmentType}`.toLowerCase();
   const c = code.toLowerCase();
 
+  if (
+    c.includes("xray") ||
+    c.includes("röntgen") ||
+    c === "tr05" ||
+    n.includes("röntgen") ||
+    n.includes("rontgen") ||
+    n.includes("panoramik") ||
+    n.includes("tomografi")
+  ) {
+    return "xray";
+  }
+  if (
+    c.includes("sinus") ||
+    c.includes("graft") ||
+    c === "tr13" ||
+    n.includes("sinüs") ||
+    n.includes("sinus") ||
+    n.includes("greft") ||
+    n.includes("kemik tozu")
+  ) {
+    return "sinus_graft";
+  }
+  if (
+    c.includes("whiten") ||
+    c.includes("bleach") ||
+    c === "tr12" ||
+    n.includes("beyazlatma") ||
+    n.includes("bleaching")
+  ) {
+    return "whitening";
+  }
   if (
     c.includes("extract") ||
     c.includes("çekim") ||
@@ -315,8 +379,7 @@ function classifyPlanItemAction(
     n.includes("detertraj") ||
     n.includes("diş taşı") ||
     n.includes("temiz") ||
-    n.includes("küretaj") ||
-    n.includes("beyazlatma")
+    n.includes("küretaj")
   ) {
     return "scaling";
   }
@@ -344,10 +407,16 @@ function getDefaultTeethForAction(
       return ["13", "12", "11", "21", "22", "23"];
     case "permanent_bridge":
     case "temporary_denture":
-      return ["14", "13", "12", "11", "21", "22", "23", "24"];
+      return ["14", "15", "16"];
     case "scaling":
     case "cleaning":
       return ["33", "32", "31", "41", "42", "43"];
+    case "whitening":
+      return ["13", "12", "11", "21", "22", "23"];
+    case "xray":
+      return ["16", "14", "11", "21", "24", "26", "36", "34", "31", "41", "44", "46"];
+    case "sinus_graft":
+      return ["16", "26"];
     case "healing":
     default:
       return [];
@@ -359,6 +428,9 @@ function computeStageDuration(
   toothCount: number
 ): number {
   if (actionType === "healing") return 6.0;
+  if (actionType === "xray") return 8.5;
+  if (actionType === "whitening") return 9.5;
+  if (actionType === "sinus_graft") return 11.0;
   const count = Math.max(1, toothCount);
   const base =
     actionType === "root_canal"
@@ -519,6 +591,7 @@ interface SimulationModuleProps {
   planItems?: StudioPlanItem[];
   visits?: StudioVisit[];
   conditions?: Record<string, ToothCondition>;
+  treatmentsCatalog?: { id: string; code?: string | null; name: string; isActive?: boolean }[];
   darkMode?: boolean;
   isActive?: boolean;
 }
@@ -534,10 +607,45 @@ export function SimulationModule({
   planItems,
   visits,
   conditions,
+  treatmentsCatalog,
   darkMode = false,
   isActive = true,
 }: SimulationModuleProps) {
   const [selectedShowcaseId, setSelectedShowcaseId] = useState<string>("plan");
+
+  const showcaseStages = useMemo(() => {
+    const base = [...TEN_TREATMENT_SHOWCASE_STAGES];
+    if (!treatmentsCatalog || treatmentsCatalog.length === 0) {
+      return base;
+    }
+    const existingActionTypes = new Set(base.map((st) => st.actionType));
+    treatmentsCatalog.forEach((cat, idx) => {
+      if (cat.isActive === false) return;
+      const actionType = classifyPlanItemAction(cat.name, cat.code || "");
+      const alreadyCovered =
+        existingActionTypes.has(actionType) &&
+        base.some(
+          (b) =>
+            b.actionType === actionType &&
+            (b.stageName.toLowerCase().includes(cat.name.toLowerCase().slice(0, 8)) ||
+              cat.name.toLowerCase().includes(b.stageName.toLowerCase().slice(0, 8)))
+        );
+      if (!alreadyCovered && !existingActionTypes.has(actionType)) {
+        const defaultTeeth = getDefaultTeethForAction(actionType);
+        base.push({
+          id: `showcase-cat-${cat.id || idx}`,
+          visitTitle: `${base.length + 1}. Klinik Tedavi`,
+          stageName: cat.name,
+          teeth: defaultTeeth.length > 0 ? defaultTeeth : ["11", "21"],
+          actionType,
+          durationSeconds: computeStageDuration(actionType, defaultTeeth.length || 2),
+          description: `${cat.name} işleminin 3D klinik simülasyonu.`,
+        });
+        existingActionTypes.add(actionType);
+      }
+    });
+    return base;
+  }, [treatmentsCatalog]);
 
   const planStages = useMemo(() => {
     if (planItems && planItems.length > 0) {
@@ -551,14 +659,14 @@ export function SimulationModule({
     if (selectedShowcaseId === "plan") {
       return planStages;
     }
-    if (selectedShowcaseId === "all_10") {
-      return TEN_TREATMENT_SHOWCASE_STAGES;
+    if (selectedShowcaseId === "all_10" || selectedShowcaseId === "all_showcase") {
+      return showcaseStages;
     }
-    const single = TEN_TREATMENT_SHOWCASE_STAGES.find(
+    const single = showcaseStages.find(
       (st) => st.id === selectedShowcaseId
     );
     return single ? [single] : planStages;
-  }, [selectedShowcaseId, planStages]);
+  }, [selectedShowcaseId, planStages, showcaseStages]);
 
   const stageTimeline = useMemo(() => {
     const items: Array<{
@@ -773,7 +881,11 @@ export function SimulationModule({
 
   const showcaseTabs: { id: string; label: string; badge?: string }[] = [
     { id: "plan", label: "Hasta Tedavi Planı", badge: `${planStages.length} Aşama` },
-    { id: "all_10", label: "Tüm 10 Tedavi (Sıralı Tur)", badge: "10 Video" },
+    {
+      id: "all_10",
+      label: `Tüm ${showcaseStages.length} Tedavi (Sıralı Tur)`,
+      badge: `${showcaseStages.length} Video`,
+    },
     { id: "showcase-1-extraction", label: "1. Diş Çekimi" },
     { id: "showcase-2-implant", label: "2. İmplant" },
     { id: "showcase-3-abutment", label: "3. Abutment" },
@@ -784,11 +896,18 @@ export function SimulationModule({
     { id: "showcase-8-veneer", label: "8. Lamina Veneer" },
     { id: "showcase-9-bridge", label: "9. Zirkonyum Köprü" },
     { id: "showcase-10-scaling", label: "10. Diş Taşı Temizliği" },
+    { id: "showcase-11-whitening", label: "11. Diş Beyazlatma" },
+    { id: "showcase-12-xray", label: "12. Panoramik Röntgen" },
+    { id: "showcase-13-sinus-graft", label: "13. Sinüs Lifting & Greft" },
+    ...showcaseStages.slice(13).map((st, idx) => ({
+      id: st.id,
+      label: `${14 + idx}. ${st.stageName}`,
+    })),
   ];
 
   return (
     <div className="space-y-4">
-      {/* 10 Clinical Treatments 3D Video Showcase & Mode Selector Bar */}
+      {/* Clinical Treatments 3D Video Showcase & Mode Selector Bar */}
       <div
         className={`rounded-2xl border p-3.5 shadow-xs transition-colors ${
           darkMode
@@ -804,7 +923,7 @@ export function SimulationModule({
               }`}
             />
             <span className="text-xs font-bold tracking-wide uppercase">
-              3D Sinematik Tedavi Kütüphanesi (10 Tedavi Türü)
+              3D Sinematik Tedavi Kütüphanesi ({showcaseStages.length} Tedavi Türü)
             </span>
           </div>
           <span

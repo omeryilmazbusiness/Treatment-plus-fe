@@ -167,6 +167,9 @@ export type AnimationActionType =
   | "veneer"
   | "scaling"
   | "cleaning"
+  | "whitening"
+  | "xray"
+  | "sinus_graft"
   | "custom";
 
 export interface AnimationTimelineStage {
