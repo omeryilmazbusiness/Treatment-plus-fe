@@ -2437,17 +2437,56 @@ export function syncCompletedStateBeforeStage(
 // CAMERA & JAW CHOREOGRAPHY HELPERS
 // ============================================================================
 
+export type StageCameraMode =
+  | "occlusal"
+  | "extraction"
+  | "section"
+  | "facial"
+  | "arch"
+  | "sinus";
+
 function computeStageCameraFrame(
   frames: ResolvedFdiFrame[],
   defaultPos: THREE.Vector3,
   defaultTarget: THREE.Vector3,
-  mode: "occlusal" | "extraction" | "section" | "facial" | "arch"
+  mode: StageCameraMode
 ) {
   if (!frames.length || mode === "arch") {
     return {
       pos: defaultPos.clone(),
       target: defaultTarget.clone(),
       jawAngle: 0.22,
+    };
+  }
+
+  // Maxillary sinus lift & bone graft: always frame from lateral buccal cheek profile
+  if (mode === "sinus" && frames.length) {
+    const allSameSide = frames.every((f) => f.right === frames[0]!.right);
+    const primary = frames[0]!;
+    const buccalX = primary.right ? -1 : 1;
+    // Predominantly lateral (94%), slightly inferior looking upward into the sinus floor (-0.08), slightly anterior looking posteromedially (0.34)
+    const sideDir = new THREE.Vector3(buccalX * 0.94, -0.08, 0.34).normalize();
+
+    if (frames.length === 1 || !allSameSide) {
+      return {
+        pos: primary.worldCervical.clone().addScaledVector(sideDir, 0.068),
+        target: primary.worldCervical.clone(),
+        jawAngle: 0.32,
+      };
+    }
+
+    const box = new THREE.Box3();
+    for (const f of frames) {
+      box.expandByPoint(f.worldCervical);
+    }
+    const center = box.getCenter(new THREE.Vector3());
+    const span = box.getSize(new THREE.Vector3()).length();
+    const dist = THREE.MathUtils.clamp(span * 1.35 + 0.058, 0.068, 0.098);
+
+    return {
+      pos: center.clone().addScaledVector(sideDir, dist),
+      target: center,
+      jawAngle: 0.32,
     };
   }
 
@@ -2600,7 +2639,7 @@ export function playTreatmentStage(
           : action === "permanent_bridge" || action === "temporary_denture"
             ? ["14", "15", "16"]
             : action === "sinus_graft"
-              ? ["16", "26"]
+              ? ["16"]
               : ["16"];
 
   const baseTeeth =
@@ -2635,7 +2674,7 @@ export function playTreatmentStage(
     controller.root.updateMatrixWorld(true);
   }
 
-  const camMode =
+  const camMode: StageCameraMode =
     action === "extraction"
       ? "extraction"
       : action === "root_canal"
@@ -2647,7 +2686,9 @@ export function playTreatmentStage(
           ? "facial"
           : action === "healing" || action === "xray"
             ? "arch"
-            : "occlusal";
+            : action === "sinus_graft"
+              ? "sinus"
+              : "occlusal";
 
   const camFrame = computeStageCameraFrame(
     frames,
@@ -2763,7 +2804,7 @@ export function playTreatmentStage(
 
   // If multiple teeth were treated sequentially, smoothly pull the camera back to frame all treated teeth together
   const seqEnd = tl.duration();
-  if (frames.length > 1 && seqEnd > 1.0) {
+  if (frames.length > 1 && seqEnd > 1.0 && action !== "sinus_graft") {
     tl.to(
       camera.position,
       {
@@ -2810,10 +2851,40 @@ function focusCameraOnTooth(
   f: ResolvedFdiFrame,
   camera: THREE.PerspectiveCamera,
   controls: { target: THREE.Vector3 },
-  mode: "occlusal" | "extraction" | "section" | "facial" | "arch",
+  mode: StageCameraMode,
   at: number,
   dur = 0.38
 ) {
+  if (mode === "sinus") {
+    const buccalX = f.right ? -1 : 1;
+    const sideDir = new THREE.Vector3(buccalX * 0.94, -0.08, 0.34).normalize();
+    const targetPos = f.worldCervical.clone().addScaledVector(sideDir, 0.068);
+
+    tl.to(
+      camera.position,
+      {
+        x: targetPos.x,
+        y: targetPos.y,
+        z: targetPos.z,
+        duration: dur,
+        ease: "power2.out",
+      },
+      at
+    );
+    tl.to(
+      controls.target,
+      {
+        x: f.worldCervical.x,
+        y: f.worldCervical.y,
+        z: f.worldCervical.z,
+        duration: dur,
+        ease: "power2.out",
+      },
+      at
+    );
+    return;
+  }
+
   const buccalX = f.right ? -1 : 1;
   const occlusalY = f.upper ? -1 : 1;
   const toothIdx = Math.abs(Number(f.fdi)) % 10;
@@ -2898,7 +2969,7 @@ function buildExtractionChoreography(
   controller: MouthCinematicController,
   camera: THREE.PerspectiveCamera,
   controls: { target: THREE.Vector3 },
-  camMode: "occlusal" | "extraction" | "section" | "facial" | "arch"
+  camMode: StageCameraMode
 ) {
   if (!frames.length) return;
 
@@ -3068,7 +3139,7 @@ function buildImplantChoreography(
   frames: ResolvedFdiFrame[],
   camera: THREE.PerspectiveCamera,
   controls: { target: THREE.Vector3 },
-  camMode: "occlusal" | "extraction" | "section" | "facial" | "arch"
+  camMode: StageCameraMode
 ) {
   if (!frames.length) return;
 
@@ -3324,7 +3395,7 @@ function buildAbutmentChoreography(
   frames: ResolvedFdiFrame[],
   camera: THREE.PerspectiveCamera,
   controls: { target: THREE.Vector3 },
-  camMode: "occlusal" | "extraction" | "section" | "facial" | "arch"
+  camMode: StageCameraMode
 ) {
   if (!frames.length) return;
 
@@ -3740,7 +3811,7 @@ function buildFillingChoreography(
   isSealant: boolean,
   camera: THREE.PerspectiveCamera,
   controls: { target: THREE.Vector3 },
-  camMode: "occlusal" | "extraction" | "section" | "facial" | "arch"
+  camMode: StageCameraMode
 ) {
   if (!frames.length) return;
   const primary = frames[0]!;
@@ -3962,7 +4033,7 @@ function buildProstheticChoreography(
   action: AnimationActionType,
   camera: THREE.PerspectiveCamera,
   controls: { target: THREE.Vector3 },
-  camMode: "occlusal" | "extraction" | "section" | "facial" | "arch"
+  camMode: StageCameraMode
 ) {
   if (!frames.length) return;
   const mode = action === "temporary_denture" ? "temp" : "crown";
@@ -5059,7 +5130,7 @@ function buildSinusGraftChoreography(
   frames: ResolvedFdiFrame[],
   camera: THREE.PerspectiveCamera,
   controls: { target: THREE.Vector3 },
-  camMode: "occlusal" | "extraction" | "section" | "facial" | "arch"
+  camMode: StageCameraMode
 ) {
   if (!frames.length) return;
   const primary = frames[0]!;
@@ -5085,17 +5156,16 @@ function buildSinusGraftChoreography(
     const isl = f.island;
     const r = isl.localRadius;
 
-    if (frames.length > 1) {
-      focusCameraOnTooth(
-        tl,
-        f,
-        camera,
-        controls,
-        camMode,
-        seqStart,
-        Math.min(0.35, toothStep * 0.22)
-      );
-    }
+    // Always orient camera smoothly to active tooth's lateral sinus floor site
+    focusCameraOnTooth(
+      tl,
+      f,
+      camera,
+      controls,
+      camMode,
+      seqStart,
+      Math.min(0.42, toothStep * 0.22)
+    );
 
     // Step 1: Sinus floor window / osteotomy preparation
     const drillStart = isl.localCervical

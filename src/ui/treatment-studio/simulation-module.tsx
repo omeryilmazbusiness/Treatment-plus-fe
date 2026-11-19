@@ -240,9 +240,9 @@ export const TEN_TREATMENT_SHOWCASE_STAGES: AnimationTimelineStage[] = [
     id: "showcase-13-sinus-graft",
     visitTitle: "13. İleri İmplant Cerrahisi",
     stageName: "Sinüs Lifting & Kemik Grefti",
-    teeth: ["16", "26"],
+    teeth: ["16"],
     actionType: "sinus_graft",
-    durationSeconds: 11.0,
+    durationSeconds: 9.0,
     description:
       "Üst çene arka bölgede sarkık sinüs membranının cerrahi olarak yükseltilmesi ve oluşan boşluğa biyouyumlu kemik grefti (kemik tozu) uygulanması.",
   },
@@ -416,7 +416,7 @@ function getDefaultTeethForAction(
     case "xray":
       return ["16", "14", "11", "21", "24", "26", "36", "34", "31", "41", "44", "46"];
     case "sinus_graft":
-      return ["16", "26"];
+      return ["16"];
     case "healing":
     default:
       return [];
@@ -430,7 +430,7 @@ function computeStageDuration(
   if (actionType === "healing") return 6.0;
   if (actionType === "xray") return 8.5;
   if (actionType === "whitening") return 9.5;
-  if (actionType === "sinus_graft") return 11.0;
+  if (actionType === "sinus_graft") return toothCount > 1 ? 11.0 : 9.0;
   const count = Math.max(1, toothCount);
   const base =
     actionType === "root_canal"
