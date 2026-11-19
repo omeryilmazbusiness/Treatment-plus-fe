@@ -220,7 +220,7 @@ export function PatientPresentationClient({ data, token }: Props) {
       toothFindingsMap: fMap,
       allTreatedTeeth: Array.from(treatedSet),
     };
-  }, [visits, plan?.situation, plan?.items]);
+  }, [visits, plan]);
 
   // Teeth active for currently selected visit filter
   const activeTeethForFilter = useMemo(() => {
@@ -1156,7 +1156,7 @@ export function PatientPresentationClient({ data, token }: Props) {
                         ))}
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-600 italic">"{rev.text}"</p>
+                    <p className="text-[11px] text-slate-600 italic">&ldquo;{rev.text}&rdquo;</p>
                   </div>
                 ))}
               </div>
