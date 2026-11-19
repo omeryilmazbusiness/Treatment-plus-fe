@@ -1511,16 +1511,23 @@ export function makeSurgicalDrill(scale: number): THREE.Group {
 
   const spinner = new THREE.Group();
   const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(scale * 0.14, scale * 0.075, scale * 1.35, 18),
+    new THREE.CylinderGeometry(scale * 0.08, scale * 0.13, scale * 1.35, 18),
     titanium
   );
   body.position.set(0, scale * 0.68, 0);
-  spinner.add(body);
+
+  const tipCone = new THREE.Mesh(
+    new THREE.ConeGeometry(scale * 0.08, scale * 0.22, 18),
+    titanium
+  );
+  tipCone.position.set(0, scale * 1.46, 0);
+
+  spinner.add(body, tipCone);
 
   // Helical flute rings + black laser depth markings
   [0.28, 0.52, 0.76, 1.0].forEach((t, idx) => {
     const ring = new THREE.Mesh(
-      new THREE.CylinderGeometry(scale * 0.145, scale * 0.13, scale * 0.055, 18),
+      new THREE.CylinderGeometry(scale * 0.135, scale * 0.12, scale * 0.055, 18),
       idx % 2 === 0 ? depthBand : chrome
     );
     ring.position.set(0, scale * t, 0);
@@ -3234,6 +3241,13 @@ function buildImplantChoreography(
         new THREE.Vector3(0, 1, 0),
         f.island.localRootAxis
       );
+      if (!f.right) {
+        const qY = new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          Math.PI
+        );
+        drill.quaternion.multiply(qY);
+      }
       drill.position.copy(entryPos);
     }, seqStart);
 
@@ -5170,17 +5184,24 @@ function buildSinusGraftChoreography(
     // Step 1: Sinus floor window / osteotomy preparation
     const drillStart = isl.localCervical
       .clone()
-      .addScaledVector(isl.localCrownAxis, r * 2.1);
+      .addScaledVector(isl.localCrownAxis, r * 1.65);
     const drillDepth = isl.localCervical
       .clone()
-      .addScaledVector(isl.localCrownAxis, -r * 0.45);
+      .addScaledVector(isl.localRootAxis, r * 0.42);
 
+    tl.set(drill, { visible: true }, seqStart);
     tl.add(() => {
       if (drill.parent !== f.arch.anchorGroup) {
         f.arch.anchorGroup.add(drill);
       }
-      drill.visible = true;
-      drill.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), isl.localCrownAxis);
+      drill.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), isl.localRootAxis);
+      if (!f.right) {
+        const qY = new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          Math.PI
+        );
+        drill.quaternion.multiply(qY);
+      }
       drill.position.copy(drillStart);
     }, seqStart);
 
@@ -5221,6 +5242,8 @@ function buildSinusGraftChoreography(
     graft.visible = false;
     f.arch.anchorGroup.add(graft);
 
+    tl.set(drill, { visible: false }, graftAt);
+    tl.set(graft, { visible: true }, graftAt);
     tl.add(() => {
       drill.visible = false;
       graft.visible = true;
