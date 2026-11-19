@@ -1495,39 +1495,40 @@ export function makeSurgicalDrill(scale: number): THREE.Group {
   });
 
   // Oriented so +Y points along `localRootAxis` (into alveolar bone),
-  // while the contra-angle surgical handpiece head sits at y = -scale*0.35 (outside socket).
+  // while the contra-angle surgical handpiece head sits at y = -scale*0.28 (outside socket).
   const head = new THREE.Mesh(
-    new THREE.CylinderGeometry(scale * 0.34, scale * 0.3, scale * 0.65, 20),
+    new THREE.CylinderGeometry(scale * 0.30, scale * 0.26, scale * 0.58, 20),
     chrome
   );
-  head.position.set(0, -scale * 0.32, 0);
+  head.position.set(0, -scale * 0.28, 0);
 
   const neck = new THREE.Mesh(
-    new THREE.CylinderGeometry(scale * 0.18, scale * 0.22, scale * 1.8, 16),
+    new THREE.CylinderGeometry(scale * 0.16, scale * 0.20, scale * 1.6, 16),
     chrome
   );
   neck.rotation.z = Math.PI / 2.15;
-  neck.position.set(-scale * 0.88, -scale * 0.45, 0);
+  neck.position.set(-scale * 0.80, -scale * 0.40, 0);
 
   const spinner = new THREE.Group();
+  // Slender surgical twist drill bur tapering towards the cutting tip
   const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(scale * 0.08, scale * 0.13, scale * 1.35, 18),
+    new THREE.CylinderGeometry(scale * 0.07, scale * 0.11, scale * 1.15, 18),
     titanium
   );
-  body.position.set(0, scale * 0.68, 0);
+  body.position.set(0, scale * 0.58, 0);
 
   const tipCone = new THREE.Mesh(
-    new THREE.ConeGeometry(scale * 0.08, scale * 0.22, 18),
+    new THREE.ConeGeometry(scale * 0.07, scale * 0.20, 18),
     titanium
   );
-  tipCone.position.set(0, scale * 1.46, 0);
+  tipCone.position.set(0, scale * 1.25, 0);
 
   spinner.add(body, tipCone);
 
   // Helical flute rings + black laser depth markings
-  [0.28, 0.52, 0.76, 1.0].forEach((t, idx) => {
+  [0.32, 0.55, 0.78, 1.0].forEach((t, idx) => {
     const ring = new THREE.Mesh(
-      new THREE.CylinderGeometry(scale * 0.135, scale * 0.12, scale * 0.055, 18),
+      new THREE.CylinderGeometry(scale * 0.115, scale * 0.105, scale * 0.05, 18),
       idx % 2 === 0 ? depthBand : chrome
     );
     ring.position.set(0, scale * t, 0);
@@ -1535,7 +1536,7 @@ export function makeSurgicalDrill(scale: number): THREE.Group {
   });
 
   const mistRing = new THREE.Mesh(
-    new THREE.RingGeometry(scale * 0.14, scale * 0.42, 24),
+    new THREE.RingGeometry(scale * 0.12, scale * 0.38, 24),
     new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
@@ -5159,7 +5160,7 @@ function buildSinusGraftChoreography(
     }
   }
 
-  const drill = makeSurgicalDrill(primary.island.localRadius * 1.2);
+  const drill = makeSurgicalDrill(primary.island.localRadius * 1.0);
   drill.visible = false;
   primary.arch.anchorGroup.add(drill);
 
@@ -5182,12 +5183,14 @@ function buildSinusGraftChoreography(
     );
 
     // Step 1: Sinus floor window / osteotomy preparation
+    // `drillStart`: tip hovers ~0.40*r cleanly outside the gum in oral cavity
+    // `drillDepth`: tip penetrates a gentle, safe 0.40*r into the sinus floor
     const drillStart = isl.localCervical
       .clone()
-      .addScaledVector(isl.localCrownAxis, r * 1.65);
+      .addScaledVector(isl.localCrownAxis, r * 1.75);
     const drillDepth = isl.localCervical
       .clone()
-      .addScaledVector(isl.localRootAxis, r * 0.42);
+      .addScaledVector(isl.localCrownAxis, r * 0.95);
 
     tl.set(drill, { visible: true }, seqStart);
     tl.add(() => {
