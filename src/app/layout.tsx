@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 
 import "./globals.css";
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
   description: "Klinik tedavi planı platformu. Cookie tarayıcıda Next BFF’de kalır.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr" className={`${sans.variable} ${serif.variable}`}>
       <body className="antialiased">{children}</body>
