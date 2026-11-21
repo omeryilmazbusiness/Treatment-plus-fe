@@ -327,10 +327,12 @@ export function OverviewModule({
       setIsGeneratingPdf(true);
       setErrorMsg(null);
 
-      // 1. Ensure plan is finalized / ready (creates backend snapshot)
-      await readyPlanAction(effectivePlanId);
-      // 2. Generate PDF document in backend
-      await generatePdfAction(effectivePlanId);
+      if (isLocked) {
+        // 1. Ensure plan is finalized / ready (creates backend snapshot)
+        await readyPlanAction(effectivePlanId);
+        // 2. Generate PDF document in backend
+        await generatePdfAction(effectivePlanId);
+      }
       // 3. Refresh embedded PDF iframe
       setPdfKey((prev) => prev + 1);
 
@@ -349,17 +351,19 @@ export function OverviewModule({
     setPdfSuccessMsg(null);
     setErrorMsg(null);
     try {
-      // 1. Snapshot the latest plan
-      await readyPlanAction(effectivePlanId);
-      // 2. Request PDF generation
-      const res = await generatePdfAction(effectivePlanId);
-      if (res.success) {
-        setPdfKey((prev) => prev + 1);
-        setPdfSuccessMsg("PDF teklifi başarıyla güncellendi.");
-        setTimeout(() => setPdfSuccessMsg(null), 3000);
-      } else {
-        setErrorMsg(res.error || "PDF güncellenemedi.");
+      if (isLocked) {
+        // 1. Snapshot the latest plan
+        await readyPlanAction(effectivePlanId);
+        // 2. Request PDF generation
+        const res = await generatePdfAction(effectivePlanId);
+        if (!res.success) {
+          setErrorMsg(res.error || "PDF güncellenemedi.");
+          return;
+        }
       }
+      setPdfKey((prev) => prev + 1);
+      setPdfSuccessMsg("PDF teklifi başarıyla güncellendi.");
+      setTimeout(() => setPdfSuccessMsg(null), 3000);
     } catch {
       setErrorMsg("PDF oluşturma sırasında hata oluştu.");
     } finally {

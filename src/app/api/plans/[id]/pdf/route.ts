@@ -16,35 +16,65 @@ export async function GET(
     }
 
     const backendUrl = runtime.config.api.url;
-    let response = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-      },
-    });
+    const authHeaders = {
+      Authorization: `Bearer ${session.accessToken}`,
+    };
 
-    // If PDF has not been generated yet or plan needs snapshot, ensure ready and generate it
-    if (!response.ok) {
-      // 1. Mark plan ready (creates the snapshot if plan was in draft)
-      await fetch(`${backendUrl}/v1/plans/${id}/ready`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.accessToken}`,
-        },
+    // Check current plan status first so previewing a draft PDF never leaves the plan locked
+    let wasDraft = false;
+    try {
+      const planRes = await fetch(`${backendUrl}/v1/plans/${id}`, {
+        headers: authHeaders,
       });
+      if (planRes.ok) {
+        const planData = (await planRes.json()) as { status?: string };
+        wasDraft = (planData.status || "").toLowerCase() === "draft";
+      }
+    } catch {
+      // ignore status check error
+    }
 
-      // 2. Generate the PDF
-      const genRes = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.accessToken}`,
-        },
-      });
-      if (genRes.ok) {
-        response = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
-          headers: {
-            Authorization: `Bearer ${session.accessToken}`,
-          },
+    let response: Response;
+    if (wasDraft) {
+      try {
+        // Temporarily build snapshot & generate PDF for draft preview, then reopen draft
+        await fetch(`${backendUrl}/v1/plans/${id}/ready`, {
+          method: "POST",
+          headers: authHeaders,
         });
+        await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
+          method: "POST",
+          headers: authHeaders,
+        });
+        response = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
+          headers: authHeaders,
+        });
+      } finally {
+        await fetch(`${backendUrl}/v1/plans/${id}/reopen`, {
+          method: "POST",
+          headers: authHeaders,
+        }).catch(() => {});
+      }
+    } else {
+      response = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
+        headers: authHeaders,
+      });
+
+      // If PDF has not been generated yet for a ready/finalized plan, generate it
+      if (!response.ok) {
+        await fetch(`${backendUrl}/v1/plans/${id}/ready`, {
+          method: "POST",
+          headers: authHeaders,
+        });
+        const genRes = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
+          method: "POST",
+          headers: authHeaders,
+        });
+        if (genRes.ok) {
+          response = await fetch(`${backendUrl}/v1/plans/${id}/pdf`, {
+            headers: authHeaders,
+          });
+        }
       }
     }
 

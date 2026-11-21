@@ -207,19 +207,34 @@ export async function savePlanDetailsAction(
       };
     }
 
-    // 1. Update Header
-    await runtime.plan.updatePlanHeader(
-      planId as ID,
-      {
-        title: payload.title,
-        diagnoses: payload.diagnoses,
-        palette: payload.palette,
-        locale: payload.locale,
-        currency: payload.currency,
-        situation: payload.situation,
-      },
-      session.accessToken
-    );
+    // 1. Update Header (if plan was prematurely marked ready by a draft PDF preview, reopen draft first)
+    const headerInput = {
+      title: payload.title,
+      diagnoses: payload.diagnoses,
+      palette: payload.palette,
+      locale: payload.locale,
+      currency: payload.currency,
+      situation: payload.situation,
+    };
+    try {
+      await runtime.plan.updatePlanHeader(
+        planId as ID,
+        headerInput,
+        session.accessToken
+      );
+    } catch (headerErr: unknown) {
+      const errMsg = headerErr instanceof Error ? headerErr.message : "";
+      if (errMsg.includes("cannot modify ready or finalized plan") || errMsg.includes("plan_locked")) {
+        await runtime.plan.reopenDraft(planId as ID, session.accessToken);
+        await runtime.plan.updatePlanHeader(
+          planId as ID,
+          headerInput,
+          session.accessToken
+        );
+      } else {
+        throw headerErr;
+      }
+    }
 
     // 2. Put Visits
     const updatedWithVisits = await runtime.plan.putVisits(
