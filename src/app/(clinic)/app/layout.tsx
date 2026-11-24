@@ -1,73 +1,65 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
-import { LogOut } from "lucide-react";
 
-import { logoutClinicAction } from "@/app/login/actions";
 import { getRuntime } from "@/bootstrap";
 import { readRawSession } from "@/platform/auth/session";
 import { Mark } from "@/ui/mark";
+import { AppTabs } from "./app-tabs";
 import { ClinicNav } from "./clinic-nav";
+import { LogoutButton } from "./logout-button";
+import { MotionShell } from "./motion-shell";
 
+/**
+ * Persistent app shell. The sidebar and header are fixed and sit above page
+ * modals (z-55), so they stay visible on every /app screen.
+ */
 export default function ClinicLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-slate-50 lg:grid lg:grid-cols-[260px_1fr]">
-      {/* Sol Sidebar */}
-      <aside className="flex flex-col justify-between border-b border-slate-200 bg-white px-5 py-6 lg:border-b-0 lg:border-r">
-        <div>
-          <Link href="/app" className="flex items-center gap-3">
-            <Mark className="size-8" />
-            <div>
-              <span className="block text-base font-bold tracking-tight text-slate-900">
-                Treatment<span className="text-blue-600">+</span>
-              </span>
-              <span className="block text-[11px] font-medium text-slate-400">
-                3D Dental SaaS
-              </span>
-            </div>
-          </Link>
+    <div className="relative min-h-dvh overflow-x-hidden bg-[linear-gradient(135deg,#e0f2fe_0%,#e0e7ff_45%,#fae8ff_100%)]">
+      {/* Soft ambient light */}
+      <div className="pointer-events-none fixed -left-32 -top-32 size-[28rem] rounded-full bg-sky-300/50 blur-3xl" />
+      <div className="pointer-events-none fixed -bottom-40 right-0 size-[32rem] rounded-full bg-indigo-300/45 blur-3xl" />
+      <div className="pointer-events-none fixed left-1/3 top-1/2 size-[24rem] rounded-full bg-cyan-300/30 blur-3xl" />
 
-          <Suspense
-            fallback={
-              <nav className="mt-6 space-y-1.5">
-                <div className="px-3 pb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-                  Yönetim Paneli
-                </div>
-                <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
-                <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
-                <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
-              </nav>
-            }
-          >
-            <ClinicNav />
-          </Suspense>
-        </div>
+      {/* Sol sabit menü (masaüstü) / alt bar (mobil) */}
+      <aside className="fixed inset-x-3 bottom-3 z-[55] rounded-2xl bg-gradient-to-b from-[#0b1f4d] via-[#1e1b6b] to-[#4c1d95] p-1.5 shadow-[0_12px_40px_-12px_rgba(30,27,107,0.6)] lg:inset-y-0 lg:left-0 lg:right-auto lg:bottom-0 lg:flex lg:w-60 lg:flex-col lg:rounded-none lg:p-4 lg:shadow-[8px_0_40px_-16px_rgba(30,27,107,0.5)]">
+        <Link
+          href="/app"
+          aria-label="Treatment+"
+          className="mb-6 hidden items-center gap-3 px-1 pt-1 lg:flex"
+        >
+          <span className="flex size-10 items-center justify-center rounded-xl bg-white">
+            <Mark className="size-6" />
+          </span>
+          <span className="text-lg font-bold tracking-tight text-white">
+            Treatment<span className="text-sky-300">+</span>
+          </span>
+        </Link>
 
-        {/* Alt Bilgi */}
-        <div className="mt-8 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 text-xs text-slate-500">
-          <p className="font-semibold text-slate-700">Treatment Plus v2.0</p>
-          <p className="mt-0.5 text-[11px] text-slate-400">Klinik Yönetim Altyapısı</p>
-        </div>
+        <ClinicNav />
       </aside>
 
-      {/* Sağ Ana İçerik */}
-      <div className="flex flex-col min-h-dvh">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 lg:px-10">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold text-slate-900">Klinik Yönetim Paneli</span>
-          </div>
+      {/* Sabit header */}
+      <header className="fixed left-3 right-3 top-3 z-[55] flex h-16 items-center gap-3 rounded-2xl border border-white/70 bg-white/55 px-3 shadow-[0_10px_40px_-16px_rgba(79,70,229,0.35)] backdrop-blur-2xl sm:px-4 lg:left-[16.5rem] lg:right-5 lg:top-5">
+        <Link href="/app" className="flex shrink-0 items-center lg:hidden" aria-label="Treatment+">
+          <Mark className="size-7" />
+        </Link>
 
-          <Suspense
-            fallback={
-              <div className="h-7 w-28 animate-pulse rounded-full bg-slate-100" />
-            }
-          >
-            <SessionChip />
+        <Suspense fallback={<div className="min-w-0 flex-1" />}>
+          <AppTabs />
+        </Suspense>
+
+        <Suspense fallback={<div className="h-9 w-24 animate-pulse rounded-lg bg-slate-100" />}>
+          <SessionChip />
+        </Suspense>
+      </header>
+
+      <div className="relative flex min-h-dvh flex-col px-3 pb-24 pt-[5.5rem] lg:pb-5 lg:pl-[16.5rem] lg:pr-5 lg:pt-[6.75rem]">
+        <main className="min-w-0 flex-1">
+          <Suspense fallback={<div className="h-40 animate-pulse rounded-2xl bg-white/40" />}>
+            <MotionShell>{children}</MotionShell>
           </Suspense>
-        </header>
-
-        <main className="flex-1 bg-slate-50 p-6 lg:p-10">
-          {children}
         </main>
       </div>
     </div>
@@ -78,28 +70,16 @@ async function SessionChip() {
   await connection();
   const { config } = getRuntime();
   const session = await readRawSession(config);
+  const email = session?.userEmail ?? "";
 
   return (
-    <div className="flex items-center gap-3">
-      {session?.userEmail && (
-        <span className="hidden text-xs font-medium text-slate-600 sm:inline">
-          {session.userEmail}
+    <div className="flex shrink-0 items-center gap-1.5">
+      {email && (
+        <span className="hidden max-w-60 truncate text-sm font-medium text-slate-600 xl:inline">
+          {email}
         </span>
       )}
-      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800">
-        {(session?.role ?? "owner").toUpperCase()}
-      </span>
-      {session && (
-        <form action={logoutClinicAction}>
-          <button
-            type="submit"
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-2xs transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
-          >
-            <LogOut className="size-3.5" />
-            <span>Çıkış Yap</span>
-          </button>
-        </form>
-      )}
+      {session && <LogoutButton />}
     </div>
   );
 }

@@ -1603,7 +1603,7 @@ export function ClinicSettingsView({
               <div className="mt-6 flex items-end justify-between border-t border-slate-100 pt-4 text-[10px] text-slate-500">
                 <div>
                   <p className="font-semibold text-slate-700">
-                    {settings.doctor.name || "Dr. Dt. Sorumlu Hekim"}
+                    {settings.doctor.name || "Sorumlu Hekim"}
                   </p>
                   <p className="text-slate-400">
                     {settings.signerTitle || settings.doctor.title || "Klinik Direktörü"}

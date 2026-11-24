@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { shouldRunSetup } from "@/app/setup/guard";
+
 import { fetchDashboardDataAction } from "./actions";
 import { DashboardClient } from "./dashboard-client";
 
@@ -26,6 +28,16 @@ async function DashboardContent() {
     );
   }
 
+  if (
+    await shouldRunSetup(
+      result.data.settings,
+      result.data.treatmentCount,
+      result.data.workspaceId
+    )
+  ) {
+    redirect("/setup");
+  }
+
   return (
     <DashboardClient
       key={result.data.workspaceId}
@@ -34,6 +46,9 @@ async function DashboardContent() {
       initialPatients={result.data.patients}
       userEmail={result.data.userEmail}
       workspaceId={result.data.workspaceId}
+      treatmentCount={result.data.treatmentCount}
+      subscription={result.data.subscription}
+      upgradeOffer={result.data.upgradeOffer}
     />
   );
 }

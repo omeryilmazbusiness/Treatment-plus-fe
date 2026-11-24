@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const src = join(root, "src");
-const contexts = ["identity", "clinic", "catalog", "plan", "media", "output", "share", "ai"];
+const contexts = ["identity", "clinic", "catalog", "plan", "media", "output", "share", "ai", "subscription"];
 
 const importRe = /from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g;
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getRuntime } from "@/bootstrap";
+import { clearSetupDeferral } from "@/app/setup/guard";
 import {
   clearSession,
   readRawSession,
@@ -153,6 +154,7 @@ export async function logoutClinicAction() {
     }
   }
   await clearSession(runtime.config);
+  await clearSetupDeferral();
   revalidatePath("/", "layout");
   revalidatePath("/app", "layout");
   redirect("/login");

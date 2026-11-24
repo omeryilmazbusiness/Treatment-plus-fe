@@ -193,3 +193,385 @@ input[type="number"] {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
+/* ── Kurulum sihirbazı (/setup): gece camı + sıvı cam yüzeyler ──────────── */
+@keyframes setup-sheen {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes setup-stage-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+    filter: blur(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes setup-stage-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes setup-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.setup-night {
+  color-scheme: dark;
+  background-color: #050816;
+}
+
+.setup-aurora {
+  background-color: #050816;
+  background-image:
+    radial-gradient(42% 38% at 18% 22%, rgba(56, 189, 248, 0.42) 0%, transparent 70%),
+    radial-gradient(40% 40% at 82% 18%, rgba(167, 139, 250, 0.4) 0%, transparent 70%),
+    radial-gradient(48% 42% at 70% 86%, rgba(45, 212, 191, 0.32) 0%, transparent 70%),
+    radial-gradient(38% 36% at 14% 88%, rgba(244, 114, 182, 0.26) 0%, transparent 70%);
+  background-size: 140% 140%;
+  animation: setup-sheen 22s ease-in-out infinite;
+}
+
+html:has(.setup-aurora) {
+  background-color: #050816;
+}
+
+.setup-glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.05) 100%);
+  -webkit-backdrop-filter: blur(28px) saturate(185%);
+  backdrop-filter: blur(28px) saturate(185%);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 40px 90px -30px rgba(0, 0, 0, 0.75),
+    0 12px 28px -16px rgba(2, 6, 23, 0.6);
+}
+
+.setup-group {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+}
+
+.setup-pill {
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 0.5px rgba(255, 255, 255, 0.12),
+    0 8px 20px -12px rgba(0, 0, 0, 0.7);
+}
+
+.setup-title {
+  background-image: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.98) 20%,
+    rgba(214, 236, 255, 0.62) 38%,
+    rgba(255, 255, 255, 0.96) 58%,
+    rgba(232, 222, 255, 0.6) 78%,
+    rgba(255, 255, 255, 0.9) 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.5);
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35)) drop-shadow(0 18px 40px rgba(125, 176, 255, 0.35))
+    drop-shadow(0 2px 8px rgba(2, 6, 23, 0.45));
+  animation: setup-sheen 7s ease-in-out infinite;
+}
+
+.animate-setup-stage-in {
+  animation: setup-stage-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-setup-card-in {
+  animation: setup-card-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .setup-glass {
+    background: rgba(17, 24, 48, 0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-title,
+  .setup-aurora {
+    animation: none;
+  }
+  .animate-setup-stage-in,
+  .animate-setup-card-in {
+    animation: setup-stage-fade 120ms linear both;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Clinic premium motion — slow, heavy, soft settle                    */
+/* ------------------------------------------------------------------ */
+:root {
+  --tp-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --tp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --tp-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --tp-dur: 520ms;
+  --tp-dur-fast: 360ms;
+  --tp-dur-slow: 780ms;
+  --tp-dur-enter: 700ms;
+}
+
+@keyframes tp-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes tp-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tp-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes tp-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tp-soft-pulse {
+  0%,
+  100% {
+    box-shadow: 0 12px 28px -14px rgba(79, 70, 229, 0.35);
+  }
+  50% {
+    box-shadow: 0 18px 40px -12px rgba(79, 70, 229, 0.5);
+  }
+}
+
+.tp-page-enter {
+  animation: tp-page-in var(--tp-dur-enter) var(--tp-ease) both;
+}
+
+.tp-panel-enter {
+  animation: tp-panel-in var(--tp-dur) var(--tp-ease) both;
+}
+
+.tp-modal-enter {
+  animation: tp-modal-in var(--tp-dur-slow) var(--tp-ease) both;
+}
+
+.tp-backdrop-enter {
+  animation: tp-backdrop-in var(--tp-dur) var(--tp-ease-out) both;
+}
+
+/* Interactive pressables */
+.tp-btn {
+  transition:
+    transform var(--tp-dur-fast) var(--tp-ease),
+    box-shadow var(--tp-dur) var(--tp-ease),
+    background-color var(--tp-dur) var(--tp-ease),
+    background var(--tp-dur) var(--tp-ease),
+    color var(--tp-dur) var(--tp-ease),
+    border-color var(--tp-dur) var(--tp-ease),
+    filter var(--tp-dur) var(--tp-ease),
+    opacity var(--tp-dur-fast) var(--tp-ease);
+  will-change: transform;
+}
+.tp-btn:hover {
+  transform: translateY(-2px);
+}
+.tp-btn:active {
+  transform: translateY(1px) scale(0.97);
+  transition-duration: 160ms;
+}
+.tp-btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 18px 40px -14px rgba(79, 70, 229, 0.55);
+}
+.tp-btn-primary:active {
+  filter: brightness(0.98);
+}
+
+.tp-icon-btn {
+  transition:
+    transform var(--tp-dur-fast) var(--tp-ease),
+    background-color var(--tp-dur) var(--tp-ease),
+    color var(--tp-dur) var(--tp-ease),
+    box-shadow var(--tp-dur) var(--tp-ease);
+}
+.tp-icon-btn:hover {
+  transform: translateY(-1px) scale(1.04);
+}
+.tp-icon-btn:active {
+  transform: scale(0.94);
+  transition-duration: 150ms;
+}
+
+.tp-tab {
+  position: relative;
+  transition:
+    color var(--tp-dur) var(--tp-ease),
+    border-color var(--tp-dur) var(--tp-ease),
+    background-color var(--tp-dur) var(--tp-ease),
+    transform var(--tp-dur-fast) var(--tp-ease),
+    box-shadow var(--tp-dur) var(--tp-ease),
+    opacity var(--tp-dur) var(--tp-ease);
+}
+.tp-tab:hover {
+  transform: translateY(-1px);
+}
+.tp-tab:active {
+  transform: scale(0.97);
+  transition-duration: 150ms;
+}
+
+.tp-card {
+  transition:
+    transform var(--tp-dur) var(--tp-ease),
+    box-shadow var(--tp-dur) var(--tp-ease),
+    background-color var(--tp-dur) var(--tp-ease),
+    border-color var(--tp-dur) var(--tp-ease),
+    filter var(--tp-dur) var(--tp-ease);
+}
+.tp-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 44px -18px rgba(15, 23, 42, 0.28);
+}
+.tp-card:active {
+  transform: translateY(-1px) scale(0.995);
+  transition-duration: 160ms;
+}
+
+.tp-nav-item {
+  transition:
+    color var(--tp-dur) var(--tp-ease),
+    background-color var(--tp-dur) var(--tp-ease),
+    transform var(--tp-dur-fast) var(--tp-ease),
+    box-shadow var(--tp-dur) var(--tp-ease);
+}
+.tp-nav-item:hover {
+  transform: translateX(2px);
+}
+.tp-nav-item:active {
+  transform: scale(0.98);
+  transition-duration: 150ms;
+}
+@media (max-width: 1023px) {
+  .tp-nav-item:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.tp-nav-indicator {
+  transition:
+    inset var(--tp-dur-slow) var(--tp-ease),
+    opacity var(--tp-dur) var(--tp-ease),
+    transform var(--tp-dur-slow) var(--tp-ease);
+}
+
+.tp-stagger > *:nth-child(1) {
+  animation-delay: 40ms;
+}
+.tp-stagger > *:nth-child(2) {
+  animation-delay: 90ms;
+}
+.tp-stagger > *:nth-child(3) {
+  animation-delay: 140ms;
+}
+.tp-stagger > *:nth-child(4) {
+  animation-delay: 190ms;
+}
+.tp-stagger > *:nth-child(5) {
+  animation-delay: 240ms;
+}
+.tp-stagger > *:nth-child(6) {
+  animation-delay: 290ms;
+}
+.tp-stagger > *:nth-child(n + 7) {
+  animation-delay: 340ms;
+}
+.tp-stagger > * {
+  animation: tp-panel-in var(--tp-dur) var(--tp-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-page-enter,
+  .tp-panel-enter,
+  .tp-modal-enter,
+  .tp-backdrop-enter,
+  .tp-stagger > * {
+    animation: tp-backdrop-in 120ms linear both;
+  }
+  .tp-btn,
+  .tp-btn:hover,
+  .tp-btn:active,
+  .tp-icon-btn,
+  .tp-icon-btn:hover,
+  .tp-icon-btn:active,
+  .tp-tab,
+  .tp-tab:hover,
+  .tp-tab:active,
+  .tp-card,
+  .tp-card:hover,
+  .tp-card:active,
+  .tp-nav-item,
+  .tp-nav-item:hover,
+  .tp-nav-item:active,
+  .tp-nav-indicator {
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}

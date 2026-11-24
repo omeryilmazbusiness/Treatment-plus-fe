@@ -6,6 +6,16 @@ import { getRuntime } from "@/bootstrap";
 import type { PriceList, Treatment } from "@/modules/catalog/domain/catalog";
 import type { ClinicSettings, WorkspaceProducts } from "@/modules/clinic/domain/clinic";
 import type { Patient, Plan } from "@/modules/plan/domain/plan";
+import {
+  UPGRADE_DISCOUNT_PERCENT,
+  findExtraPdfPack,
+  discountedPrice,
+  isProfessionalTier,
+  pickUpgradeTarget,
+  tierLabel,
+  type Subscription,
+  type UpgradeOffer,
+} from "@/modules/subscription/domain/subscription";
 import { resolveActiveSession } from "@/platform/auth/session";
 import type { ID } from "@/shared/id";
 import { ensureStandard3DTreatments, seedDefaultCatalog } from "./plans/actions";
@@ -24,6 +34,9 @@ export async function fetchDashboardDataAction(): Promise<
     patients: Patient[];
     userEmail: string;
     workspaceId: string;
+    treatmentCount: number;
+    subscription: Subscription | null;
+    upgradeOffer: UpgradeOffer | null;
   }>
 > {
   try {
@@ -37,11 +50,37 @@ export async function fetchDashboardDataAction(): Promise<
       };
     }
 
-    const [settings, plans, patients] = await Promise.all([
+    const [settings, plans, patients, treatments, subscription] = await Promise.all([
       runtime.clinic.getSettings(session.accessToken),
       runtime.plan.listPlans(session.accessToken),
       runtime.plan.list(session.accessToken),
+      runtime.catalog.listTreatments(session.accessToken),
+      // Paket bilgisi paneli kırmamalı: hata olursa kart "alınamadı" gösterir.
+      runtime.subscription.getCurrent(session.accessToken).catch((err: unknown) => {
+        runtime.log.error("subscription_fetch_failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      }),
     ]);
+
+    let upgradeOffer: UpgradeOffer | null = null;
+    if (subscription && !isProfessionalTier(subscription.tier)) {
+      try {
+        const target = pickUpgradeTarget(
+          await runtime.subscription.listPlans(session.accessToken)
+        );
+        if (target) {
+          upgradeOffer = {
+            target,
+            discountPercent: UPGRADE_DISCOUNT_PERCENT,
+            discountedMinor: discountedPrice(target.priceMinor, UPGRADE_DISCOUNT_PERCENT),
+          };
+        }
+      } catch {
+        upgradeOffer = null;
+      }
+    }
 
     let userEmail = session.userEmail || settings.name || "klinik@treatment.health";
     try {
@@ -67,6 +106,9 @@ export async function fetchDashboardDataAction(): Promise<
         patients,
         userEmail,
         workspaceId: session.clinicId,
+        treatmentCount: treatments.length,
+        subscription,
+        upgradeOffer,
       },
     };
   } catch (err: unknown) {
@@ -495,4 +537,91 @@ export async function deleteTreatmentAction(
     const msg = err instanceof Error ? err.message : "İşlem silinemedi.";
     return { success: false, error: msg };
   }
+}
+
+const LEAD_DEDUPE_MS = 10 * 60 * 1000;
+const recentLeads = new Map<string, number>();
+
+type LeadKind =
+  | { kind: "upgrade" }
+  | { kind: "extra_pdf"; pdfs: number; priceMinor: number; currency: string };
+
+/**
+ * Satış talebi (paket yükseltme / ek PDF paketi). Ödeme ya da paket değişikliği
+ * YAPMAZ; mevcut satış kuyruğuna (demo-requests) kampanya bilgisiyle kayıt düşer.
+ */
+async function submitLead(lead: LeadKind): Promise<ActionResult<{ alreadyRequested: boolean }>> {
+  try {
+    const runtime = getRuntime();
+    const session = await resolveActiveSession(runtime.config, runtime.backend);
+    if (!session) {
+      return { success: false, unauthenticated: true, error: "Oturum bulunamadı." };
+    }
+
+    const dedupeKey = `${session.clinicId}:${lead.kind === "extra_pdf" ? `pdf${lead.pdfs}` : "upgrade"}`;
+    const last = recentLeads.get(dedupeKey);
+    if (last && Date.now() - last < LEAD_DEDUPE_MS) {
+      return { success: true, data: { alreadyRequested: true } };
+    }
+
+    const [settings, subscription] = await Promise.all([
+      runtime.clinic.getSettings(session.accessToken),
+      runtime.subscription.getCurrent(session.accessToken),
+    ]);
+
+    let summary: string[];
+    if (lead.kind === "upgrade") {
+      if (subscription && isProfessionalTier(subscription.tier)) {
+        return { success: false, error: "Paketiniz zaten profesyonel seviyede." };
+      }
+      const target = pickUpgradeTarget(
+        await runtime.subscription.listPlans(session.accessToken)
+      );
+      summary = [
+        "[UPGRADE] Paket yükseltme talebi",
+        `hedef=${target ? target.id : "ultimate"}`,
+        `kampanya=%${UPGRADE_DISCOUNT_PERCENT}`,
+      ];
+    } else {
+      summary = [
+        "[EXTRA_PDF] Ek PDF paketi talebi (aylık)",
+        `adet=${lead.pdfs}`,
+        `fiyat=${lead.priceMinor / 100} ${lead.currency}/ay`,
+      ];
+    }
+
+    await runtime.subscription.requestUpgrade({
+      clinicName: settings.name,
+      contactName: settings.signerName || settings.doctor?.name || settings.name,
+      email: settings.email || session.userEmail || "",
+      phone: settings.phone || "",
+      website: settings.website?.trim() || runtime.config.app.url || "https://treatment.plus",
+      notes: [
+        ...summary,
+        `workspace=${session.clinicId}`,
+        `mevcut=${subscription ? tierLabel(subscription.tier) : "-"}`,
+      ].join(" | "),
+    });
+
+    recentLeads.set(dedupeKey, Date.now());
+    return { success: true, data: { alreadyRequested: false } };
+  } catch (err: unknown) {
+    getRuntime().log.error("subscription_lead_failed", {
+      kind: lead.kind,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { success: false, error: "Talep gönderilemedi. Lütfen tekrar deneyin." };
+  }
+}
+
+export async function requestUpgradeAction(): Promise<ActionResult<{ alreadyRequested: boolean }>> {
+  return submitLead({ kind: "upgrade" });
+}
+
+export async function requestExtraPdfPackAction(
+  pdfs: number
+): Promise<ActionResult<{ alreadyRequested: boolean }>> {
+  const pack = findExtraPdfPack(pdfs);
+  if (!pack) return { success: false, error: "Geçersiz paket." };
+  return submitLead({ kind: "extra_pdf", ...pack });
 }

@@ -3,37 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
-import { Building2, FileText, LayoutDashboard } from "lucide-react";
+import { Building2, FileText, LayoutDashboard, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
-  {
-    href: "/app",
-    label: "Genel Bakış",
-    icon: LayoutDashboard,
-    exact: true,
-  },
-  {
-    href: "/app/plans",
-    label: "Tedavi Planları",
-    icon: FileText,
-    exact: false,
-  },
-  {
-    href: "/app/clinic",
-    label: "Klinik & Şablon",
-    icon: Building2,
-    exact: false,
-  },
+  { href: "/app", label: "Genel Bakış", short: "Genel", icon: LayoutDashboard, exact: true },
+  { href: "/app/plans", label: "Tedavi Planları", short: "Planlar", icon: FileText, exact: false },
+  { href: "/app/clinic", label: "Klinik & Şablon", short: "Klinik", icon: Building2, exact: false },
+  { href: "/app/settings", label: "Ayarlar", short: "Ayarlar", icon: Settings, exact: false },
 ] as const;
 
 function ClinicNavContent() {
   const pathname = usePathname();
 
   return (
-    <nav className="mt-6 space-y-1.5">
-      <div className="px-3 pb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-        Yönetim Paneli
-      </div>
+    <nav aria-label="Ana menü" className="flex gap-1 lg:flex-1 lg:flex-col lg:gap-1.5">
       {NAV_ITEMS.map((item) => {
         const isActive = item.exact
           ? pathname === item.href
@@ -44,18 +27,21 @@ function ClinicNavContent() {
           <Link
             key={item.href}
             href={item.href}
-            className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm transition-all duration-200 ${
+            aria-current={isActive ? "page" : undefined}
+            className={`tp-nav-item group relative flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 lg:flex-none lg:flex-row lg:gap-3.5 lg:px-4 lg:py-3 ${
               isActive
-                ? "bg-slate-900 text-white font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-950 font-medium"
+                ? "bg-white/15 text-white"
+                : "text-white/55 hover:bg-white/10 hover:text-white"
             }`}
           >
-            <Icon
-              className={`size-4.5 transition-colors ${
-                isActive ? "text-white" : "text-slate-400 group-hover:text-slate-700"
-              }`}
-            />
-            <span>{item.label}</span>
+            {isActive && (
+              <span className="tp-nav-indicator absolute inset-x-6 bottom-0 h-0.5 rounded-full bg-sky-300 lg:inset-x-auto lg:bottom-2 lg:left-0 lg:top-2 lg:h-auto lg:w-1" />
+            )}
+            <Icon className="size-5 shrink-0" strokeWidth={isActive ? 2 : 1.7} />
+            <span className="text-[11px] font-semibold leading-none lg:hidden">
+              {item.short}
+            </span>
+            <span className="hidden text-[15px] font-semibold lg:inline">{item.label}</span>
           </Link>
         );
       })}
@@ -67,13 +53,10 @@ export function ClinicNav() {
   return (
     <Suspense
       fallback={
-        <nav className="mt-6 space-y-1.5">
-          <div className="px-3 pb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-            Yönetim Paneli
-          </div>
-          <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
-          <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
-          <div className="h-10 w-full animate-pulse rounded-xl bg-slate-100" />
+        <nav className="flex gap-1 lg:flex-col lg:gap-1.5">
+          <div className="h-12 flex-1 animate-pulse rounded-xl bg-white/10" />
+          <div className="h-12 flex-1 animate-pulse rounded-xl bg-white/10" />
+          <div className="h-12 flex-1 animate-pulse rounded-xl bg-white/10" />
         </nav>
       }
     >
@@ -81,4 +64,3 @@ export function ClinicNav() {
     </Suspense>
   );
 }
-

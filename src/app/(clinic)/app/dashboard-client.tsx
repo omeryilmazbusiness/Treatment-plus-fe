@@ -9,26 +9,33 @@ import {
   Building2,
   Check,
   ChevronDown,
+  ChevronRight,
   FileText,
   Mail,
   MapPin,
   Phone,
   Plus,
+  PencilLine,
   PlusCircle,
-  Quote,
   Search,
-  Settings2,
-  Sparkles,
+  Pencil,
   Stethoscope,
   User,
   UserPlus,
   Users,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 import { createPatientAction, createPlanAction } from "@/app/(clinic)/app/plans/actions";
 import type { ClinicSettings, Palette } from "@/modules/clinic/domain/clinic";
+import { doctorDisplayName } from "@/modules/clinic/domain/doctor";
+import { buildSetupOverview, needsSetup } from "@/modules/clinic/domain/setup";
 import type { Patient, Plan } from "@/modules/plan/domain/plan";
+import type { Subscription, UpgradeOffer } from "@/modules/subscription/domain/subscription";
+import { formatMoney, money } from "@/shared/money";
+
+import { PlansCard, SetupProgressChip } from "./dashboard-widgets";
 
 interface DashboardClientProps {
   initialSettings: ClinicSettings;
@@ -36,6 +43,9 @@ interface DashboardClientProps {
   initialPatients: Patient[];
   userEmail: string;
   workspaceId: string;
+  treatmentCount: number;
+  subscription: Subscription | null;
+  upgradeOffer: UpgradeOffer | null;
 }
 
 const TITLE_SUGGESTIONS = [
@@ -69,14 +79,128 @@ function getGreeting(): string {
   return "İyi Akşamlar";
 }
 
+function formatPlanDate(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Europe/Istanbul",
+  }).format(d);
+}
+
+function ActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  primary,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`tp-btn inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-xl px-6 text-base font-semibold ${
+        primary
+          ? "tp-btn-primary bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/30"
+          : "text-[#0b1f4d] hover:bg-white/80"
+      }`}
+    >
+      <Icon className="size-6" strokeWidth={1.8} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function TabButton({
+  active,
+  icon: Icon,
+  label,
+  count,
+  onClick,
+}: {
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`tp-tab -mb-px inline-flex cursor-pointer items-center gap-2.5 border-b-2 pb-4 text-base font-semibold ${
+        active
+          ? "border-indigo-500 text-[#0b1f4d]"
+          : "border-transparent text-slate-400 hover:text-slate-700"
+      }`}
+    >
+      <Icon className="size-5" strokeWidth={1.9} />
+      <span>{label}</span>
+      <span className={`text-sm font-bold tabular-nums ${active ? "text-indigo-600" : "text-slate-400"}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function InfoItem({
+  icon: Icon,
+  value,
+  tone,
+}: {
+  icon: LucideIcon;
+  value?: string;
+  tone: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5 py-1.5 pr-3">
+      <Icon className={`size-5 shrink-0 ${tone}`} strokeWidth={1.7} />
+      <p
+        className={`min-w-0 flex-1 truncate text-sm font-medium ${
+          value ? "text-[#0b1f4d]" : "text-slate-300"
+        }`}
+      >
+        {value || "—"}
+      </p>
+    </div>
+  );
+}
+
 export function DashboardClient({
   initialSettings,
+  initialPlans,
   initialPatients,
   userEmail,
   workspaceId,
+  treatmentCount,
+  subscription,
+  upgradeOffer,
 }: DashboardClientProps) {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>(initialPatients);
+
+  // Plans / drafts tabs
+  const { readyPlans, draftPlans } = useMemo(() => {
+    const byDate = (a: Plan, b: Plan) =>
+      (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || "");
+    const sorted = [...initialPlans].sort(byDate);
+    return {
+      readyPlans: sorted.filter((p) => p.status?.toLowerCase() !== "draft"),
+      draftPlans: sorted.filter((p) => p.status?.toLowerCase() === "draft"),
+    };
+  }, [initialPlans]);
+  const [tab, setTab] = useState<"plans" | "drafts" | null>(null);
+  const activeTab = tab ?? (readyPlans.length === 0 && draftPlans.length > 0 ? "drafts" : "plans");
+  const visiblePlans = activeTab === "plans" ? readyPlans : draftPlans;
 
   // Modals state
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -160,6 +284,21 @@ export function DashboardClient({
   }, [initialSettings]);
 
   const hasMissingInfo = missingFields.length > 0;
+
+  const doctorName = doctorDisplayName(initialSettings.doctor?.name);
+
+  // Kurulum ilerlemesi: sihirbazın aynı kuralları (domain/setup.ts).
+  const { setupDone, setupTotal, setupPercent } = useMemo(() => {
+    const overview = buildSetupOverview(initialSettings, {
+      treatmentCount,
+      prefsConfirmed: !needsSetup(initialSettings, treatmentCount),
+    });
+    return {
+      setupDone: overview.doneCount,
+      setupTotal: overview.totalSteps,
+      setupPercent: Math.round((overview.doneCount / overview.totalSteps) * 100),
+    };
+  }, [initialSettings, treatmentCount]);
 
   // Sidebar patient search state
   const [patientSidebarSearch, setPatientSidebarSearch] = useState("");
@@ -273,395 +412,294 @@ export function DashboardClient({
       : "$";
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 pb-12">
-      {/* 1. ÜST HERO & HOŞ GELDİNİZ BÖLÜMÜ */}
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
-        <div className="absolute -right-16 -top-16 -z-0 size-64 rounded-full bg-blue-50/60 blur-3xl pointer-events-none" />
-        <div className="absolute right-32 -bottom-20 -z-0 size-64 rounded-full bg-slate-100/70 blur-3xl pointer-events-none" />
+    <div className="mx-auto flex min-h-[calc(100dvh-12.5rem)] w-full max-w-[1500px] flex-col pb-4 lg:h-[calc(100dvh-8.5rem)] lg:min-h-[480px]">
+      <section className="relative flex flex-1 flex-col overflow-hidden lg:min-h-0 rounded-[2.25rem] border border-white/70 bg-white/55 shadow-[0_20px_60px_-20px_rgba(79,70,229,0.35)] backdrop-blur-2xl">
+        <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-cyan-300/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 size-72 rounded-full bg-teal-200/30 blur-3xl" />
 
-        <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/70 bg-blue-50/80 px-3 py-1 text-xs font-semibold text-blue-800">
-                <span className="size-2 rounded-full bg-blue-600 animate-pulse" />
-                <span>Klinik Çalışma Alanı</span>
-              </span>
-              {initialSettings.name && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                  <Building2 className="size-3 text-slate-400" />
-                  {initialSettings.name}
-                </span>
-              )}
-            </div>
-
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              {getGreeting()},{" "}
-              <span className="text-blue-950">
-                {initialSettings.doctor?.name
-                  ? `Dr. ${initialSettings.doctor.name}`
-                  : initialSettings.name || "Hoş Geldiniz"}
-              </span>
+        {/* ÜST: KARŞILAMA + AKSİYONLAR */}
+        <div className="relative flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:py-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-400">{getGreeting()}</p>
+            <h1 className="truncate text-4xl font-bold tracking-tight text-[#0b1f4d] lg:text-3xl">
+              {doctorName || initialSettings.name || "Hoş Geldiniz"}
             </h1>
-
-            <p className="max-w-2xl text-sm leading-relaxed text-slate-500">
-              {initialSettings.slogan
-                ? `“${initialSettings.slogan}”`
-                : "3D Tedavi planlama, interaktif hasta sunumları ve klinik yönetim merkezi."}
-            </p>
           </div>
 
-          {/* Hızlı Aksiyon Butonları */}
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
+          <div className="flex flex-wrap items-center gap-2">
+            <SetupProgressChip
+              percent={setupPercent}
+              doneCount={setupDone}
+              totalSteps={setupTotal}
+            />
+            <ActionButton
+              icon={UserPlus}
+              label="Yeni Hasta"
               onClick={() => {
                 setModalError("");
                 setShowPatientModal(true);
               }}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 active:scale-98"
-            >
-              <UserPlus className="size-4 text-slate-500" />
-              <span>Yeni Hasta Ekle</span>
-            </button>
-
-            <button
-              type="button"
+            />
+            <ActionButton
+              icon={PlusCircle}
+              label="Yeni Plan"
+              primary
               onClick={() => {
                 setModalError("");
                 setIsNewPatientInPlan(patients.length === 0);
                 setNewPlanTitle("");
                 setShowPlanModal(true);
               }}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-slate-900/10 transition hover:bg-slate-800 active:scale-98"
-            >
-              <PlusCircle className="size-4 text-blue-400" />
-              <span>Yeni Tedavi Planı Oluştur</span>
-            </button>
+            />
           </div>
+        </div>
+
+        <div className="relative h-px bg-white/80" />
+
+        {/* ORTA: PLANLAR / TASLAKLAR + HASTALAR */}
+        <div className="relative grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)]">
+          {/* Planlar & Taslaklar */}
+          <div className="flex min-h-[320px] min-w-0 flex-col px-6 py-7 sm:px-10 lg:col-span-8 lg:min-h-0 lg:overflow-x-clip lg:py-5">
+            <div role="tablist" aria-label="Planlar" className="flex gap-8 border-b border-white/80">
+              <TabButton
+                active={activeTab === "plans"}
+                icon={FileText}
+                label="Planlar"
+                count={readyPlans.length}
+                onClick={() => setTab("plans")}
+              />
+              <TabButton
+                active={activeTab === "drafts"}
+                icon={PencilLine}
+                label="Taslaklar"
+                count={draftPlans.length}
+                onClick={() => setTab("drafts")}
+              />
+            </div>
+
+            <div
+              key={activeTab}
+              role="tabpanel"
+              className="tp-panel-enter tp-stagger flex flex-1 flex-col gap-2.5 overflow-x-clip p-0.5 pt-3 lg:min-h-0 lg:overflow-y-auto [scrollbar-gutter:stable]"
+            >
+              {visiblePlans.length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12">
+                  {activeTab === "plans" ? (
+                    <FileText className="size-12 text-indigo-200" strokeWidth={1.4} />
+                  ) : (
+                    <PencilLine className="size-12 text-indigo-200" strokeWidth={1.4} />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalError("");
+                      setIsNewPatientInPlan(patients.length === 0);
+                      setNewPlanTitle("");
+                      setShowPlanModal(true);
+                    }}
+                    className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 px-5 py-2.5 text-base font-semibold text-white shadow-md shadow-indigo-500/30"
+                  >
+                    <Plus className="size-4" strokeWidth={2.2} />
+                    Yeni Plan
+                  </button>
+                </div>
+              ) : (
+                visiblePlans.map((p) => {
+                  const isDraft = p.status?.toLowerCase() === "draft";
+                  const patientName =
+                    p.patient?.name ||
+                    patients.find((x) => x.id === p.patientId)?.name ||
+                    "İsimsiz Hasta";
+                  const date = formatPlanDate(p.updatedAt || p.createdAt);
+                  return (
+                    <Link
+                      key={p.id}
+                      href={`/app/plans/${p.id}`}
+                      className="tp-card group flex min-w-0 items-center gap-4 rounded-2xl bg-white px-4 py-3.5 shadow-[0_10px_28px_-16px_rgba(15,23,42,0.32)] ring-1 ring-slate-900/[0.04]"
+                    >
+                      <span
+                        className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
+                          isDraft ? "bg-amber-50 text-amber-500" : "bg-emerald-50 text-emerald-500"
+                        }`}
+                      >
+                        {isDraft ? (
+                          <PencilLine className="size-5" strokeWidth={1.9} />
+                        ) : (
+                          <FileText className="size-5" strokeWidth={1.9} />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-semibold text-[#0b1f4d]">
+                          {p.title || "Tedavi Planı"}
+                        </p>
+                        <p className="mt-0.5 truncate text-sm text-slate-400">
+                          {patientName}
+                          {date && <span className="text-slate-300"> · </span>}
+                          {date}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-lg font-semibold tabular-nums text-[#0b1f4d]">
+                        {formatMoney(money(p.totalsGrand, p.currency))}
+                      </span>
+                      <ChevronRight className="size-5 shrink-0 text-slate-300 transition duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 group-hover:text-indigo-500" />
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Hastalar */}
+          <div className="flex min-w-0 flex-col border-t border-white/80 px-6 py-7 sm:px-10 lg:col-span-4 lg:min-h-0 lg:overflow-x-clip lg:overflow-y-auto lg:border-l lg:border-t-0 lg:px-6 lg:py-5">
+            <div className="flex items-center gap-3 border-b border-white/80 pb-2">
+              <div className="flex shrink-0 items-center gap-2 text-[#0b1f4d]">
+                <Users className="size-5 text-violet-500" strokeWidth={1.8} />
+                <span className="text-xl font-bold tabular-nums">{patients.length}</span>
+              </div>
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-0 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  aria-label="Hasta ara"
+                  placeholder="Hasta ara"
+                  value={patientSidebarSearch}
+                  onChange={(e) => setPatientSidebarSearch(e.target.value)}
+                  className="w-full bg-transparent py-1.5 pl-6 pr-6 text-sm text-[#0b1f4d] placeholder:text-slate-300 focus:outline-hidden"
+                />
+                {patientSidebarSearch && (
+                  <button
+                    type="button"
+                    aria-label="Temizle"
+                    onClick={() => setPatientSidebarSearch("")}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label="Hasta Ekle"
+                title="Hasta Ekle"
+                onClick={() => {
+                  setModalError("");
+                  setShowPatientModal(true);
+                }}
+                className="tp-icon-btn flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-indigo-500 hover:bg-white/70"
+              >
+                <UserPlus className="size-5" strokeWidth={1.8} />
+              </button>
+            </div>
+
+            <div className="tp-stagger mt-2 flex max-h-[340px] min-h-[160px] flex-col gap-2 overflow-x-clip overflow-y-auto p-0.5 lg:min-h-[56px] lg:flex-1 [@media(max-height:800px)]:lg:min-h-0 lg:max-h-none">
+              {sidebarFilteredPatients.length === 0 ? (
+                <div className="flex flex-1 items-center justify-center py-8">
+                  <User className="size-12 text-indigo-200" strokeWidth={1.4} />
+                </div>
+              ) : (
+                sidebarFilteredPatients.map((pat) => (
+                  <div
+                    key={pat.id}
+                    className="tp-card flex min-w-0 items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2.5 shadow-[0_10px_28px_-16px_rgba(15,23,42,0.32)] ring-1 ring-slate-900/[0.04]"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-50 to-violet-100 text-sm font-bold tracking-wide text-indigo-600">
+                        {getInitials(pat.name)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-[#0b1f4d]">
+                          {pat.name}
+                        </p>
+                        {pat.contact && (
+                          <p className="truncate text-sm text-slate-400">{pat.contact}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStartPlanForPatient(pat.id)}
+                      aria-label={`${pat.name} için tedavi planı başlat`}
+                      title={`${pat.name} için tedavi planı başlat`}
+                      className="tp-icon-btn flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-indigo-50 text-indigo-500 hover:bg-indigo-500 hover:text-white"
+                    >
+                      <Plus className="size-5" strokeWidth={2.2} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <PlansCard subscription={subscription} upgradeOffer={upgradeOffer} />
+          </div>
+        </div>
+
+        <div className="relative h-px bg-white/80" />
+
+        {/* ALT: KLİNİK */}
+        <div className="relative flex flex-col gap-1 px-6 py-5 sm:px-10 lg:py-3 2xl:flex-row 2xl:items-center 2xl:gap-3">
+          <div className="flex min-w-0 items-center gap-3 2xl:w-80 2xl:shrink-0">
+            <Building2 className="size-6 shrink-0 text-blue-600" strokeWidth={1.8} />
+            <h2 className="truncate text-base font-bold text-[#0b1f4d]">
+              {initialSettings.name || "Klinik"}
+            </h2>
+            {hasMissingInfo ? (
+              <Link
+                href="/app/clinic"
+                title={missingFields.map((f) => f.label).join(", ")}
+                className="inline-flex items-center gap-1 text-sm font-bold text-amber-600 transition hover:text-amber-700"
+              >
+                <AlertCircle className="size-5" />
+                {missingFields.length}
+              </Link>
+            ) : (
+              <Check className="size-5 text-emerald-600" />
+            )}
+            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500">
+              <span
+                className="size-2 rounded-full"
+                style={{ backgroundColor: activePalette.hex }}
+              />
+              {currencySymbol}
+            </span>
+          </div>
+
+          <div className="grid flex-1 grid-cols-1 gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
+            <InfoItem
+              icon={Stethoscope}
+              tone="text-indigo-500"
+              value={doctorName}
+            />
+            <InfoItem icon={Phone} tone="text-emerald-500" value={initialSettings.phone} />
+            <InfoItem icon={Mail} tone="text-sky-500" value={initialSettings.email || userEmail} />
+            <InfoItem icon={MapPin} tone="text-rose-500" value={initialSettings.address} />
+          </div>
+
+          <Link
+            href="/app/clinic"
+            aria-label="Profili Düzenle"
+            title="Profili Düzenle"
+            className="tp-icon-btn absolute right-4 top-2.5 flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-white/70 hover:text-indigo-600 sm:right-8 2xl:static 2xl:size-11"
+          >
+            <Pencil className="size-5" strokeWidth={1.8} />
+          </Link>
         </div>
       </section>
 
-      {/* 2. ANA İÇERİK IZGARASI (SOL 8 KOLON: GENİŞLETİLMİŞ KLİNİK BİLGİLERİ, SAĞ 4 KOLON: KOMPLE HASTA PORTFÖYÜ) */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 items-stretch">
-        {/* SOL BÖLÜM (8 KOLON) - PREMIUM & ESTETİK KLİNİK PROFİLİ */}
-        <section className="flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-7 shadow-xs lg:col-span-8 h-full">
-          <div className="space-y-6">
-            {/* 1. ÜST BAŞLIK & KLİNİK KİMLİĞİ HERO ALANI */}
-            <div className="flex flex-col justify-between gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-4">
-                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-base font-bold text-white shadow-md shadow-slate-900/10 ring-1 ring-black/5">
-                  {initialSettings.name ? getInitials(initialSettings.name) : "KL"}
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-xl font-bold tracking-tight text-slate-900">
-                      {initialSettings.name || "Klinik İsmi Tanımlanmamış"}
-                    </h3>
-                    {!hasMissingInfo ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
-                        <Check className="size-3" />
-                        Aktif Profil
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
-                        <AlertCircle className="size-3" />
-                        {missingFields.length} Eksik Bilgi
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
-                      <span
-                        className="size-2 rounded-full"
-                        style={{ backgroundColor: activePalette.hex }}
-                      />
-                      {activePalette.name}
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                      {initialSettings.currency} ({currencySymbol})
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500 italic font-medium">
-                    {initialSettings.slogan
-                      ? `“${initialSettings.slogan}”`
-                      : "3D Tedavi planlama ve interaktif sunum merkezi"}
-                  </p>
-                </div>
-              </div>
-
-              <Link
-                href="/app/clinic"
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 self-start sm:self-auto"
-              >
-                <Settings2 className="size-3.5 text-slate-400" />
-                <span>Profili Düzenle</span>
-                <ArrowRight className="size-3 text-slate-400" />
-              </Link>
-            </div>
-
-            {/* 2. ZARİF VE SAKİN EKSİK BİLGİ UYARISI (SADECE EKSİK VARSA GÖRÜNÜR) */}
-            {hasMissingInfo && (
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/50 px-4 py-2.5 text-xs text-amber-900">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <AlertCircle className="size-4 shrink-0 text-amber-600" />
-                  <p className="truncate text-xs">
-                    <span className="font-semibold text-amber-950">Eksik Bilgiler:</span>{" "}
-                    <span className="text-amber-800">
-                      {missingFields.map((f) => f.label).join(", ")}
-                    </span>
-                  </p>
-                </div>
-                <Link
-                  href="/app/clinic"
-                  className="shrink-0 text-xs font-semibold text-amber-900 underline hover:text-amber-950 transition"
-                >
-                  Tamamla →
-                </Link>
-              </div>
-            )}
-
-            {/* 3. DİNGİN VE DÜZENLİ 2 KOLONLU BİLGİ ALANI */}
-            <div className="grid grid-cols-1 gap-5 pt-1 sm:grid-cols-2">
-              {/* Sol Panel: Sorumlu Hekim & İletişim */}
-              <div className="rounded-2xl border border-slate-100/90 bg-slate-50/50 p-5 space-y-4 transition hover:bg-slate-50/80">
-                <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex size-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                      <Stethoscope className="size-3.5" />
-                    </div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Hekim & İletişim
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-slate-400">PDF Anteti</span>
-                </div>
-
-                {/* Hekim Bilgisi */}
-                <div className="space-y-0.5">
-                  <p className="text-sm font-bold text-slate-900">
-                    {initialSettings.doctor?.name
-                      ? `Dr. ${initialSettings.doctor.name}`
-                      : <span className="text-slate-400 font-normal italic">Hekim tanımlanmamış</span>}
-                  </p>
-                  <p className="text-xs font-medium text-indigo-600">
-                    {initialSettings.doctor?.title || "Diş Hekimi"}
-                  </p>
-                </div>
-
-                {/* İletişim Bilgileri */}
-                <div className="space-y-2 border-t border-slate-200/60 pt-3 text-xs text-slate-600">
-                  <div className="flex items-center gap-2.5">
-                    <Phone className="size-3.5 text-slate-400 shrink-0" />
-                    <span className="font-medium text-slate-800">
-                      {initialSettings.phone || <span className="text-slate-400 font-normal italic">Telefon belirtilmedi</span>}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Mail className="size-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{initialSettings.email || userEmail}</span>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <MapPin className="size-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <span className="line-clamp-2">
-                      {initialSettings.address || <span className="text-slate-400 font-normal italic">Adres bilgisi eklenmedi</span>}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sağ Panel: Tanıtım & Şablon Standartları */}
-              <div className="rounded-2xl border border-slate-100/90 bg-slate-50/50 p-5 space-y-4 transition hover:bg-slate-50/80 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                        <Quote className="size-3.5" />
-                      </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                        Tanıtım & Şablon
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-semibold text-slate-400">Rapor Girişi</span>
-                  </div>
-
-                  {/* Tanıtım Ön Sözü */}
-                  <p className="text-xs leading-relaxed text-slate-600 italic line-clamp-3">
-                    “{initialSettings.aboutText ||
-                      initialSettings.intro ||
-                      initialSettings.welcomeBody ||
-                      "Kliniğimize hoş geldiniz. Dijital tedavi planlama ve estetik diş hekimliği ile hastalarımıza özel çözümler sunuyoruz."}”
-                  </p>
-                </div>
-
-                {/* Standartlar */}
-                <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-3 text-xs">
-                  <div className="rounded-xl border border-slate-200/60 bg-white p-2.5">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Para Birimi</span>
-                    <span className="font-bold text-slate-900 mt-0.5 block">{initialSettings.currency} ({currencySymbol})</span>
-                  </div>
-                  <div className="rounded-xl border border-slate-200/60 bg-white p-2.5">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Rapor Dili</span>
-                    <span className="font-bold text-slate-900 mt-0.5 block">{initialSettings.locale === "tr" ? "Türkçe (TR)" : "English (EN)"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. ALT DİPNOT (SADECE BİLGİ METNİ, SAĞDAKİ YAZI SİLİNDİ) */}
-          <div className="mt-8 border-t border-slate-100 pt-4 flex items-center text-xs text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="size-3.5 text-slate-400" />
-              Bu bilgiler hasta sunumları ve PDF tedavi tekliflerinde antet olarak kullanılır.
-            </span>
-          </div>
-        </section>
-
-        {/* SAĞ BÖLÜM (4 KOLON): KOMPLE HASTA PORTFÖYÜ VE YÖNETİMİ (ALT ÇİZGİSİ EŞİTLENMİŞ) */}
-        <div className="flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs lg:col-span-4 h-full">
-          {/* Kart Üst Başlık & Aksiyon */}
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <Users className="size-4.5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Kayıtlı Hastalar
-                </h3>
-                <p className="text-[11px] text-slate-400">
-                  Portföy ({patients.length} hasta)
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setModalError("");
-                setShowPatientModal(true);
-              }}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition"
-            >
-              <Plus className="size-3" />
-              <span>Hasta Ekle</span>
-            </button>
-          </div>
-
-          {/* Hızlı Arama Girişi */}
-          <div className="relative mt-4 shrink-0">
-            <Search className="pointer-events-none absolute left-3 top-2.5 size-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Hasta adı veya telefon ara..."
-              value={patientSidebarSearch}
-              onChange={(e) => setPatientSidebarSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200/80 bg-slate-50/60 py-2 pl-8.5 pr-8 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:bg-white focus:outline-hidden"
-            />
-            {patientSidebarSearch && (
-              <button
-                type="button"
-                onClick={() => setPatientSidebarSearch("")}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Hasta Listesi - Alt çizgiyi eşitlemek için dikey esneyebilir alan */}
-          <div className="mt-4 flex-1 space-y-2 overflow-y-auto min-h-[300px] pr-1">
-            {sidebarFilteredPatients.length === 0 ? (
-              <div className="py-12 text-center">
-                <User className="mx-auto size-8 text-slate-300" />
-                <p className="mt-2 text-xs font-semibold text-slate-700">
-                  {patientSidebarSearch
-                    ? "Eşleşen hasta bulunamadı"
-                    : "Henüz kayıtlı hasta bulunmuyor"}
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  {patientSidebarSearch
-                    ? "Farklı bir arama terimi deneyin."
-                    : "Tedavi planlamasına başlamak için ilk hastanızı ekleyin."}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalError("");
-                    setShowPatientModal(true);
-                  }}
-                  className="mt-3.5 inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
-                >
-                  <UserPlus className="size-3.5" />
-                  <span>Yeni Hasta Tanımla</span>
-                </button>
-              </div>
-            ) : (
-              sidebarFilteredPatients.map((pat) => (
-                <div
-                  key={pat.id}
-                  className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-3 transition hover:border-blue-200 hover:bg-white hover:shadow-xs"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white shadow-2xs">
-                      {getInitials(pat.name)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-slate-900 group-hover:text-blue-900">
-                        {pat.name}
-                      </p>
-                      <p className="truncate text-[11px] text-slate-400">
-                        {pat.contact || "İletişim girilmedi"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleStartPlanForPatient(pat.id)}
-                    className="inline-flex cursor-pointer shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 shadow-2xs hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition"
-                    title={`${pat.name} için tedavi planı başlat`}
-                  >
-                    <Plus className="size-3 text-blue-600" />
-                    <span>Plan Başlat</span>
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Alt Yeni Hasta Butonu */}
-          <div className="mt-4 shrink-0 border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setModalError("");
-                setShowPatientModal(true);
-              }}
-              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-800 shadow-2xs transition hover:bg-slate-50 hover:border-slate-300"
-            >
-              <UserPlus className="size-3.5 text-slate-500" />
-              <span>+ Yeni Hasta Tanımla</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* YENİ TEDAVİ PLANI MODALI */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md transition-all duration-300">
-          <div className="w-full max-w-lg overflow-visible rounded-3xl border border-slate-200/80 bg-white p-7 shadow-2xl shadow-slate-900/10">
+        <div className="tp-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-indigo-950/25 p-4 backdrop-blur-xl">
+          <div className="tp-modal-enter w-full max-w-lg overflow-visible rounded-[2rem] border border-white/70 bg-white/75 p-7 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl">
             {/* Modal Üst Başlık */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-2xs">
-                  <FileText className="size-5" />
+                <div className="flex size-9 items-center justify-center text-indigo-500">
+                  <FileText className="size-5" strokeWidth={1.8} />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-950">
                     Yeni Tedavi Planı Oluştur
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    Hasta seçin ve tedavi detaylarını yapılandırın.
-                  </p>
                 </div>
               </div>
 
@@ -671,7 +709,7 @@ export function DashboardClient({
                   setShowPlanModal(false);
                   setIsPatientDropdownOpen(false);
                 }}
-                className="flex size-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                className="tp-icon-btn flex size-8 cursor-pointer items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X className="size-4" />
               </button>
@@ -698,7 +736,7 @@ export function DashboardClient({
                         setIsNewPatientInPlan(false);
                         setIsPatientDropdownOpen(false);
                       }}
-                      className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition ${
+                      className={`tp-tab flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold ${
                         !isNewPatientInPlan
                           ? "bg-white text-slate-950 shadow-xs"
                           : "text-slate-500 hover:text-slate-800"
@@ -713,7 +751,7 @@ export function DashboardClient({
                         setIsNewPatientInPlan(true);
                         setIsPatientDropdownOpen(false);
                       }}
-                      className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition ${
+                      className={`tp-tab flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold ${
                         isNewPatientInPlan
                           ? "bg-white text-slate-950 shadow-xs"
                           : "text-slate-500 hover:text-slate-800"
@@ -760,7 +798,7 @@ export function DashboardClient({
                     {isPatientDropdownOpen && (
                       <div className="absolute left-0 top-full z-60 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
                         {/* Arama Girişi */}
-                        <div className="relative border-b border-slate-100 pb-2">
+                        <div className="relative border-b border-white/80 pb-2">
                           <Search className="pointer-events-none absolute left-3 top-2.5 size-3.5 text-slate-400" />
                           <input
                             type="text"
@@ -921,14 +959,14 @@ export function DashboardClient({
                     setShowPlanModal(false);
                     setIsPatientDropdownOpen(false);
                   }}
-                  className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                  className="tp-btn cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 >
                   Vazgeç
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 active:scale-98"
+                  className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 px-6 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
                 >
                   <span>{isPending ? "Oluşturuluyor..." : "Planı Başlat & Düzenle"}</span>
                   <ArrowRight className="size-3.5" />
@@ -941,25 +979,22 @@ export function DashboardClient({
 
       {/* YENİ HASTA EKLE MODALI */}
       {showPatientModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md transition-all duration-300">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-7 shadow-2xl shadow-slate-900/10">
+        <div className="tp-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-indigo-950/25 p-4 backdrop-blur-xl">
+          <div className="tp-modal-enter w-full max-w-md rounded-[2rem] border border-white/70 bg-white/75 p-7 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-2xs">
-                  <UserPlus className="size-5" />
+                <div className="flex size-9 items-center justify-center text-indigo-500">
+                  <UserPlus className="size-5" strokeWidth={1.8} />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-950">Yeni Hasta Ekle</h3>
-                  <p className="text-xs text-slate-500">
-                    Klinik portföyünüze yeni bir hasta tanımlayın.
-                  </p>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowPatientModal(false)}
-                className="flex size-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                className="tp-icon-btn flex size-8 cursor-pointer items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X className="size-4" />
               </button>
@@ -1010,14 +1045,14 @@ export function DashboardClient({
                 <button
                   type="button"
                   onClick={() => setShowPatientModal(false)}
-                  className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                  className="tp-btn cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 >
                   Vazgeç
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 active:scale-98"
+                  className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 px-6 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
                 >
                   <span>{isPending ? "Kaydediliyor..." : "Hastayı Kaydet"}</span>
                   <Check className="size-3.5" />
