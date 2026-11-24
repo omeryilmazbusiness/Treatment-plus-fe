@@ -81,3 +81,11 @@ export const DEFAULT_CONTACT_INFO: ContactInfo = {
   phone: "+90 (212) 900 30 30",
   address: "Büyükdere Cad. No: 199, Levent / İstanbul",
 };
+
+/** Demo / soru talepleri için konusu hazır bir mailto bağlantısı üretir. */
+export function mailtoHref(
+  subject: string,
+  email: string = DEFAULT_CONTACT_INFO.email
+): string {
+  return `mailto:${email}?subject=${encodeURIComponent(subject)}`;
+}

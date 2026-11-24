@@ -2,14 +2,17 @@ export interface MarkProps {
   readonly className?: string;
   readonly title?: string;
   readonly framed?: boolean;
+  /** Koyu zeminlerde kullanılan açık renkli çizim. */
+  readonly light?: boolean;
 }
 
 export function Mark({
   className = "size-9",
   title,
   framed = false,
+  light = false,
 }: MarkProps) {
-  const fg = framed ? "#F3EFE6" : "#172647";
+  const fg = framed ? "#F3EFE6" : light ? "#FFFFFF" : "#172647";
 
   return (
     <svg

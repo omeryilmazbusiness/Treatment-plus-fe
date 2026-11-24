@@ -17,6 +17,8 @@ const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 export interface LanguageSwitcherProps {
   readonly locale: Locale;
   readonly label: string;
+  /** "dark": koyu zemin üzerinde açık renkli buton. */
+  readonly tone?: "light" | "dark";
 }
 
 /** Dil tercihini yalnızca dil kodu olarak, bu origin üzerinde saklar. */
@@ -24,7 +26,11 @@ function rememberLocale(locale: Locale) {
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
 }
 
-export function LanguageSwitcher({ locale, label }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  locale,
+  label,
+  tone = "light",
+}: LanguageSwitcherProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -61,9 +67,16 @@ export function LanguageSwitcher({ locale, label }: LanguageSwitcherProps) {
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:bg-slate-900/5 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2.5 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+          tone === "dark"
+            ? "text-white/80 hover:bg-white/10 hover:text-white"
+            : "text-slate-700 hover:bg-slate-900/5 hover:text-slate-950"
+        }`}
       >
-        <Languages aria-hidden="true" className="h-[18px] w-[18px] text-blue-600" />
+        <Languages
+          aria-hidden="true"
+          className={`h-[18px] w-[18px] ${tone === "dark" ? "text-sky-300" : "text-blue-600"}`}
+        />
         <span className="hidden text-xs tracking-wide sm:inline" dir="ltr">
           {LOCALE_META[locale].shortCode}
         </span>

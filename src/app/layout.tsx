@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { IBM_Plex_Sans, Noto_Sans_Arabic, Source_Serif_4 } from "next/font/google";
+import {
+  IBM_Plex_Sans,
+  Inter,
+  Noto_Sans_Arabic,
+  Source_Serif_4,
+} from "next/font/google";
 
 import { loadConfig } from "@/platform/config/env";
 
@@ -10,6 +15,14 @@ const sans = IBM_Plex_Sans({
   subsets: ["latin", "latin-ext", "cyrillic"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-ibm-sans",
+  display: "swap",
+});
+
+/** Landing sayfası için; diğer ekranlar IBM Plex Sans kullanmaya devam eder. */
+const landing = Inter({
+  subsets: ["latin", "latin-ext", "cyrillic"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -40,7 +53,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="tr" className={`${sans.variable} ${serif.variable} ${arabic.variable}`}>
+    <html
+      lang="tr"
+      className={`${sans.variable} ${serif.variable} ${arabic.variable} ${landing.variable}`}
+    >
       <body className="antialiased">{children}</body>
     </html>
   );

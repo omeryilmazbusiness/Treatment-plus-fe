@@ -31,10 +31,121 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Landing sayfası yazı tipi (Inter) */
+.font-landing {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
 /* Arapça: Noto Sans Arabic, bitişik harf yapısını bozan aralık/büyük harf dönüşümü kapalı */
 .font-arabic {
-  font-family: var(--font-noto-arabic), var(--font-ibm-sans), ui-sans-serif, system-ui,
+  font-family: var(--font-noto-arabic), var(--font-inter), ui-sans-serif, system-ui,
     sans-serif;
+}
+
+/* Landing: gradyan vurgu metinleri (açık ve koyu zemin) */
+.text-grad-light,
+.text-grad-dark {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding-block-end: 0.08em;
+}
+
+.text-grad-light {
+  background-image: linear-gradient(95deg, #6d46c9 0%, #4f6fdc 55%, #3f95e0 100%);
+}
+
+.text-grad-dark {
+  background-image: linear-gradient(95deg, #a78bfa 0%, #8fa8ff 50%, #8ad0ff 100%);
+}
+
+/* Landing: kaydırınca görünür olan bölümler (yalnızca destekleyen tarayıcılarda) */
+@keyframes landing-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .landing-reveal {
+      animation: landing-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
+}
+
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes landing-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes landing-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+
+/* Sekme/format geçişi: hafif yukarı kayarak ve bulanıklıktan netleşerek belirir. */
+@keyframes landing-swap {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-pulse {
+    animation: landing-pulse 3.6s ease-in-out infinite;
+  }
+  .landing-ping {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: landing-ping 2.8s ease-out infinite;
+  }
+  .landing-swap {
+    animation: landing-swap 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .landing-float {
+    animation: landing-float 6s ease-in-out infinite;
+  }
+  .landing-float-slow {
+    animation: landing-float 8s ease-in-out -2s infinite;
+  }
 }
 
 :lang(ar),
