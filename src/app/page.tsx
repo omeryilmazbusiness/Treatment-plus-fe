@@ -1,23 +1,7 @@
-import {
-  LandingFeatures,
-  LandingFooter,
-  LandingHeader,
-  LandingHero,
-  LandingStatsBanner,
-  LandingWorkflow,
-} from "@/ui/landing";
+import { LandingPage, landingMetadata } from "@/ui/landing";
+
+export const metadata = landingMetadata("tr");
 
 export default function HomePage() {
-  return (
-    <div className="min-h-dvh bg-white font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
-      <LandingHeader />
-      <main>
-        <LandingHero />
-        <LandingFeatures />
-        <LandingStatsBanner />
-        <LandingWorkflow />
-      </main>
-      <LandingFooter />
-    </div>
-  );
+  return <LandingPage locale="tr" />;
 }

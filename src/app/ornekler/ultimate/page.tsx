@@ -14,24 +14,24 @@ import { Mark } from "@/ui/mark";
 const ultimateSamples = [
   {
     code: "ULT-301",
-    title: "3D Odontogram Destekli Full-Arch İmplant Sunumu",
-    tag: "3D + Animasyonlu Prosedür",
+    title: "Full-Arch İmplant: 3D Film + Hastaya Özel Web Sitesi",
+    tag: "3D Film + Web Sitesi",
     summary:
-      "Hastanın eksik dişlerini, sinüs lifting ihtiyacını ve yerleştirilecek implant açılarını 3 boyutlu interaktif model üzerinde katmanlı olarak gösteren kapsamlı sunum.",
+      "Hastanın eksik dişlerini, sinüs lifting ihtiyacını ve implant aşamalarını anlatan 3D tedavi filmi, hastaya özel bir web sitesinde klinik tanıtımıyla birlikte sunulur.",
     features: [
-      "360° döndürülebilir 3D çene ve diş simülasyonu",
-      "Adım adım cerrahi ve protetik aşama animasyonları",
-      "Klinik laboratuvarı, hekim kadrosu ve konaklama vitrini",
+      "Adım adım cerrahi ve protetik aşamaları anlatan 3D tedavi filmi",
+      "Kliniğinize ait, hastaya özel web sitesi olarak sunum",
+      "Klinik laboratuvarı, hekim kadrosu ve konaklama bölümleri",
     ],
   },
   {
     code: "ULT-302",
     title: "Uluslararası Hasta (Sağlık Turizmi) VIP Tedavi Paketi",
-    tag: "Çok Dilli İnteraktif Sunum",
+    tag: "Çok Dilli Web Sitesi Sunumu",
     summary:
-      "Yurt dışı hastalar için uçuş/transfer, otel konaklaması, 3D gülüş önizlemesi ve aşamalı tedavi takvimini tek bir interaktif bağlantıda birleştiren deneyim.",
+      "Yurt dışı hastalar için uçuş/transfer, otel konaklaması, 3D tedavi filmi ve aşamalı tedavi takvimini tek bir web sitesinde birleştiren deneyim.",
     features: [
-      "Önce / Sonra 3D restorasyon karşılaştırma modu",
+      "Çok dilli, kliniğinizin renk ve logosuyla web sitesi",
       "Otel, klinik ödülleri ve sertifika galerisi",
       "Mobil cihazdan anlık tedavi onayı ve soru-cevap",
     ],
@@ -47,7 +47,7 @@ export default function UltimateShowcasePage() {
           <Link href="/" className="flex items-center gap-2.5">
             <Mark framed className="h-9 w-9 ring-1 ring-white/15" />
             <span className="text-base font-bold tracking-tight text-white">
-              Treatment+ · Ultimate Paket
+              Treatment+ · Professional Paket
             </span>
           </Link>
 
@@ -56,7 +56,7 @@ export default function UltimateShowcasePage() {
               href="/ornekler/classic"
               className="rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10"
             >
-              Classic Paket Örneklerine Bak
+              Communication Paket Örneklerine Bak
             </Link>
             <Link
               href="/register"
@@ -83,16 +83,16 @@ export default function UltimateShowcasePage() {
           <div className="lg:col-span-6">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-400/30 bg-blue-500/15 px-3 py-1 text-xs font-semibold text-cyan-300">
               <Sparkles className="h-3.5 w-3.5" />
-              Ultimate Paket Örnekleri
+              Professional Paket Örnekleri
             </span>
             <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-              3 Boyutlu İnteraktif Tedavi ve Klinik Deneyimi
+              3D Tedavi Filmi ve Hastaya Özel Web Sitesi
             </h1>
             <p className="mt-4 text-base leading-relaxed text-slate-300">
-              Ultimate Paket; 3D odontogram modellerini, animasyonlu tedavi
-              prosedürlerini ve kliniğinizin tüm prestij öğelerini (laboratuvar,
-              hekim profili, konaklama) tek bir interaktif hasta sunumunda
-              birleştirir.
+              Professional Paket; Communication Paket&apos;in 3D tedavi filmine ek
+              olarak planı, kliniğinizin tüm prestij öğeleriyle (laboratuvar,
+              hekim profili, konaklama) birlikte hastaya özel bir web sitesi
+              olarak sunar.
             </p>
           </div>
 
@@ -146,10 +146,10 @@ export default function UltimateShowcasePage() {
         <div className="mt-12 flex flex-col items-center justify-between gap-6 rounded-3xl border border-blue-500/30 bg-gradient-to-r from-slate-900 to-blue-950 p-8 sm:flex-row">
           <div>
             <h3 className="text-xl font-bold text-white">
-              Ultimate Paket Deneyimini Kliniğinize Taşıyın
+              Professional Paket Deneyimini Kliniğinize Taşıyın
             </h3>
             <p className="mt-1 text-sm text-slate-300">
-              Kayıt olarak 3D odontogram ve interaktif sunum modüllerini hemen
+              Kayıt olarak 3D tedavi filmi ve web sitesi sunumunu hemen
               kullanmaya başlayın.
             </p>
           </div>

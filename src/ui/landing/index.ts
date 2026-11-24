@@ -1,10 +1,14 @@
 export * from "./landing-data";
 export * from "./odontogram-canvas";
 export * from "./interactive-mouth-explorer";
+export * from "./interactive-tooth-model";
+export * from "./language-switcher";
 export * from "./landing-header";
 export * from "./landing-hero";
 export * from "./landing-features";
+export * from "./landing-clients";
 export * from "./landing-stats-banner";
 export * from "./landing-workflow";
 export * from "./landing-footer";
-
+export * from "./landing-page";
+export * from "./landing-metadata";

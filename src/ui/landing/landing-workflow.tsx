@@ -10,22 +10,29 @@ import {
   UserPlus,
 } from "lucide-react";
 
-import {
-  DEFAULT_PRICING,
-  DEFAULT_STEPS,
-  type PricingPlan,
-  type WorkflowStep,
-} from "./landing-data";
+import type { LandingDictionary } from "./i18n";
+
+const PLAN_LINKS = {
+  classic: "/ornekler/classic",
+  ultimate: "/ornekler/ultimate",
+} as const;
 
 export interface LandingWorkflowProps {
-  readonly steps?: readonly WorkflowStep[];
-  readonly pricingPlans?: readonly PricingPlan[];
+  readonly workflow: LandingDictionary["workflow"];
+  readonly pricing: LandingDictionary["pricing"];
+  readonly cta: LandingDictionary["cta"];
 }
 
 export function LandingWorkflow({
-  steps = DEFAULT_STEPS,
-  pricingPlans = DEFAULT_PRICING,
+  workflow,
+  pricing,
+  cta,
 }: LandingWorkflowProps) {
+  const plans = [
+    { id: "classic", featured: false, copy: pricing.classic },
+    { id: "ultimate", featured: true, copy: pricing.ultimate },
+  ] as const;
+
   return (
     <>
       {/* Nasıl Çalışır Bölümü (Kutucukların Hepsi Aynı Renk) */}
@@ -35,72 +42,69 @@ export function LandingWorkflow({
       >
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-1 text-xs font-bold tracking-wider text-blue-700 uppercase">
-              Klinik İş Akışı
+            <span className="text-xs font-semibold tracking-[0.18em] text-blue-600 uppercase">
+              {workflow.eyebrow}
             </span>
             <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-              3 Adımda İnteraktif Tedavi Planlama
+              {workflow.title}
             </h2>
             <p className="mt-4 text-base text-slate-600">
-              Mevcut klinik iş akışınızı yavaşlatmadan dakikalar içinde 3D
-              sunum hazırlayın.
+              {workflow.subtitle}
             </p>
           </div>
 
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
-            {steps.map((item) => (
-              <div
-                key={item.step}
-                className="group relative overflow-hidden rounded-[2rem] border border-blue-500/25 bg-gradient-to-b from-slate-900 via-slate-950 to-blue-950 p-8 text-white shadow-xl shadow-slate-900/10 transition-all duration-300 hover:-translate-y-1.5 hover:border-blue-400/50"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-3.5 py-1.5 font-mono text-xs font-extrabold tracking-widest text-white">
-                    ADIM {item.step}
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold text-cyan-300">
-                    {item.badge}
-                  </span>
-                </div>
-
-                <h3 className="mt-6 text-xl font-extrabold text-white">
+          <ol className="mt-20 grid gap-14 md:grid-cols-3 md:gap-10">
+            {workflow.steps.map((item, index) => (
+              <li key={item.title} className="relative">
+                <span
+                  aria-hidden="true"
+                  className="bg-gradient-to-br from-blue-600 to-cyan-400 bg-clip-text text-6xl font-extrabold tracking-tighter text-transparent"
+                >
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <p className="mt-5 text-xs font-semibold tracking-[0.14em] text-blue-600 uppercase">
+                  <span className="sr-only">{workflow.stepLabel} {index + 1}: </span>
+                  {item.badge}
+                </p>
+                <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                   {item.title}
                 </h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                <p className="mt-3 text-sm leading-relaxed text-slate-500">
                   {item.description}
                 </p>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
-      {/* Paketler Alanı (Fiyatsız, Classic & Ultimate Örnek Yönlendirmeli) */}
+      {/* Paketler Alanı (Fiyatsız, Communication & Professional Örnek Yönlendirmeli) */}
       <section
         id="fiyatlandirma"
         className="scroll-mt-20 border-t border-slate-200/70 bg-white py-28"
       >
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-1 text-xs font-bold tracking-wider text-blue-700 uppercase">
-              <Layers className="h-3.5 w-3.5" />
-              Klinik Çözüm Paketleri
+            <span className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.18em] text-blue-600 uppercase">
+              <Layers aria-hidden="true" className="h-4 w-4" />
+              {pricing.eyebrow}
             </span>
             <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-              Kliniğinize Uygun Sunum Paketini Keşfedin
+              {pricing.title}
             </h2>
             <p className="mt-4 text-base text-slate-600">
-              Örnek hasta sunumlarını inceleyerek kliniğiniz için en uygun paketi seçin.
+              {pricing.subtitle}
             </p>
           </div>
 
           <div className="mx-auto mt-16 grid max-w-5xl gap-8 md:grid-cols-2">
-            {pricingPlans.map((plan) => (
+            {plans.map((plan) => (
               <div
                 key={plan.id}
-                className={`relative flex flex-col justify-between overflow-hidden rounded-[2rem] border p-9 transition-all duration-300 hover:-translate-y-1.5 ${
+                className={`relative flex flex-col justify-between overflow-hidden rounded-[2rem] p-9 transition-all duration-300 hover:-translate-y-1.5 sm:p-10 ${
                   plan.featured
-                    ? "border-blue-500/50 bg-gradient-to-b from-slate-900 via-slate-950 to-blue-950 text-white shadow-2xl shadow-blue-950/25"
-                    : "border-slate-200/90 bg-white text-slate-900 shadow-md hover:border-blue-300 hover:shadow-xl"
+                    ? "bg-gradient-to-b from-slate-900 via-slate-950 to-blue-950 text-white shadow-2xl shadow-blue-950/25"
+                    : "bg-slate-50 text-slate-900 hover:bg-slate-100/80"
                 }`}
               >
                 {plan.featured && (
@@ -111,12 +115,10 @@ export function LandingWorkflow({
                 )}
 
                 <div className="relative z-10">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-h-7 items-center justify-between gap-2">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold ${
-                        plan.featured
-                          ? "border border-cyan-400/30 bg-cyan-500/15 text-cyan-300"
-                          : "border border-blue-100 bg-blue-50 text-blue-700"
+                      className={`inline-flex items-center gap-2 text-xs font-semibold tracking-[0.14em] uppercase ${
+                        plan.featured ? "text-cyan-300" : "text-blue-600"
                       }`}
                     >
                       {plan.featured ? (
@@ -124,18 +126,18 @@ export function LandingWorkflow({
                       ) : (
                         <FileText className="h-3.5 w-3.5" />
                       )}
-                      {plan.tagLabel}
+                      {plan.copy.tag}
                     </span>
 
                     {plan.featured && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm">
-                        Önerilen
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+                        {pricing.recommended}
                       </span>
                     )}
                   </div>
 
                   <h3 className="mt-6 text-2xl font-extrabold tracking-tight sm:text-3xl">
-                    {plan.name}
+                    {plan.copy.name}
                   </h3>
 
                   <p
@@ -143,11 +145,11 @@ export function LandingWorkflow({
                       plan.featured ? "text-slate-300" : "text-slate-600"
                     }`}
                   >
-                    {plan.subtitle}
+                    {plan.copy.subtitle}
                   </p>
 
-                  <ul className="mt-8 space-y-3.5 border-t border-current/10 pt-7">
-                    {plan.perks.map((perk) => (
+                  <ul className="mt-9 space-y-4">
+                    {plan.copy.perks.map((perk) => (
                       <li
                         key={perk}
                         className="flex items-start gap-3 text-sm"
@@ -168,7 +170,7 @@ export function LandingWorkflow({
                 </div>
 
                 <Link
-                  href={plan.ctaHref}
+                  href={PLAN_LINKS[plan.id]}
                   className={`group relative z-10 mt-9 inline-flex items-center justify-center gap-2.5 rounded-2xl px-6 py-4 text-sm font-semibold transition-all ${
                     plan.featured
                       ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500"
@@ -176,28 +178,28 @@ export function LandingWorkflow({
                   }`}
                 >
                   <Eye className="h-4 w-4" />
-                  <span>{plan.ctaLabel}</span>
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  <span>{plan.copy.cta}</span>
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 rtl:-scale-x-100 rtl:group-hover:-translate-x-1" />
                 </Link>
               </div>
             ))}
           </div>
 
           {/* Alt Kayıt Ol Çağrı Alanı */}
-          <div className="relative mt-20 flex flex-col items-center justify-between gap-8 overflow-hidden rounded-[2.25rem] border border-blue-500/20 bg-gradient-to-r from-slate-900 via-slate-950 to-blue-950 p-8 text-white shadow-2xl sm:p-12 lg:flex-row">
+          <div className="relative mt-20 flex flex-col items-center justify-between gap-8 overflow-hidden rounded-[2.25rem] bg-gradient-to-r from-slate-900 via-slate-950 to-blue-950 p-8 text-white shadow-2xl sm:p-12 lg:flex-row">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl"
             />
             <div className="relative z-10">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-400/30 bg-blue-500/15 px-3.5 py-1 text-xs font-semibold text-cyan-300">
-                Hızlı Klinik Kurulumu
+              <span className="text-xs font-semibold tracking-[0.18em] text-cyan-300 uppercase">
+                {cta.eyebrow}
               </span>
               <h3 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">
-                Dakikalar içinde 3D tedavi planlamaya başlayın
+                {cta.title}
               </h3>
               <p className="mt-2.5 text-sm leading-relaxed text-slate-300">
-                Klinik hesabınızı açın, kataloğunuzu tanımlayın ve hastalarınıza interaktif 3D planlar sunun.
+                {cta.description}
               </p>
             </div>
             <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-3.5">
@@ -206,13 +208,13 @@ export function LandingWorkflow({
                 className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-7 py-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition-all hover:-translate-y-0.5 hover:bg-blue-500"
               >
                 <UserPlus className="h-4 w-4" />
-                <span>Hemen Kayıt Ol</span>
+                <span>{cta.register}</span>
               </Link>
               <Link
                 href="/login"
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/5 px-6 py-4 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-6 py-4 text-sm font-semibold text-white transition hover:bg-white/15"
               >
-                <span>Giriş Yap</span>
+                <span>{cta.login}</span>
               </Link>
             </div>
           </div>

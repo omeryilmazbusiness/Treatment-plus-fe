@@ -31,6 +31,18 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Arapça: Noto Sans Arabic, bitişik harf yapısını bozan aralık/büyük harf dönüşümü kapalı */
+.font-arabic {
+  font-family: var(--font-noto-arabic), var(--font-ibm-sans), ui-sans-serif, system-ui,
+    sans-serif;
+}
+
+:lang(ar),
+:lang(ar) * {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
 html,
 body {
   background: var(--paper);

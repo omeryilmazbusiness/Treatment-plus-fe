@@ -32,6 +32,10 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    // Varsayılan dil (tr) kök yolda yayınlanır; /tr kopya içerik oluşturmasın.
+    return [{ source: "/tr", destination: "/", permanent: true }];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: security },

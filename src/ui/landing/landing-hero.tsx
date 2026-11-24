@@ -1,45 +1,85 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import gsap from "gsap";
 import {
   ArrowRight,
-  CheckCircle2,
-  Layers,
+  Cuboid,
+  FileSearch,
   ShieldCheck,
-  Sparkles,
+  TrendingUp,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 
-import {
-  OdontogramCanvas,
-  type OdontogramCanvasProps,
-} from "./odontogram-canvas";
+import { DEFAULT_CONTACT_INFO } from "./landing-data";
+import type { LandingDictionary } from "./i18n";
 
-export interface LandingHeroProps {
-  readonly badgeText?: string;
-  readonly titlePrefix?: string;
-  readonly titleHighlight?: string;
-  readonly subtitle?: string;
-  readonly primaryCtaLabel?: string;
-  readonly primaryCtaHref?: string;
-  readonly secondaryCtaLabel?: string;
-  readonly secondaryCtaHref?: string;
-  readonly canvasProps?: OdontogramCanvasProps;
+export type HeroTone = "blue" | "emerald" | "violet";
+
+export interface HeroLink {
+  readonly label: string;
+  readonly href: string;
+  readonly icon: LucideIcon;
+  readonly tone: HeroTone;
+  readonly variant: "soft" | "premium";
 }
 
-export function LandingHero({
-  badgeText = "Diş Klinikleri İçin 3D Tedavi Sunum Platformu",
-  titlePrefix = "Tedavi Planlamasında",
-  titleHighlight = "3 Boyutlu Dönüşüm",
-  subtitle = "Karmaşık röntgenleri ve anlaşılması güç fiyat listelerini geride bırakın. Hastalarınıza tedavi süreçlerini interaktif 3D odontogramlar üzerinde gösterin; klinik güvenini ve vaka kabul oranlarını ilk muayenede artırın.",
-  primaryCtaLabel = "Hemen Kayıt Ol",
-  primaryCtaHref = "/register",
-  secondaryCtaLabel = "Özellikleri İncele",
-  secondaryCtaHref = "#ozellikler",
-  canvasProps,
-}: LandingHeroProps) {
+export interface HeroMetric {
+  readonly title: string;
+  readonly caption: string;
+  readonly icon: LucideIcon;
+  readonly tone: HeroTone;
+}
+
+/** Tailwind sınıfları statik kalmalı; dinamik birleştirme purge edilir. */
+const TONE_ICON: Record<HeroTone, string> = {
+  blue: "text-blue-600",
+  emerald: "text-emerald-600",
+  violet: "text-violet-600",
+};
+
+export interface LandingHeroProps {
+  readonly copy: LandingDictionary["hero"];
+  readonly imageAlt: string;
+}
+
+const METRIC_VISUALS: readonly [
+  { icon: LucideIcon; tone: HeroTone },
+  ...{ icon: LucideIcon; tone: HeroTone }[],
+] = [
+  { icon: Zap, tone: "blue" },
+  { icon: TrendingUp, tone: "emerald" },
+  { icon: ShieldCheck, tone: "violet" },
+];
+
+export function LandingHero({ copy, imageAlt }: LandingHeroProps) {
+  const demoHref = `mailto:${DEFAULT_CONTACT_INFO.email}?subject=${encodeURIComponent(
+    copy.demoMailSubject
+  )}`;
+  const secondaryLinks: readonly HeroLink[] = [
+    {
+      label: copy.sampleCta,
+      href: "/ornekler/classic",
+      icon: FileSearch,
+      tone: "blue",
+      variant: "soft",
+    },
+    {
+      label: copy.professionalCta,
+      href: "/ornekler/ultimate",
+      icon: Cuboid,
+      tone: "violet",
+      variant: "premium",
+    },
+  ];
+  const metrics: readonly HeroMetric[] = copy.metrics.map((metric, index) => ({
+    title: metric.title,
+    caption: metric.caption,
+    ...(METRIC_VISUALS[index] ?? METRIC_VISUALS[0]),
+  }));
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -66,32 +106,10 @@ export function LandingHero({
     return () => ctx.revert();
   }, []);
 
-  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!secondaryCtaHref.startsWith("#")) return;
-    const targetId = secondaryCtaHref.slice(1);
-    const targetEl = document.getElementById(targetId);
-    if (!targetEl) return;
-
-    e.preventDefault();
-    const headerOffset = 76;
-    const targetY =
-      targetEl.getBoundingClientRect().top + window.scrollY - headerOffset;
-
-    const scrollProxy = { y: window.scrollY };
-    gsap.to(scrollProxy, {
-      y: targetY,
-      duration: 0.9,
-      ease: "power3.inOut",
-      onUpdate: () => {
-        window.scrollTo(0, scrollProxy.y);
-      },
-    });
-  };
-
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-100/80 pt-14 pb-24 lg:pt-20 lg:pb-32"
+      className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-100/80 pt-16 pb-24 lg:pt-24 lg:pb-32"
     >
       {/* Arka Plan Medikal Mimari Grid ve Işık Efektleri */}
       <div
@@ -108,25 +126,15 @@ export function LandingHero({
       />
 
       <div className="mx-auto grid max-w-7xl items-center gap-14 px-6 lg:grid-cols-12 lg:gap-12">
-        {/* Sol Sütun: Başlık, Alt Başlık, Aksiyonlar ve Klinik Metrik Kartları */}
+        {/* Sol Sütun: Başlık, Alt Başlık, Aksiyonlar ve Metrikler */}
         <div className="lg:col-span-6">
-          <div
-            data-gsap="hero-fade-up"
-            className="inline-flex items-center gap-2.5 rounded-full border border-blue-200/80 bg-white/90 px-4 py-1.5 text-xs font-semibold text-blue-700 shadow-xs backdrop-blur-sm"
-          >
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white">
-              <Sparkles className="h-3 w-3" />
-            </span>
-            <span>{badgeText}</span>
-          </div>
-
           <h1
             data-gsap="hero-fade-up"
-            className="mt-7 text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl lg:text-[56px] lg:leading-[1.08]"
+            className="text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl lg:text-[56px] lg:leading-[1.08] rtl:leading-[1.35] rtl:lg:leading-[1.3]"
           >
-            {titlePrefix}
-            <span className="mt-1 block bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">
-              {titleHighlight}
+            {copy.titlePrefix}
+            <span className="mt-1 block bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent rtl:pb-2">
+              {copy.titleHighlight}
             </span>
           </h1>
 
@@ -134,72 +142,116 @@ export function LandingHero({
             data-gsap="hero-fade-up"
             className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg"
           >
-            {subtitle}
+            {copy.subtitle}
           </p>
 
-          {/* CTA Butonları */}
+          {/* CTA */}
           <div
             data-gsap="hero-fade-up"
-            className="mt-9 flex flex-wrap items-center gap-4"
+            className="mt-10 flex flex-wrap items-center gap-x-2.5 gap-y-4"
           >
-            <Link
-              href={primaryCtaHref}
-              className="group inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-blue-950 px-7 py-4 text-sm font-semibold text-white shadow-xl shadow-slate-900/20 transition-all duration-300 hover:-translate-y-0.5 hover:from-blue-600 hover:to-blue-500 hover:shadow-blue-600/30"
-            >
-              <span>{primaryCtaLabel}</span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-
             <a
-              href={secondaryCtaHref}
-              onClick={handleSmoothScroll}
-              className="inline-flex cursor-pointer items-center gap-2.5 rounded-2xl border border-slate-200/90 bg-white/90 px-6 py-4 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:bg-white hover:text-blue-600"
+              href={demoHref}
+              className="group inline-flex items-center gap-2.5 rounded-xl bg-slate-950 px-6 py-3.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
-              <Layers className="h-4 w-4 text-blue-600" />
-              <span>{secondaryCtaLabel}</span>
+              <span>{copy.demoCta}</span>
+              <ArrowRight
+                aria-hidden="true"
+                className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5"
+              />
             </a>
+
+            <nav
+              aria-label={copy.plansAriaLabel}
+              className="relative isolate flex flex-wrap items-center gap-3"
+            >
+              {/* Cam efektinin görünmesi için butonların arkasındaki yumuşak renk alanları */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -z-10 h-14 w-40 rounded-full bg-blue-400/35 blur-2xl ltr:-left-2 rtl:-right-2"
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -z-10 h-14 w-48 rounded-full bg-violet-500/40 blur-2xl ltr:left-40 rtl:right-40"
+              />
+              {secondaryLinks.map((link) => {
+                const Icon = link.icon;
+                const premium = link.variant === "premium";
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl py-2.5 ps-2.5 pe-5 text-sm font-semibold ring-1 backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 ease-out hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 ${
+                      premium
+                        ? "bg-gradient-to-br from-violet-600/90 via-indigo-600/85 to-blue-600/90 text-white shadow-[0_12px_36px_-10px_rgba(91,33,182,0.65),inset_0_1px_0_rgba(255,255,255,0.35)] ring-white/25 hover:shadow-[0_18px_44px_-10px_rgba(91,33,182,0.75),inset_0_1px_0_rgba(255,255,255,0.45)]"
+                        : "bg-white/55 text-slate-800 shadow-[0_12px_32px_-12px_rgba(37,99,235,0.45),inset_0_1px_0_rgba(255,255,255,0.95)] ring-white/70 hover:bg-white/75 hover:shadow-[0_18px_40px_-12px_rgba(37,99,235,0.55),inset_0_1px_0_rgba(255,255,255,1)]"
+                    }`}
+                  >
+                    {/* Hover'da geçen ışık parlaması */}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/45 to-transparent opacity-0 transition-all duration-700 ease-out group-hover:opacity-100 ltr:-left-full ltr:group-hover:left-full rtl:-right-full rtl:group-hover:right-full"
+                    />
+                    <span
+                      className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 backdrop-blur-sm ${
+                        premium
+                          ? "bg-white/15 text-white ring-white/25"
+                          : "bg-gradient-to-br from-blue-500/15 to-cyan-400/15 text-blue-600 ring-blue-500/15"
+                      }`}
+                    >
+                      <Icon aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                    </span>
+                    <span className="relative">{link.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
           </div>
 
-          {/* Alt Klinik Güven & Performans Kartçıkları */}
-          <div
+          {/* Metrikler: çerçevesiz renkli ikon + metin */}
+          <dl
             data-gsap="hero-fade-up"
-            className="mt-11 grid grid-cols-3 gap-3 border-t border-slate-200/80 pt-7"
+            className="mt-14 grid grid-cols-1 gap-6 border-t border-slate-200/80 pt-8 sm:grid-cols-3 sm:gap-6"
           >
-            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-3.5 shadow-2xs backdrop-blur-xs">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                <Zap className="h-3.5 w-3.5 text-blue-600" />
-                <span>60 FPS WebGL</span>
-              </div>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Tarayıcıda kurulumsuz 3D
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-3.5 shadow-2xs backdrop-blur-xs">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span>+%42 Onay</span>
-              </div>
-              <p className="mt-1 text-[11px] text-slate-500">
-                İlk muayenede vaka kabulü
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-3.5 shadow-2xs backdrop-blur-xs">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
-                <span>KVKK Uyumlu</span>
-              </div>
-              <p className="mt-1 text-[11px] text-slate-500">
-                İzole klinik veri güvenliği
-              </p>
-            </div>
-          </div>
+            {metrics.map((metric) => {
+              const Icon = metric.icon;
+              return (
+                <div key={metric.title} className="flex items-start gap-3">
+                  <Icon
+                    aria-hidden="true"
+                    className={`mt-0.5 h-6 w-6 shrink-0 ${TONE_ICON[metric.tone]}`}
+                  />
+                  <div className="min-w-0">
+                    <dt className="text-sm font-semibold tracking-tight text-slate-950">
+                      {metric.title}
+                    </dt>
+                    <dd className="mt-0.5 text-[13px] leading-snug text-slate-500">
+                      {metric.caption}
+                    </dd>
+                  </div>
+                </div>
+              );
+            })}
+          </dl>
         </div>
 
-        {/* Sağ Sütun: React Three Fiber 3D Odontogram Sahnesi */}
-        <div data-gsap="hero-fade-up" className="relative lg:col-span-6">
-          <OdontogramCanvas {...canvasProps} />
+        {/* Sağ Sütun: Statik diş görseli */}
+        <div
+          data-gsap="hero-fade-up"
+          className="relative flex items-center justify-center lg:col-span-6"
+        >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute h-72 w-72 rounded-full bg-gradient-to-br from-blue-200/60 via-cyan-100/50 to-transparent blur-2xl sm:h-80 sm:w-80"
+          />
+          <Image
+            src="/tooth-hero.png"
+            alt={imageAlt}
+            width={360}
+            height={360}
+            priority
+            className="relative h-auto w-64 select-none drop-shadow-xl sm:w-80 lg:w-[360px]"
+          />
         </div>
       </div>
     </section>

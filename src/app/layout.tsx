@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import { IBM_Plex_Sans, Noto_Sans_Arabic, Source_Serif_4 } from "next/font/google";
+
+import { loadConfig } from "@/platform/config/env";
 
 import "./globals.css";
 
 const sans = IBM_Plex_Sans({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
+  subsets: ["latin", "latin-ext", "cyrillic"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-ibm-sans",
   display: "swap",
 });
@@ -18,7 +20,17 @@ const serif = Source_Serif_4({
   display: "swap",
 });
 
+/** Arapça sayfa için; yalnızca RTL içerik kullanıldığında indirilir. */
+const arabic = Noto_Sans_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-noto-arabic",
+  display: "swap",
+  preload: false,
+});
+
 export const metadata: Metadata = {
+  metadataBase: new URL(loadConfig().app.url),
   title: {
     default: "Treatment Plus",
     template: "%s · Treatment Plus",
@@ -28,7 +40,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="tr" className={`${sans.variable} ${serif.variable}`}>
+    <html lang="tr" className={`${sans.variable} ${serif.variable} ${arabic.variable}`}>
       <body className="antialiased">{children}</body>
     </html>
   );

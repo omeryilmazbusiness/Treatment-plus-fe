@@ -117,7 +117,7 @@ const PROCEDURE_STAGES: Record<string, readonly ProcedureStageMeta[]> = {
 /**
  * Gerçekçi 4 tüberküllü (cusp) ve derin santral fissür oluklu anatomik azı dişi (molar) kuronu.
  */
-function createSculptedMolarCrownGeometry(
+export function createSculptedMolarCrownGeometry(
   widthScale = 1.0,
   heightScale = 1.0
 ): THREE.BufferGeometry {
@@ -190,7 +190,7 @@ function createSculptedMolarCrownGeometry(
 /**
  * Çatallanan 2 anatomik kök (Mezial ve Distal) + furkasyon gövdesi geometrisi.
  */
-function createBifurcatedRootTrunkGeometry(): {
+export function createBifurcatedRootTrunkGeometry(): {
   mesialRoot: THREE.BufferGeometry;
   distalRoot: THREE.BufferGeometry;
   rootTrunk: THREE.BufferGeometry;
