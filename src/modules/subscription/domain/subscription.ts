@@ -22,12 +22,24 @@ export const UNLIMITED = -1;
 export const UPGRADE_DISCOUNT_PERCENT = 45;
 
 /** Ek PDF paketleri: her ay satın alınır, tüm paketlerde geçerlidir (USD, cent). */
-export type ExtraPdfPack = { pdfs: number; priceMinor: number; currency: string };
+export type ExtraPdfPack = {
+  pdfs: number;
+  /** Liste fiyatı (cent). */
+  listPriceMinor: number;
+  /** Kampanya indirim yüzdesi. */
+  discountPercent: number;
+  currency: string;
+};
 
 export const EXTRA_PDF_PACKS: readonly ExtraPdfPack[] = [
-  { pdfs: 10, priceMinor: 2000, currency: "USD" },
-  { pdfs: 25, priceMinor: 4500, currency: "USD" },
+  // %25 → $10 (liste $13,33); %50 → $20 (liste $40)
+  { pdfs: 10, listPriceMinor: 1333, discountPercent: 25, currency: "USD" },
+  { pdfs: 25, listPriceMinor: 4000, discountPercent: 50, currency: "USD" },
 ];
+
+export function extraPackPriceMinor(pack: ExtraPdfPack): number {
+  return Math.round((pack.listPriceMinor * (100 - pack.discountPercent)) / 100);
+}
 
 export function findExtraPdfPack(pdfs: number): ExtraPdfPack | undefined {
   return EXTRA_PDF_PACKS.find((p) => p.pdfs === pdfs);
@@ -90,6 +102,22 @@ export function tierLabel(tier: Tier): string {
     case Tier.ENTERPRISE:
       return "Enterprise";
   }
+}
+
+/** Paket vitrin metni: Communication 40+ / Professional 80+ PDF aylık. */
+export function tierPdfAllowanceLabel(tier: Tier): string {
+  switch (tier) {
+    case Tier.CLASSIC:
+      return "40+ PDF / ay";
+    case Tier.ULTIMATE:
+    case Tier.ENTERPRISE:
+      return "80+ PDF / ay";
+  }
+}
+
+/** Yükseltme kartı / katalog için kısa vitrin (kota yerine). */
+export function catalogPdfAllowanceLabel(tier: Tier): string {
+  return tierPdfAllowanceLabel(tier);
 }
 
 export function intervalLabel(interval: BillingInterval): string {

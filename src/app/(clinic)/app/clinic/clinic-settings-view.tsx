@@ -12,7 +12,6 @@ import {
   FileText,
   Globe,
   ImageIcon,
-  Info,
   Loader2,
   Mail,
   MapPin,
@@ -69,32 +68,32 @@ const PALETTE_CONFIGS: Record<
   }
 > = {
   navy: {
-    name: "Derin Lacivert (Navy)",
-    description: "Kurumsal, güven veren gece mavisi tonu.",
+    name: "Navy",
+    description: "",
     primaryHex: "#0f172a",
     accentHex: "#2563eb",
     bgSoft: "#f1f5f9",
     borderHex: "#cbd5e1",
   },
   forest: {
-    name: "Zümrüt Orman (Forest)",
-    description: "Doğallık, dinginlik ve sağlık tonu.",
+    name: "Forest",
+    description: "",
     primaryHex: "#064e3b",
     accentHex: "#059669",
     bgSoft: "#ecfdf5",
     borderHex: "#a7f3d0",
   },
   rose: {
-    name: "Zarif Gül (Rose)",
-    description: "Sıcak, estetik ve premium gül kurusu.",
+    name: "Rose",
+    description: "",
     primaryHex: "#881337",
     accentHex: "#e11d48",
     bgSoft: "#fff1f2",
     borderHex: "#fecdd3",
   },
   slate: {
-    name: "Arduvaz Taş (Slate)",
-    description: "Modern, minimalist ve tarafsız gri-füme.",
+    name: "Slate",
+    description: "",
     primaryHex: "#334155",
     accentHex: "#64748b",
     bgSoft: "#f8fafc",
@@ -152,50 +151,35 @@ function getMediaUrl(key?: string | null): string | null {
 
 export function ClinicSettingsView({
   initialSettings,
-  userEmail,
-  workspaceId,
   initialTreatments = [],
   initialPriceList = null,
   initialTab = "general",
 }: ClinicSettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<TabType>(() => {
-    if (initialTab && ["general", "media", "doctor", "pdf", "pricing"].includes(initialTab)) {
-      return initialTab;
-    }
-    if (typeof window !== "undefined") {
-      const sp = new URLSearchParams(window.location.search);
-      const urlTab = sp.get("tab") as TabType | null;
-      if (urlTab && ["general", "media", "doctor", "pdf", "pricing"].includes(urlTab)) {
-        return urlTab;
-      }
-    }
-    return "general";
-  });
+  const [activeTab, setActiveTab] = useState<TabType>(() =>
+    initialTab && ["general", "media", "doctor", "pdf", "pricing"].includes(initialTab)
+      ? initialTab
+      : "general"
+  );
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("tab", tab);
-      window.history.replaceState(null, "", url.toString());
-    }
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", url.toString());
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const sp = new URLSearchParams(window.location.search);
-      if (!sp.get("tab")) {
-        const url = new URL(window.location.href);
-        url.searchParams.set("tab", activeTab);
-        window.history.replaceState(null, "", url.toString());
-      }
+    const sp = new URLSearchParams(window.location.search);
+    if (!sp.get("tab")) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", activeTab);
+      window.history.replaceState(null, "", url.toString());
     }
 
     const onPopState = () => {
-      const sp = new URLSearchParams(window.location.search);
-      const urlTab = sp.get("tab") as TabType | null;
-      if (urlTab && ["general", "media", "doctor", "pdf", "pricing"].includes(urlTab)) {
-        setActiveTab(urlTab);
+      const next = new URLSearchParams(window.location.search).get("tab") as TabType | null;
+      if (next && ["general", "media", "doctor", "pdf", "pricing"].includes(next)) {
+        setActiveTab(next);
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -586,596 +570,422 @@ export function ClinicSettingsView({
     }
   };
 
+  const STEPS: { id: TabType; label: string; icon: typeof Building2 }[] = [
+    { id: "general", label: "Profil", icon: Building2 },
+    { id: "media", label: "Medya", icon: ImageIcon },
+    { id: "doctor", label: "Hekim", icon: UserCheck },
+    { id: "pdf", label: "Şablon", icon: FileCheck2 },
+    { id: "pricing", label: "Fiyatlar", icon: Coins },
+  ];
+  const stepIndex = Math.max(0, STEPS.findIndex((s) => s.id === activeTab));
+
+  const fieldCls =
+    "mt-1.5 w-full rounded-2xl bg-slate-50 px-3.5 py-2.5 text-sm text-[#0b1f4d] placeholder:text-slate-400 outline-hidden ring-1 ring-slate-900/[0.05] transition focus:bg-white focus:ring-[#0b1f4d]/20";
+  const labelCls = "block text-xs font-semibold text-slate-500";
+  const softCard =
+    "rounded-[1.75rem] bg-slate-50/70 p-5 ring-1 ring-slate-900/[0.04] sm:p-6";
+
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      {/* Üst Başlık & Sekme Çubuğu */}
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Klinik Ayarları & Marka Kimliği
-          </h1>
-          <p className="mt-1 text-xs text-slate-500">
-            {userEmail} • Workspace: {workspaceId} • Hastalarınıza sunacağınız kurumsal PDF şablonunu ve klinik profilinizi yapılandırın.
-          </p>
-        </div>
-
-        {/* Bildirim Çubuğu */}
-        {saveStatus !== "idle" && (
-          <div
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold ${saveStatus === "success"
-              ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border border-rose-200 bg-rose-50 text-rose-800"
-              }`}
-          >
-            {saveStatus === "success" ? (
-              <CheckCircle2 className="size-4 text-emerald-600" />
-            ) : null}
-            <span>{statusMessage}</span>
+    <div className="mx-auto flex min-h-[calc(100dvh-12.5rem)] w-full max-w-[1500px] flex-col pb-4 lg:h-[calc(100dvh-8.5rem)] lg:min-h-[480px]">
+      <section className="relative flex flex-1 flex-col overflow-hidden rounded-[2.25rem] border border-slate-200/80 bg-white shadow-[0_16px_48px_-28px_rgba(15,23,42,0.18)] lg:min-h-0">
+        {/* Header */}
+        <div className="relative flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:py-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-400">Klinik Profili</p>
+            <h1 className="truncate text-3xl font-bold tracking-tight text-[#0b1f4d] lg:text-[1.75rem]">
+              {settings.name?.trim() || "Klinik & Şablon"}
+            </h1>
           </div>
-        )}
-      </div>
 
-      {/* Modern Sekme (Tab) Menüsü */}
-      <div className="flex overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xs gap-1.5">
-        <button
-          type="button"
-          onClick={() => handleTabChange("general")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${activeTab === "general"
-            ? "bg-slate-900 text-white shadow-xs"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            }`}
-        >
-          <Building2 className="size-3.5" />
-          <span>Genel Bilgiler</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange("media")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${activeTab === "media"
-            ? "bg-slate-900 text-white shadow-xs"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            }`}
-        >
-          <ImageIcon className="size-3.5" />
-          <span>Medya & Logo Yükleme</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange("doctor")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${activeTab === "doctor"
-            ? "bg-slate-900 text-white shadow-xs"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            }`}
-        >
-          <UserCheck className="size-3.5" />
-          <span>Hekim Profili</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange("pdf")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${activeTab === "pdf"
-            ? "bg-slate-900 text-white shadow-xs"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            }`}
-        >
-          <FileCheck2 className="size-3.5" />
-          <span>PDF Şablonu (Canlı Önizleme)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange("pricing")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${activeTab === "pricing"
-            ? "bg-slate-900 text-white shadow-xs"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            }`}
-        >
-          <Coins className="size-3.5" />
-          <span>Tedavi & Fiyat Listesi</span>
-          {totalChanges > 0 && (
-            <span className="flex size-1.5 rounded-full bg-amber-500 animate-pulse" />
-          )}
-        </button>
-      </div>
-
-      {/* 1. SEKME: GENEL BİLGİLER */}
-      {activeTab === "general" && (
-        <form onSubmit={handleSave} className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Temel İletişim ve Klinik Bilgileri
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Bu bilgiler hastalarınıza iletilecek PDF planlarının antetinde ve portalında görünür.
-                </p>
-              </div>
-              <button
-                type="submit"
-                disabled={!isDirty || isPending}
-                className={`inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
-                  !isDirty || isPending
-                    ? "cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200/80 opacity-60 shadow-none"
-                    : "cursor-pointer bg-slate-900 text-white shadow-2xs hover:bg-slate-800"
+          <div className="flex flex-wrap items-center gap-2">
+            {saveStatus !== "idle" && (
+              <div
+                className={`inline-flex h-11 max-w-[260px] items-center gap-2 truncate rounded-2xl px-3.5 text-sm font-semibold ${
+                  saveStatus === "success"
+                    ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80"
+                    : "bg-rose-50 text-rose-800 ring-1 ring-rose-200/80"
                 }`}
               >
-                {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                <span>Kaydet</span>
-              </button>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Klinik Adı *
-                </label>
-                <input
-                  type="text"
-                  value={settings.name}
-                  onChange={(e) => handleFieldChange("name", e.target.value)}
-                  placeholder="Örn: DentArt Ağız ve Diş Sağlığı"
-                  required
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
-                />
+                {saveStatus === "success" ? (
+                  <CheckCircle2 className="size-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="size-4 shrink-0" />
+                )}
+                <span className="truncate">{statusMessage}</span>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Kurumsal Slogan
-                </label>
-                <input
-                  type="text"
-                  value={settings.slogan}
-                  onChange={(e) => handleFieldChange("slogan", e.target.value)}
-                  placeholder="Örn: Gülüşünüz Estetikle Buluşuyor"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Telefon Numarası
-                </label>
-                <div className="relative mt-1.5">
-                  <Phone className="pointer-events-none absolute left-3.5 top-3 size-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={settings.phone}
-                    onChange={(e) => handleFieldChange("phone", e.target.value)}
-                    placeholder="+90 212 000 00 00"
-                    className="w-full rounded-xl border border-slate-200 pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Kurumsal E-posta
-                </label>
-                <div className="relative mt-1.5">
-                  <Mail className="pointer-events-none absolute left-3.5 top-3 size-4 text-slate-400" />
-                  <input
-                    type="email"
-                    value={settings.email}
-                    onChange={(e) => handleFieldChange("email", e.target.value)}
-                    placeholder="info@dentart.com"
-                    className="w-full rounded-xl border border-slate-200 pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Web Sitesi
-                </label>
-                <div className="relative mt-1.5">
-                  <Globe className="pointer-events-none absolute left-3.5 top-3 size-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={settings.website}
-                    onChange={(e) => handleFieldChange("website", e.target.value)}
-                    placeholder="https://www.dentart.com"
-                    className="w-full rounded-xl border border-slate-200 pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Çalışma Gün ve Saatleri
-                </label>
-                <input
-                  type="text"
-                  value={settings.hours}
-                  onChange={(e) => handleFieldChange("hours", e.target.value)}
-                  placeholder="Hafta içi: 09:00 - 19:00, Cmt: 09:00 - 16:00"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Klinik Açık Adresi
-                </label>
-                <div className="relative mt-1.5">
-                  <MapPin className="pointer-events-none absolute left-3.5 top-3 size-4 text-slate-400" />
-                  <textarea
-                    rows={2}
-                    value={settings.address}
-                    onChange={(e) => handleFieldChange("address", e.target.value)}
-                    placeholder="Levent Mah. Nispetiye Cad. No:12 Beşiktaş / İstanbul"
-                    className="w-full rounded-xl border border-slate-200 pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Google Harita Linki (Map URL)
-                </label>
-                <input
-                  type="text"
-                  value={settings.mapUrl}
-                  onChange={(e) => handleFieldChange("mapUrl", e.target.value)}
-                  placeholder="https://maps.google.com/..."
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
-                />
-              </div>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* 2. SEKME: MEDYA & LOGO YÜKLEME */}
-      {activeTab === "media" && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Görsel Varlıklar & Marka Logoları
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Klinik logonuzu ve sunumlarda kullanılacak kapak fotoğraflarını yükleyin.
-                </p>
-              </div>
+            )}
+            {activeTab === "pricing" ? (
+              totalChanges > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void handleSaveAllChanges()}
+                  disabled={isSavingPrices}
+                  className="tp-btn tp-btn-primary inline-flex h-11 items-center gap-2 rounded-xl bg-[#0b1f4d] px-5 text-sm font-semibold text-white shadow-lg shadow-[#0b1f4d]/25 disabled:opacity-60"
+                >
+                  {isSavingPrices ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Save className="size-4" />
+                  )}
+                  Kaydet
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs tabular-nums">
+                    {totalChanges}
+                  </span>
+                </button>
+              ) : null
+            ) : (
               <button
                 type="button"
                 onClick={() => handleSave()}
                 disabled={!isDirty || isPending}
-                className={`inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+                className={`tp-btn inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold ${
                   !isDirty || isPending
-                    ? "cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200/80 opacity-60 shadow-none"
-                    : "cursor-pointer bg-slate-900 text-white shadow-2xs hover:bg-slate-800"
+                    ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                    : "tp-btn-primary bg-[#0b1f4d] text-white shadow-lg shadow-[#0b1f4d]/25"
                 }`}
               >
-                {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                <span>Kaydet</span>
+                {isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                Kaydet
               </button>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-              {/* 1. Kurumsal Logo */}
-              <div className="flex flex-col justify-between rounded-xl border border-slate-200 p-5 bg-slate-50/50">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">1. Kurumsal Logo</span>
-                    {settings.logoKey ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                        <Check className="size-3" /> Yüklendi
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    PDF antetinde ve hasta portalında kullanılır.
-                  </p>
-                  <div className="mt-4 flex h-36 w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white overflow-hidden p-2">
-                    {settings.logoKey ? (
-                      <img
-                        src={getMediaUrl(settings.logoKey)!}
-                        alt="Kurumsal Logo"
-                        className="max-h-32 max-w-full object-contain"
-                      />
-                    ) : (
-                      <div className="text-center text-slate-400 p-4">
-                        <ImageIcon className="mx-auto size-8 text-slate-300 stroke-[1.5]" />
-                        <span className="mt-1.5 block text-xs font-medium text-slate-500">Logo yüklenmedi</span>
-                        <span className="mt-0.5 block text-[10px] text-slate-400">PNG, JPG, WebP (Maks. 5MB)</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center gap-2">
-                  <input
-                    id={logoInputId}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, "logo")}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor={logoInputId}
-                    className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
-                  >
-                    {uploadingKind === "logo" ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="size-3.5" />
-                    )}
-                    <span>{settings.logoKey ? "Logoyu Değiştir" : "Logo Seç & Yükle"}</span>
-                  </label>
-                  {settings.logoKey ? (
-                    <button
-                      type="button"
-                      onClick={() => handleFieldChange("logoKey", "")}
-                      className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
-                      title="Logoyu Kaldır"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* 2. Kapak Fotoğrafı */}
-              <div className="flex flex-col justify-between rounded-xl border border-slate-200 p-5 bg-slate-50/50">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">2. Kapak Fotoğrafı</span>
-                    {settings.coverKey ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                        <Check className="size-3" /> Yüklendi
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    24 sayfalık PDF&apos;in 1. kapağında yer alır.
-                  </p>
-                  <div className="mt-4 flex h-36 w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white overflow-hidden p-1">
-                    {settings.coverKey ? (
-                      <img
-                        src={getMediaUrl(settings.coverKey)!}
-                        alt="Kapak Fotoğrafı"
-                        className="h-full w-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <div className="text-center text-slate-400 p-4">
-                        <ImageIcon className="mx-auto size-8 text-slate-300 stroke-[1.5]" />
-                        <span className="mt-1.5 block text-xs font-medium text-slate-500">Kapak yüklenmedi</span>
-                        <span className="mt-0.5 block text-[10px] text-slate-400">Yüksek çözünürlüklü yatay görsel</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center gap-2">
-                  <input
-                    id={coverInputId}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, "cover")}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor={coverInputId}
-                    className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
-                  >
-                    {uploadingKind === "cover" ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="size-3.5" />
-                    )}
-                    <span>{settings.coverKey ? "Kapağı Değiştir" : "Kapak Seç & Yükle"}</span>
-                  </label>
-                  {settings.coverKey ? (
-                    <button
-                      type="button"
-                      onClick={() => handleFieldChange("coverKey", "")}
-                      className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
-                      title="Kapağı Kaldır"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* 3. Klinik Tanıtım Görseli */}
-              <div className="flex flex-col justify-between rounded-xl border border-slate-200 p-5 bg-slate-50/50">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">3. Klinik Tanıtım Görseli</span>
-                    {settings.aboutKey ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                        <Check className="size-3" /> Yüklendi
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    Klinik içi veya ekip fotoğrafı.
-                  </p>
-                  <div className="mt-4 flex h-36 w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white overflow-hidden p-1">
-                    {settings.aboutKey ? (
-                      <img
-                        src={getMediaUrl(settings.aboutKey)!}
-                        alt="Klinik Görseli"
-                        className="h-full w-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <div className="text-center text-slate-400 p-4">
-                        <ImageIcon className="mx-auto size-8 text-slate-300 stroke-[1.5]" />
-                        <span className="mt-1.5 block text-xs font-medium text-slate-500">Görsel yüklenmedi</span>
-                        <span className="mt-0.5 block text-[10px] text-slate-400">Klinik içi veya ekip fotoğrafı</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center gap-2">
-                  <input
-                    id={aboutInputId}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, "about")}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor={aboutInputId}
-                    className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
-                  >
-                    {uploadingKind === "about" ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="size-3.5" />
-                    )}
-                    <span>{settings.aboutKey ? "Görseli Değiştir" : "Görsel Seç & Yükle"}</span>
-                  </label>
-                  {settings.aboutKey ? (
-                    <button
-                      type="button"
-                      onClick={() => handleFieldChange("aboutKey", "")}
-                      className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
-                      title="Görseli Kaldır"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
-      )}
 
-      {/* 3. SEKME: HEKİM PROFİLİ */}
-      {activeTab === "doctor" && (
-        <form onSubmit={handleSave} className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Sorumlu Hekim ve İmza Yetkilisi
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Hastalarınıza sunulan tedavi planlarında onaylayıcı hekim kartı olarak gösterilir.
-                </p>
-              </div>
-              <button
-                type="submit"
-                disabled={!isDirty || isPending}
-                className={`inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
-                  !isDirty || isPending
-                    ? "cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200/80 opacity-60 shadow-none"
-                    : "cursor-pointer bg-slate-900 text-white shadow-2xs hover:bg-slate-800"
-                }`}
-              >
-                {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                <span>Kaydet</span>
-              </button>
-            </div>
+        <div className="relative h-px bg-slate-100" />
 
-            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+        {/* Stepped tabs */}
+        <div className="relative px-6 pt-4 sm:px-8">
+          <div className="mb-3 h-1 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-[#0b1f4d] transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+              style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }}
+            />
+          </div>
+          <div
+            role="tablist"
+            aria-label="Klinik profil adımları"
+            className="flex gap-1 overflow-x-auto pb-1"
+          >
+            {STEPS.map((step, i) => {
+              const Icon = step.icon;
+              const active = activeTab === step.id;
+              const done = i < stepIndex;
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => handleTabChange(step.id)}
+                  className={`tp-tab group inline-flex shrink-0 items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-sm font-semibold ${
+                    active
+                      ? "bg-[#0b1f4d] text-white shadow-[0_10px_28px_-14px_rgba(11,31,77,0.45)]"
+                      : done
+                        ? "bg-slate-50 text-[#0b1f4d] ring-1 ring-slate-900/[0.04]"
+                        : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                  }`}
+                >
+                  <span
+                    className={`flex size-7 items-center justify-center rounded-xl text-xs font-bold tabular-nums ${
+                      active
+                        ? "bg-white/15 text-white"
+                        : done
+                          ? "bg-[#0b1f4d]/10 text-[#0b1f4d]"
+                          : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {done && !active ? (
+                      <Check className="size-3.5" strokeWidth={2.6} />
+                    ) : (
+                      i + 1
+                    )}
+                  </span>
+                  <Icon className="size-4 opacity-80" strokeWidth={1.9} />
+                  <span>{step.label}</span>
+                  {step.id === "pricing" && totalChanges > 0 ? (
+                    <span
+                      className={`size-1.5 rounded-full ${
+                        active ? "bg-amber-300" : "bg-amber-500"
+                      }`}
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="relative mt-3 h-px bg-slate-100" />
+
+        {/* Panel */}
+        <div
+          key={activeTab}
+          className="tp-panel-enter flex min-h-0 flex-1 flex-col overflow-x-clip overflow-y-auto px-6 py-6 sm:px-8 lg:py-5"
+        >
+          {/* 1. PROFİL */}
+          {activeTab === "general" && (
+            <form
+              onSubmit={handleSave}
+              className="tp-stagger mx-auto grid w-full max-w-4xl grid-cols-1 gap-5 md:grid-cols-2"
+            >
               <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Hekim Adı ve Soyadı *
-                </label>
+                <label className={labelCls}>Klinik adı *</label>
                 <input
                   type="text"
-                  value={settings.doctor.name}
-                  onChange={(e) => handleDoctorChange("name", e.target.value)}
-                  placeholder="Örn: Dr. Dt. Selim Aydın"
                   required
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
+                  value={settings.name}
+                  onChange={(e) => handleFieldChange("name", e.target.value)}
+                  placeholder="Örn: DentArt"
+                  className={fieldCls}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Uzmanlık & Ana Unvan
+                <label className={labelCls}>Slogan</label>
+                <input
+                  type="text"
+                  value={settings.slogan}
+                  onChange={(e) => handleFieldChange("slogan", e.target.value)}
+                  placeholder="Kısa marka cümlesi"
+                  className={fieldCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Phone className="size-3.5" /> Telefon
+                  </span>
                 </label>
+                <input
+                  type="tel"
+                  value={settings.phone}
+                  onChange={(e) => handleFieldChange("phone", e.target.value)}
+                  placeholder="+90 …"
+                  className={fieldCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Mail className="size-3.5" /> E-posta
+                  </span>
+                </label>
+                <input
+                  type="email"
+                  value={settings.email}
+                  onChange={(e) => handleFieldChange("email", e.target.value)}
+                  placeholder="info@klinik.com"
+                  className={fieldCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Web sitesi</label>
+                <input
+                  type="url"
+                  value={settings.website}
+                  onChange={(e) => handleFieldChange("website", e.target.value)}
+                  placeholder="https://"
+                  className={fieldCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Çalışma saatleri</label>
+                <input
+                  type="text"
+                  value={settings.hours}
+                  onChange={(e) => handleFieldChange("hours", e.target.value)}
+                  placeholder="Pzt–Cum 09:00–18:00"
+                  className={fieldCls}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelCls}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="size-3.5" /> Adres
+                  </span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={settings.address}
+                  onChange={(e) => handleFieldChange("address", e.target.value)}
+                  placeholder="Klinik adresi"
+                  className={`${fieldCls} min-h-[88px] resize-y`}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelCls}>Harita bağlantısı</label>
+                <input
+                  type="url"
+                  value={settings.mapUrl}
+                  onChange={(e) => handleFieldChange("mapUrl", e.target.value)}
+                  placeholder="Google Maps URL"
+                  className={fieldCls}
+                />
+              </div>
+            </form>
+          )}
+
+          {/* 2. MEDYA */}
+          {activeTab === "media" && (
+            <div className="tp-stagger mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 md:grid-cols-3">
+              {(
+                [
+                  {
+                    kind: "logo" as const,
+                    title: "Logo",
+                    key: settings.logoKey,
+                    inputId: logoInputId,
+                    clear: () => handleFieldChange("logoKey", ""),
+                    fit: "object-contain p-3",
+                  },
+                  {
+                    kind: "cover" as const,
+                    title: "Kapak",
+                    key: settings.coverKey,
+                    inputId: coverInputId,
+                    clear: () => handleFieldChange("coverKey", ""),
+                    fit: "object-cover",
+                  },
+                  {
+                    kind: "about" as const,
+                    title: "Tanıtım",
+                    key: settings.aboutKey,
+                    inputId: aboutInputId,
+                    clear: () => handleFieldChange("aboutKey", ""),
+                    fit: "object-cover",
+                  },
+                ] as const
+              ).map((item) => (
+                <div key={item.kind} className={`${softCard} flex flex-col`}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-[#0b1f4d]">{item.title}</h3>
+                    {item.key ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        <Check className="size-3" /> Hazır
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-3 flex h-40 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/[0.05]">
+                    {item.key ? (
+                      <img
+                        src={getMediaUrl(item.key)!}
+                        alt={item.title}
+                        className={`size-full ${item.fit}`}
+                      />
+                    ) : (
+                      <ImageIcon className="size-8 text-slate-300" strokeWidth={1.5} />
+                    )}
+                  </div>
+                  <div className="mt-4 flex items-center gap-2">
+                    <input
+                      id={item.inputId}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileUpload(e, item.kind)}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor={item.inputId}
+                      className="tp-btn inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-xs font-semibold text-[#0b1f4d] ring-1 ring-slate-900/[0.06]"
+                    >
+                      {uploadingKind === item.kind ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="size-3.5" />
+                      )}
+                      {item.key ? "Değiştir" : "Yükle"}
+                    </label>
+                    {item.key ? (
+                      <button
+                        type="button"
+                        onClick={item.clear}
+                        className="tp-icon-btn inline-flex size-10 items-center justify-center rounded-xl text-rose-500 ring-1 ring-rose-100 hover:bg-rose-50"
+                        title="Kaldır"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 3. HEKİM */}
+          {activeTab === "doctor" && (
+            <form
+              onSubmit={handleSave}
+              className="tp-stagger mx-auto grid w-full max-w-4xl grid-cols-1 gap-5 md:grid-cols-2"
+            >
+              <div>
+                <label className={labelCls}>Hekim adı *</label>
+                <input
+                  type="text"
+                  required
+                  value={settings.doctor.name}
+                  onChange={(e) => handleDoctorChange("name", e.target.value)}
+                  placeholder="Dr. Dt. …"
+                  className={fieldCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Unvan</label>
                 <input
                   type="text"
                   value={settings.doctor.title}
                   onChange={(e) => handleDoctorChange("title", e.target.value)}
-                  placeholder="Örn: Protetik Diş Tedavisi Uzmanı & Başhekim"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
+                  placeholder="Uzmanlık / başhekim"
+                  className={fieldCls}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Alt Başlık / İkinci Unvan
-                </label>
+                <label className={labelCls}>Alt unvan</label>
                 <input
                   type="text"
                   value={settings.doctor.subtitle}
                   onChange={(e) => handleDoctorChange("subtitle", e.target.value)}
-                  placeholder="Örn: İmplantoloji ve Estetik Diş Hekimi"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
+                  placeholder="İkinci unvan"
+                  className={fieldCls}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  İmza Yetkilisi Başlığı (PDF Alt İmza)
-                </label>
+                <label className={labelCls}>İmza başlığı</label>
                 <input
                   type="text"
                   value={settings.signerTitle}
                   onChange={(e) => handleFieldChange("signerTitle", e.target.value)}
-                  placeholder="Örn: Klinik Direktörü & Başhekim"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
+                  placeholder="PDF alt imza"
+                  className={fieldCls}
                 />
               </div>
-
               <div className="md:col-span-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Hekim Kısa Biyografisi (PDF Hekim Tanıtım Sayfası)
-                  </label>
-                  <span className="text-[10px] text-slate-400">
-                    PDF ve web sunumunda hekim kartında yer alır
-                  </span>
-                </div>
+                <label className={labelCls}>Kısa biyografi</label>
                 <textarea
-                  rows={5}
+                  rows={4}
                   value={settings.doctor.bio}
                   onChange={(e) => handleDoctorChange("bio", e.target.value)}
-                  placeholder="15 yılı aşkın süredir ileri cerrahi ve gülüş estetiği alanında uluslararası vakaları yönetmektedir..."
-                  className="mt-1.5 w-full min-h-[140px] resize-y rounded-xl border border-slate-200 px-3.5 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-hidden"
+                  placeholder="Hekim tanıtım metni"
+                  className={`${fieldCls} min-h-[120px] resize-y`}
                 />
               </div>
-
-              {/* Hekim Portre Fotoğrafı */}
-              <div className="md:col-span-2 flex flex-col md:flex-row items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="relative size-16 shrink-0 rounded-full border border-slate-300 bg-white flex items-center justify-center overflow-hidden font-bold text-slate-400 shadow-xs">
+              <div className="md:col-span-2 flex flex-col items-center gap-4 rounded-[1.75rem] bg-slate-50/70 p-5 ring-1 ring-slate-900/[0.04] sm:flex-row">
+                <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-slate-900/[0.06]">
                   {settings.doctor.photoKey ? (
                     <img
                       src={getMediaUrl(settings.doctor.photoKey)!}
-                      alt={settings.doctor.name || "Hekim Fotoğrafı"}
+                      alt={settings.doctor.name || "Hekim"}
                       className="size-full object-cover"
                     />
                   ) : (
-                    <UserCheck className="size-8 text-slate-300" />
+                    <UserCheck className="size-7 text-slate-300" />
                   )}
                 </div>
-                <div className="flex-1 text-center md:text-left">
-                  <div className="flex items-center gap-2 justify-center md:justify-start">
-                    <span className="text-xs font-semibold text-slate-900">Hekim Portre Fotoğrafı</span>
-                    {settings.doctor.photoKey ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                        <Check className="size-3" /> Yüklendi
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    PDF hasta sunumu ve hekim kartında yer alır.
-                  </p>
+                <div className="min-w-0 flex-1 text-center sm:text-left">
+                  <p className="text-sm font-semibold text-[#0b1f4d]">Portre fotoğrafı</p>
+                  <p className="text-xs text-slate-400">PDF hekim kartında görünür</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -1187,926 +997,590 @@ export function ClinicSettingsView({
                   />
                   <label
                     htmlFor={doctorInputId}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-100 transition"
+                    className="tp-btn inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-[#0b1f4d] ring-1 ring-slate-900/[0.06]"
                   >
                     {uploadingKind === "doctor" ? (
                       <Loader2 className="size-3.5 animate-spin" />
                     ) : (
                       <Upload className="size-3.5" />
                     )}
-                    <span>{settings.doctor.photoKey ? "Fotoğrafı Değiştir" : "Fotoğraf Yükle"}</span>
+                    {settings.doctor.photoKey ? "Değiştir" : "Yükle"}
                   </label>
                   {settings.doctor.photoKey ? (
                     <button
                       type="button"
                       onClick={() => handleDoctorChange("photoKey", "")}
-                      className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
-                      title="Fotoğrafı Kaldır"
+                      className="tp-icon-btn inline-flex size-10 items-center justify-center rounded-xl text-rose-500 ring-1 ring-rose-100 hover:bg-rose-50"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
                   ) : null}
                 </div>
               </div>
-            </div>
-          </div>
-        </form>
-      )}
+            </form>
+          )}
 
-      {/* 4. SEKME: PDF ŞABLONU (İKİYE BÖLÜNMÜŞ EKRAN / SPLIT-SCREEN) */}
-      {activeTab === "pdf" && (
-        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
-          {/* Sol Kolon: Şablon Ayar Paneli */}
-          <div className="space-y-4 lg:col-span-6">
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
-              {/* Başlık & Hızlı Kaydet */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Şablon Yapılandırması
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    PDF planının dil, kur, renk ve metin detaylarını özelleştirin.
-                  </p>
+          {/* 4. ŞABLON */}
+          {activeTab === "pdf" && (
+            <div className="tp-stagger mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-6 md:grid-cols-12">
+              <div className="space-y-4 md:col-span-5">
+                <div className={softCard}>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className={`${labelCls} inline-flex items-center gap-1.5`}>
+                        <Globe className="size-3.5" /> Dil
+                      </span>
+                      <div className="mt-1.5 flex rounded-2xl bg-white p-1 ring-1 ring-slate-900/[0.05]">
+                        {(["tr", "en"] as Locale[]).map((loc) => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => handleFieldChange("locale", loc)}
+                            className={`tp-tab flex-1 rounded-xl py-2 text-xs font-semibold ${
+                              settings.locale === loc
+                                ? "bg-[#0b1f4d] text-white"
+                                : "text-slate-500 hover:text-[#0b1f4d]"
+                            }`}
+                          >
+                            {loc === "tr" ? "TR" : "EN"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`${labelCls} inline-flex items-center gap-1.5`}>
+                        <Coins className="size-3.5" /> Para birimi
+                      </span>
+                      <div className="mt-1.5 flex rounded-2xl bg-white p-1 ring-1 ring-slate-900/[0.05]">
+                        {(["TRY", "EUR", "USD"] as Currency[]).map((cur) => (
+                          <button
+                            key={cur}
+                            type="button"
+                            onClick={() => handleFieldChange("currency", cur)}
+                            className={`tp-tab flex-1 rounded-xl py-2 text-xs font-semibold ${
+                              settings.currency === cur
+                                ? "bg-[#0b1f4d] text-white"
+                                : "text-slate-500 hover:text-[#0b1f4d]"
+                            }`}
+                          >
+                            {CURRENCY_SYMBOLS[cur]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <span className={`${labelCls} inline-flex items-center gap-1.5`}>
+                      <PaletteIcon className="size-3.5" /> Renk paleti
+                    </span>
+                    <div className="mt-1.5 grid grid-cols-2 gap-2">
+                      {(Object.keys(PALETTE_CONFIGS) as Palette[]).map((palKey) => {
+                        const pal = PALETTE_CONFIGS[palKey];
+                        const active = settings.palette === palKey;
+                        return (
+                          <button
+                            key={palKey}
+                            type="button"
+                            onClick={() => handleFieldChange("palette", palKey)}
+                            className={`tp-tab flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left ${
+                              active
+                                ? "bg-white ring-2 ring-[#0b1f4d]/30"
+                                : "bg-white/60 ring-1 ring-slate-900/[0.04] hover:bg-white"
+                            }`}
+                          >
+                            <span
+                              className="size-7 shrink-0 rounded-xl shadow-inner"
+                              style={{ backgroundColor: pal.primaryHex }}
+                            />
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-semibold text-[#0b1f4d]">
+                                {pal.name}
+                              </span>
+                            </span>
+                            {active ? (
+                              <Check className="ml-auto size-3.5 shrink-0 text-[#0b1f4d]" />
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleSave()}
-                  disabled={!isDirty || isPending}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
-                    !isDirty || isPending
-                      ? "cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200/80 opacity-60 shadow-none"
-                      : "cursor-pointer bg-slate-900 text-white shadow-2xs hover:bg-slate-800"
-                  }`}
-                >
-                  {isPending ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Save className="size-3.5" />
-                  )}
-                  <span>Kaydet</span>
-                </button>
-              </div>
 
-              {/* 1. Satır: Belge Dili ve Para Birimi (Yan Yana Segmented Control) */}
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {/* Belge Dili */}
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                      <Globe className="size-3.5 text-slate-400" />
-                      Belge Dili
-                    </span>
-                    <span className="font-mono text-[10px] text-slate-400 uppercase">
-                      {settings.locale}
-                    </span>
-                  </div>
-                  <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleFieldChange("locale", "tr" as Locale)}
-                      className={`flex-1 cursor-pointer rounded-lg py-1.5 text-xs font-semibold transition text-center ${
-                        settings.locale === "tr"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      Türkçe (TR)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFieldChange("locale", "en" as Locale)}
-                      className={`flex-1 cursor-pointer rounded-lg py-1.5 text-xs font-semibold transition text-center ${
-                        settings.locale === "en"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      English (EN)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Para Birimi */}
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                      <Coins className="size-3.5 text-slate-400" />
-                      Para Birimi (Kur)
-                    </span>
-                    <span className="font-mono text-[10px] text-slate-400">
-                      {currencySymbol}
-                    </span>
-                  </div>
-                  <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
-                    {(["TRY", "EUR", "USD"] as Currency[]).map((curr) => (
+                <div className={softCard}>
+                  <div className="flex rounded-2xl bg-white p-1 ring-1 ring-slate-900/[0.05]">
+                    {(
+                      [
+                        { id: "welcome" as const, label: "Karşılama", icon: FileText },
+                        { id: "legal" as const, label: "Yasal", icon: FileCheck2 },
+                      ] as const
+                    ).map((t) => (
                       <button
-                        key={curr}
+                        key={t.id}
                         type="button"
-                        onClick={() => handleFieldChange("currency", curr)}
-                        className={`flex-1 cursor-pointer rounded-lg py-1.5 text-xs font-semibold transition text-center ${
-                          settings.currency === curr
-                            ? "bg-white text-slate-900 shadow-2xs"
-                            : "text-slate-600 hover:text-slate-900"
+                        onClick={() => setPdfTextTab(t.id)}
+                        className={`tp-tab flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold ${
+                          pdfTextTab === t.id
+                            ? "bg-[#0b1f4d] text-white"
+                            : "text-slate-500 hover:text-[#0b1f4d]"
                         }`}
                       >
-                        {CURRENCY_SYMBOLS[curr]} {curr}
+                        <t.icon className="size-3.5" />
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    rows={7}
+                    value={
+                      pdfTextTab === "welcome" ? settings.welcomeBody : settings.legal
+                    }
+                    onChange={(e) =>
+                      handleFieldChange(
+                        pdfTextTab === "welcome" ? "welcomeBody" : "legal",
+                        e.target.value
+                      )
+                    }
+                    placeholder={
+                      pdfTextTab === "welcome"
+                        ? "Hasta karşılama metni"
+                        : "Yasal uyarı metni"
+                    }
+                    className={`${fieldCls} mt-3 min-h-[160px] resize-y`}
+                  />
+                </div>
+              </div>
+
+              {/* Live preview */}
+              <div className="md:col-span-7 md:sticky md:top-2">
+                <div className="overflow-hidden rounded-[1.75rem] bg-white p-6 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/[0.06] sm:p-7">
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex size-11 items-center justify-center overflow-hidden rounded-xl font-bold text-white"
+                        style={{
+                          backgroundColor: settings.logoKey
+                            ? "#ffffff"
+                            : currentPalette.primaryHex,
+                          border: settings.logoKey ? "1px solid #e2e8f0" : undefined,
+                        }}
+                      >
+                        {settings.logoKey ? (
+                          <img
+                            src={getMediaUrl(settings.logoKey)!}
+                            alt=""
+                            className="size-full object-contain p-1"
+                          />
+                        ) : (
+                          (settings.name || "D").charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900">
+                          {settings.name || "Klinik Adı"}
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          {settings.slogan || "Slogan"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span
+                        className="inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                        style={{
+                          backgroundColor: currentPalette.bgSoft,
+                          color: currentPalette.primaryHex,
+                        }}
+                      >
+                        {settings.locale === "en" ? "TREATMENT PLAN" : "TEDAVİ PLANI"}
+                      </span>
+                      <p className="mt-1 text-[10px] text-slate-400" suppressHydrationWarning>
+                        {new Date().toLocaleDateString(
+                          settings.locale === "en" ? "en-GB" : "tr-TR"
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-xl bg-slate-50/80 p-3 text-[11px] leading-relaxed text-slate-600">
+                    {settings.welcomeBody ||
+                      "Değerli hastamız, size özel hazırlanan tedavi planı aşağıda sunulmuştur."}
+                  </div>
+
+                  <div className="mt-5 overflow-hidden rounded-xl ring-1 ring-slate-100">
+                    <table className="w-full text-left text-[11px]">
+                      <thead
+                        style={{
+                          backgroundColor: currentPalette.bgSoft,
+                          color: currentPalette.primaryHex,
+                        }}
+                        className="font-bold"
+                      >
+                        <tr>
+                          <th className="px-3 py-2">
+                            {settings.locale === "en" ? "Procedure" : "İşlem"}
+                          </th>
+                          <th className="px-3 py-2 text-center">
+                            {settings.locale === "en" ? "Session" : "Seans"}
+                          </th>
+                          <th className="px-3 py-2 text-right">
+                            {settings.locale === "en" ? "Amount" : "Tutar"} (
+                            {settings.currency})
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-600">
+                        <tr>
+                          <td className="px-3 py-2 font-medium text-slate-900">
+                            Titanyum İmplant
+                          </td>
+                          <td className="px-3 py-2 text-center">1</td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                            {currencySymbol} 18.000
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 font-medium text-slate-900">
+                            Zirkonyum Kron
+                          </td>
+                          <td className="px-3 py-2 text-center">2</td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                            {currencySymbol} 12.500
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                    <p className="max-w-[55%] text-[10px] leading-relaxed text-slate-400">
+                      {settings.legal ||
+                        (settings.locale === "en"
+                          ? "Prices may vary based on clinical findings."
+                          : "Fiyatlar klinik bulgulara göre değişiklik gösterebilir.")}
+                    </p>
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-400">
+                        {settings.locale === "en" ? "Total" : "Toplam"}
+                      </p>
+                      <p
+                        className="text-base font-bold tabular-nums"
+                        style={{ color: currentPalette.primaryHex }}
+                      >
+                        {currencySymbol} 30.500
+                      </p>
+                      <p className="mt-2 text-[10px] font-semibold text-slate-700">
+                        {settings.doctor.name || settings.signerTitle || "Hekim"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 5. FİYATLAR */}
+          {activeTab === "pricing" && (
+            <div className="tp-stagger mx-auto flex w-full max-w-5xl flex-col gap-5">
+              {pricingStatus ? (
+                <div
+                  className={`inline-flex items-center gap-2 self-start rounded-2xl px-3.5 py-2.5 text-sm font-semibold ${
+                    pricingStatus.type === "success"
+                      ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80"
+                      : "bg-rose-50 text-rose-800 ring-1 ring-rose-200/80"
+                  }`}
+                >
+                  {pricingStatus.type === "success" ? (
+                    <CheckCircle2 className="size-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="size-4 shrink-0" />
+                  )}
+                  <span>{pricingStatus.message}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPricingStatus(null)}
+                    className="ml-1 rounded-lg p-0.5 opacity-60 hover:opacity-100"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ) : null}
+
+              <div className={softCard}>
+                <form
+                  onSubmit={handleAddTreatment}
+                  noValidate
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end"
+                >
+                  <div className="sm:col-span-5">
+                    <label className={labelCls}>Yeni işlem</label>
+                    <input
+                      ref={treatNameInputRef}
+                      type="text"
+                      value={newTreatName}
+                      onChange={(e) => setNewTreatName(e.target.value)}
+                      placeholder="Tedavi adı"
+                      className={fieldCls}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Kod</label>
+                    <input
+                      type="text"
+                      value={newTreatCode}
+                      onChange={(e) => setNewTreatCode(e.target.value)}
+                      placeholder="TR…"
+                      className={fieldCls}
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className={labelCls}>
+                      Fiyat ({currencySymbol})
+                    </label>
+                    <div className="mt-1.5">
+                      <PriceInput
+                        value={newTreatPrice}
+                        onChange={setNewTreatPrice}
+                        className="w-full rounded-2xl bg-slate-50 px-3.5 py-2.5 text-sm text-[#0b1f4d] outline-hidden ring-1 ring-slate-900/[0.05] focus:bg-white focus:ring-[#0b1f4d]/20"
+                      />
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <button
+                      type="submit"
+                      disabled={isAddingTreatment}
+                      className="tp-btn tp-btn-primary inline-flex h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-[#0b1f4d] text-sm font-semibold text-white shadow-md shadow-[#0b1f4d]/20 disabled:opacity-60"
+                    >
+                      {isAddingTreatment ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
+                      Ekle
+                    </button>
+                  </div>
+                </form>
+
+                <div className="mt-4">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    Hızlı ekle
+                  </p>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {QUICK_TREATMENT_TEMPLATES.map((tpl) => (
+                      <button
+                        key={tpl.code}
+                        type="button"
+                        disabled={isAddingTreatment}
+                        onClick={() => {
+                          void submitNewTreatment({
+                            name: tpl.name,
+                            code: tpl.code,
+                            priceMinor: tpl.priceMinor,
+                          });
+                        }}
+                        className="tp-tab shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-900/[0.05] hover:text-[#0b1f4d] disabled:opacity-50"
+                      >
+                        {tpl.name}
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* 2. Satır: Kurumsal Renk Paleti (Tek Sıra / Yan Yana 4 Renk) */}
-              <div className="mt-4 border-t border-slate-100 pt-3.5">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                    <PaletteIcon className="size-3.5 text-slate-400" />
-                    Kurumsal Renk Teması
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    {settings.palette === "navy"
-                      ? "Lacivert"
-                      : settings.palette === "forest"
-                      ? "Zümrüt"
-                      : settings.palette === "rose"
-                      ? "Gül"
-                      : "Arduvaz"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2">
-                  {(Object.keys(PALETTE_CONFIGS) as Palette[]).map((palKey) => {
-                    const pal = PALETTE_CONFIGS[palKey];
-                    const isSelected = settings.palette === palKey;
-                    const label =
-                      palKey === "navy"
-                        ? "Lacivert"
-                        : palKey === "forest"
-                        ? "Zümrüt"
-                        : palKey === "rose"
-                        ? "Gül"
-                        : "Arduvaz";
-
-                    return (
+              <div className={softCard}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="relative min-w-0 flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="İşlem veya kod ara"
+                      className="h-11 w-full rounded-2xl bg-white pl-10 pr-9 text-sm text-[#0b1f4d] placeholder:text-slate-400 outline-hidden ring-1 ring-slate-900/[0.05] transition focus:ring-[#0b1f4d]/20"
+                    />
+                    {searchQuery ? (
                       <button
-                        key={palKey}
                         type="button"
-                        onClick={() => handleFieldChange("palette", palKey)}
-                        className={`group relative flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl border py-2 px-1 sm:px-2.5 text-center transition cursor-pointer ${
-                          isSelected
-                            ? "border-slate-900 bg-slate-900/5 shadow-2xs ring-1 ring-slate-900"
-                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
-                        }`}
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:text-slate-700"
                       >
-                        {/* Çift Renkli Swatch Çemberi */}
-                        <span
-                          className="flex size-4.5 shrink-0 items-center justify-center rounded-full shadow-2xs ring-1 ring-black/10"
-                          style={{ backgroundColor: pal.primaryHex }}
-                        >
-                          <span
-                            className="size-1.5 rounded-full"
-                            style={{ backgroundColor: pal.accentHex }}
-                          />
-                        </span>
-
-                        <span
-                          className={`truncate text-xs ${
-                            isSelected
-                              ? "font-bold text-slate-900"
-                              : "font-medium text-slate-700"
-                          }`}
-                        >
-                          {label}
-                        </span>
-
-                        {isSelected && (
-                          <Check className="size-3.5 shrink-0 text-slate-900" />
-                        )}
+                        <X className="size-3.5" />
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 3. Satır: Şablon Metinleri (Sade & Karmaşadan Uzak) */}
-              <div className="mt-5 border-t border-slate-100 pt-4 space-y-3">
-                {/* Minimal İkili Sekme */}
-                <div className="flex items-center justify-between">
-                  <div className="inline-flex rounded-xl bg-slate-100 p-1 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setPdfTextTab("welcome")}
-                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                        pdfTextTab === "welcome"
-                          ? "bg-white text-slate-900 shadow-2xs font-bold"
-                          : "text-slate-500 hover:text-slate-900"
-                      }`}
-                    >
-                      Karşılama Yazısı
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPdfTextTab("legal")}
-                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                        pdfTextTab === "legal"
-                          ? "bg-white text-slate-900 shadow-2xs font-bold"
-                          : "text-slate-500 hover:text-slate-900"
-                      }`}
-                    >
-                      Yasal & KVKK
-                    </button>
+                    ) : null}
                   </div>
-
-                  <span className="text-[11px] font-medium text-slate-400">
-                    {pdfTextTab === "welcome" ? "PDF 1. Sayfa Açılışı" : "PDF Alt Dipnotu"}
-                  </span>
-                </div>
-
-                {/* Tek, Ferah ve Sade Metin Alanı */}
-                {pdfTextTab === "welcome" ? (
-                  <div>
-                    <textarea
-                      rows={5}
-                      value={settings.welcomeBody || ""}
-                      onChange={(e) => {
-                        handleFieldChange("welcomeBody", e.target.value);
-                      }}
-                      placeholder="Sayın hastamız, size özel hazırlanan tedavi planı sunulmuştur..."
-                      className="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-hidden"
-                    />
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Bu metin PDF teklifinin ilk sayfasında hastaya hitaben gösterilir.
+                  {totalChanges > 0 ? (
+                    <p className="text-xs font-semibold text-amber-700">
+                      {totalChanges} bekleyen değişiklik
                     </p>
-                  </div>
-                ) : (
-                  <div>
-                    <textarea
-                      rows={5}
-                      value={settings.legal}
-                      onChange={(e) => handleFieldChange("legal", e.target.value)}
-                      placeholder="İşbu tedavi planı hekim muayenesi sonrası ön tanı niteliğindedir..."
-                      className="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-hidden"
-                    />
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Bu metin PDF teklifinin alt kısmında hukuki ön tanı ve KVKK dipnotu olarak yer alır.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Bilgi Çizgisi */}
-              <div className="mt-4 border-t border-slate-100 pt-3 text-center">
-                <span className="text-[11px] text-slate-400">
-                  Değişiklikler anlık sağdaki canlı önizlemeye yansır.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Sağ Kolon: Sticky Beyaz A4 Formunda Canlı PDF Önizleme */}
-          <div className="lg:col-span-6 lg:sticky lg:top-6">
-            {/* A4 Kağıt Kartı */}
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-7 shadow-xl">
-              {/* Kurumsal Renk Üst Çizgisi */}
-              <div
-                className="h-1.5 w-full rounded-full transition-colors duration-300"
-                style={{ backgroundColor: currentPalette.primaryHex }}
-              />
-
-              {/* Antet Başlığı */}
-              <div className="mt-5 flex items-start justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex size-11 items-center justify-center rounded-xl font-bold text-white shadow-xs transition-colors duration-300 overflow-hidden"
-                    style={{
-                      backgroundColor: settings.logoKey ? "#ffffff" : currentPalette.primaryHex,
-                      border: settings.logoKey ? "1px solid #e2e8f0" : undefined,
-                    }}
-                  >
-                    {settings.logoKey ? (
-                      <img
-                        src={getMediaUrl(settings.logoKey)!}
-                        alt="Logo"
-                        className="size-full object-contain p-1"
-                      />
-                    ) : settings.name ? (
-                      settings.name.charAt(0).toUpperCase()
-                    ) : (
-                      "D"
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">
-                      {settings.name || "Klinik Adı"}
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      {settings.slogan || "Gülüşünüz Estetikle Buluşuyor"}
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      {settings.phone || "+90 212 000 00 00"}
-                    </p>
-                  </div>
+                  ) : null}
                 </div>
 
-                <div className="text-right">
-                  <span
-                    className="inline-block rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase"
-                    style={{
-                      backgroundColor: currentPalette.bgSoft,
-                      color: currentPalette.primaryHex,
-                    }}
-                  >
-                    {settings.locale === "en" ? "TREATMENT PLAN" : "TEDAVİ PLANI"}
-                  </span>
-                  <p className="mt-1 text-[10px] text-slate-400">
-                    Tarih: {new Date().toLocaleDateString("tr-TR")}
-                  </p>
-                  <p className="text-[10px] text-slate-400">No: #TP-2026-001</p>
-                </div>
-              </div>
-
-              {/* Hasta Karşılama */}
-              <div className="mt-4 rounded-lg bg-slate-50/70 p-3 text-[11px] leading-relaxed text-slate-600">
-                {settings.welcomeBody ||
-                  "Değerli hastamız, size özel hazırlanan tedavi planı ve seans detayları aşağıda sunulmuştur."}
-              </div>
-
-              {/* Örnek Tedavi Tablosu */}
-              <div className="mt-5 overflow-hidden rounded-lg border border-slate-100">
-                <table className="w-full text-left text-[11px]">
-                  <thead
-                    style={{
-                      backgroundColor: currentPalette.bgSoft,
-                      color: currentPalette.primaryHex,
-                    }}
-                    className="font-bold border-b border-slate-100"
-                  >
-                    <tr>
-                      <th className="px-3 py-2">
-                        {settings.locale === "en" ? "Procedure" : "İşlem / Tedavi"}
-                      </th>
-                      <th className="px-3 py-2 text-center">
-                        {settings.locale === "en" ? "Session" : "Seans"}
-                      </th>
-                      <th className="px-3 py-2 text-right">
-                        {settings.locale === "en" ? "Amount" : "Tutar"} ({settings.currency})
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-600">
-                    <tr>
-                      <td className="px-3 py-2 font-medium text-slate-900">
-                        Titanyum İmplant Tedavisi (SLA)
-                      </td>
-                      <td className="px-3 py-2 text-center text-slate-500">1. Seans</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-900">
-                        {currencySymbol} 18.000
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-3 py-2 font-medium text-slate-900">
-                        Zirkonyum Kuron Kaplama (CAD/CAM)
-                      </td>
-                      <td className="px-3 py-2 text-center text-slate-500">2. Seans</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-900">
-                        {currencySymbol} 12.500
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-3 py-2 font-medium text-slate-900">
-                        Panoramik Röntgen ve 3D Analiz
-                      </td>
-                      <td className="px-3 py-2 text-center text-slate-500">Dahil</td>
-                      <td className="px-3 py-2 text-right font-semibold text-slate-900">
-                        {currencySymbol} 0
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Toplam Tutar Alanı */}
-              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
-                <span className="text-slate-500">
-                  {settings.locale === "en" ? "Grand Total:" : "Genel Toplam:"}
-                </span>
-                <span
-                  className="text-base font-extrabold tracking-tight"
-                  style={{ color: currentPalette.primaryHex }}
-                >
-                  {currencySymbol} 30.500
-                </span>
-              </div>
-
-              {/* Alt İmza & Hekim Alanı */}
-              <div className="mt-6 flex items-end justify-between border-t border-slate-100 pt-4 text-[10px] text-slate-500">
-                <div>
-                  <p className="font-semibold text-slate-700">
-                    {settings.doctor.name || "Sorumlu Hekim"}
-                  </p>
-                  <p className="text-slate-400">
-                    {settings.signerTitle || settings.doctor.title || "Klinik Direktörü"}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="h-6 w-20 border-b border-dashed border-slate-300" />
-                  <span className="text-[9px] text-slate-400">Kaşe & İmza</span>
-                </div>
-              </div>
-
-              {/* Alt Filigran */}
-              <div className="mt-4 text-center text-[9px] text-slate-300">
-                Treatment Plus Clinical Systems • 24 Sayfalık Kurumsal Wise PDF
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 5. SEKME: TEDAVİ İŞLEMLERİ & FİYAT LİSTESİ */}
-      {activeTab === "pricing" && (
-        <div className="space-y-6">
-          {/* Bildirim / Toast Banner */}
-          {pricingStatus && (
-            <div
-              className={`flex items-center justify-between gap-2 rounded-xl p-4 text-xs font-semibold shadow-xs transition-all ${
-                pricingStatus.type === "success"
-                  ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : "border border-rose-200 bg-rose-50 text-rose-800"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {pricingStatus.type === "success" ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
-                ) : (
-                  <AlertCircle className="size-4 shrink-0 text-rose-600" />
-                )}
-                <span>{pricingStatus.message}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPricingStatus(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-black/5 hover:text-slate-600"
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
-          )}
-
-          {/* 1. KART: YENİ İŞLEM VE FİYAT TANIMLAMA */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-            <div className="border-b border-slate-100 pb-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Plus className="size-4 text-slate-900" />
-                    Yeni Tedavi İşlemi & Fiyat Tanımla
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Buraya eklediğiniz tüm işlemler tedavi planı oluştururken işlem seçme listesinde yer alacak ve seçildiğinde belirlediğiniz fiyat otomatik gelecektir.
-                  </p>
-                </div>
-                <div className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl bg-slate-50 border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600">
-                  <span>Aktif Para Birimi:</span>
-                  <span className="font-bold text-slate-900">{settings.currency} ({currencySymbol})</span>
-                </div>
-              </div>
-            </div>
-
-            <form onSubmit={handleAddTreatment} noValidate className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-end">
-              {/* İşlem Adı */}
-              <div className="sm:col-span-5">
-                <label className="block text-[11px] font-bold tracking-wider text-slate-400 uppercase mb-1.5">
-                  Tedavi / İşlem Adı <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  ref={treatNameInputRef}
-                  type="text"
-                  placeholder="Örn: Zirkonyum Kaplama, Diş Beyazlatma, Gece Plağı..."
-                  value={newTreatName}
-                  onChange={(e) => setNewTreatName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-900 shadow-2xs focus:border-slate-900 focus:outline-hidden transition"
-                />
-              </div>
-
-              {/* İşlem Kodu (Opsiyonel) */}
-              <div className="sm:col-span-3">
-                <label className="block text-[11px] font-bold tracking-wider text-slate-400 uppercase mb-1.5">
-                  İşlem Kodu <span className="text-slate-400 font-normal">(Opsiyonel)</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Örn: TR06 (Boşsa oto)"
-                  value={newTreatCode}
-                  onChange={(e) => setNewTreatCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-900 shadow-2xs focus:border-slate-900 focus:outline-hidden transition uppercase"
-                />
-              </div>
-
-              {/* Standart Birim Fiyat */}
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold tracking-wider text-slate-400 uppercase mb-1.5">
-                  Birim Fiyat ({currencySymbol})
-                </label>
-                <div className="relative">
-                  <PriceInput
-                    value={newTreatPrice}
-                    onChange={(val) => setNewTreatPrice(val)}
-                    placeholder="0"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white px-3 py-2.5 pr-8 text-right text-xs font-semibold text-slate-900 shadow-2xs focus:border-slate-900 focus:outline-hidden transition"
-                  />
-                  <span className="pointer-events-none absolute right-3 top-2.5 text-xs font-bold text-slate-400">
-                    {currencySymbol}
-                  </span>
-                </div>
-              </div>
-
-              {/* Ekle Butonu */}
-              <div className="sm:col-span-2">
-                <button
-                  type="submit"
-                  disabled={isAddingTreatment}
-                  className="w-full cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  {isAddingTreatment ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Plus className="size-4" />
-                  )}
-                  <span>İşlemi Ekle</span>
-                </button>
-              </div>
-            </form>
-
-            {/* Hazır 3D Destekli Klinik Tedavi Şablonları (Tek Tıkla Ekle) */}
-            <div className="mt-5 pt-4 border-t border-slate-100">
-              <div className="flex items-center justify-between gap-2 mb-2.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Hazır 3D Klinik İşlem Şablonları (Tek Tıkla Hemen Ekle):
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  Listede olmayan işlemlere tıklayarak doğrudan ekleyebilirsiniz
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {QUICK_TREATMENT_TEMPLATES.map((tpl) => {
-                  const alreadyExists = treatmentsList.some(
-                    (t) =>
-                      t.name.toLowerCase() === tpl.name.toLowerCase() ||
-                      (t.code && t.code.toUpperCase() === tpl.code)
-                  );
-                  return (
-                    <button
-                      key={tpl.code}
-                      type="button"
-                      disabled={isAddingTreatment}
-                      onClick={() => {
-                        if (alreadyExists) {
-                          setNewTreatName(tpl.name);
-                          setNewTreatPrice(tpl.priceMinor);
-                          treatNameInputRef.current?.focus();
-                          return;
-                        }
-                        void submitNewTreatment({
-                          name: tpl.name,
-                          code: tpl.code,
-                          priceMinor: tpl.priceMinor,
-                        });
-                      }}
-                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
-                        alreadyExists
-                          ? "border-emerald-200 bg-emerald-50/60 text-emerald-800 hover:bg-emerald-100/70"
-                          : "border-slate-200 bg-slate-50/80 text-slate-800 hover:border-slate-900 hover:bg-slate-900 hover:text-white shadow-2xs"
-                      }`}
-                      title={
-                        alreadyExists
-                          ? "Bu işlem zaten kayıtlı (Formu doldurmak için tıklayın)"
-                          : `${tpl.name} işlemini tek tıkla ekle`
-                      }
-                    >
-                      {alreadyExists ? (
-                        <Check className="size-3.5 text-emerald-600" />
+                <div className="mt-4 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/[0.05]">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      <tr>
+                        <th className="px-4 py-3 w-24">Kod</th>
+                        <th className="px-4 py-3">İşlem</th>
+                        <th className="px-4 py-3 w-44 text-right">
+                          Fiyat ({currencySymbol})
+                        </th>
+                        <th className="px-4 py-3 w-28 text-center">Durum</th>
+                        <th className="px-4 py-3 w-24 text-right" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredTreatments.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="px-4 py-12 text-center text-sm text-slate-400"
+                          >
+                            {searchQuery
+                              ? "Sonuç yok"
+                              : "Henüz işlem eklenmedi"}
+                          </td>
+                        </tr>
                       ) : (
-                        <Plus className="size-3.5" />
-                      )}
-                      <span>{tpl.name}</span>
-                      <span className="opacity-70 font-mono text-[10px]">
-                        ({currencySymbol}
-                        {(tpl.priceMinor / 100).toLocaleString("tr-TR")})
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+                        filteredTreatments.map((t) => {
+                          const treatId = String(t.id);
+                          const isPendingDelete = pendingDeleteIds.has(treatId);
+                          const dirty = dirtyPrices.has(treatId);
+                          const displayPrice =
+                            dirtyPrices.get(treatId) ?? priceMap.get(treatId) ?? 0;
+                          const isEditing = editingTreatmentId === treatId;
 
-          {/* 2. KART: MEVCUT TEDAVİLER VE FİYAT LİSTESİ */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Coins className="size-4 text-slate-900" />
-                  Kayıtlı Tedavi İşlemleri ve Standart Fiyatlar
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Toplam <span className="font-semibold text-slate-800">{treatmentsList.length}</span> adet tanımlı tedavi işlemi bulunmaktadır. Fiyatları doğrudan satır üzerinden değiştirebilirsiniz.
-                </p>
-              </div>
-
-              {/* Arama ve Toplu Kaydet Butonu */}
-              <div className="flex items-center gap-3">
-                <div className="relative min-w-[200px]">
-                  <Search className="absolute left-3 top-2.5 size-3.5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="İşlem adı veya kod ile ara..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white pl-8 pr-3 py-1.5 text-xs font-semibold text-slate-900 shadow-2xs focus:border-slate-900 focus:outline-hidden transition"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="size-3" />
-                    </button>
-                  )}
-                </div>
-
-                {totalChanges > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleSaveAllChanges}
-                    disabled={isSavingPrices}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
-                  >
-                    {isSavingPrices ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Save className="size-3.5" />
-                    )}
-                    <span>Değişiklikleri Kaydet ({totalChanges})</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Değişiklik Bildirimi Banner */}
-            {totalChanges > 0 && (
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 font-medium">
-                <span className="flex size-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                <span>
-                  {pendingDeleteIds.size > 0 && dirtyPrices.size > 0 ? (
-                    <>
-                      <strong>{pendingDeleteIds.size}</strong> işlem silinmek üzere işaretlendi ve{" "}
-                      <strong>{dirtyPrices.size}</strong> işlemin fiyatı değiştirildi.
-                    </>
-                  ) : pendingDeleteIds.size > 0 ? (
-                    <>
-                      <strong>{pendingDeleteIds.size}</strong> işlem silinmek üzere işaretlendi.
-                    </>
-                  ) : (
-                    <>
-                      <strong>{dirtyPrices.size}</strong> işlemin fiyatında değişiklik yapıldı.
-                    </>
-                  )}{" "}
-                  Değişiklikleri onaylamak için sağ üstteki <strong>&quot;Değişiklikleri Kaydet&quot;</strong> butonuna tıklayabilirsiniz.
-                </span>
-              </div>
-            )}
-
-            {/* Tedavi Listesi Tablosu */}
-            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 w-24">Kod</th>
-                    <th scope="col" className="px-4 py-3">İşlem / Tedavi Adı</th>
-                    <th scope="col" className="px-4 py-3 w-48 text-right">Standart Fiyat ({currencySymbol})</th>
-                    <th scope="col" className="px-4 py-3 w-28 text-center">Durum</th>
-                    <th scope="col" className="px-4 py-3 w-28 text-right">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredTreatments.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
-                        {searchQuery ? (
-                          <div>
-                            <p className="font-medium text-slate-600">Aramanıza uygun işlem bulunamadı.</p>
-                            <button
-                              type="button"
-                              onClick={() => setSearchQuery("")}
-                              className="mt-2 text-xs font-semibold text-slate-900 underline"
-                            >
-                              Aramayı temizle
-                            </button>
-                          </div>
-                        ) : (
-                          <div>
-                            <p className="font-medium text-slate-600">Henüz tanımlı tedavi işlemi bulunmuyor.</p>
-                            <p className="mt-1 text-[11px] text-slate-400">Yukarıdaki formdan yeni işlemler ekleyebilirsiniz.</p>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredTreatments.map((t) => {
-                      const treatId = String(t.id);
-                      const isPendingDelete = pendingDeleteIds.has(treatId);
-                      const isPriceDirty = dirtyPrices.has(treatId);
-                      const currentAmount = isPriceDirty ? dirtyPrices.get(treatId)! : (priceMap.get(treatId) ?? 0);
-                      const isEditingName = editingTreatmentId === treatId;
-
-                      return (
-                        <tr
-                          key={treatId}
-                          className={`transition ${
-                            isPendingDelete
-                              ? "bg-rose-50/50"
-                              : isPriceDirty
-                              ? "bg-amber-50/20"
-                              : "hover:bg-slate-50/60"
-                          }`}
-                        >
-                          {/* Kod */}
-                          <td className="px-4 py-3 font-mono font-semibold text-slate-700">
-                            <span
-                              className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-bold border ${
+                          return (
+                            <tr
+                              key={treatId}
+                              className={`transition ${
                                 isPendingDelete
-                                  ? "bg-rose-100/70 border-rose-200 text-rose-700 line-through"
-                                  : "bg-slate-100 border-slate-200 text-slate-700"
+                                  ? "bg-rose-50/50 opacity-60"
+                                  : dirty
+                                    ? "bg-amber-50/40"
+                                    : "hover:bg-slate-50/80"
                               }`}
                             >
-                              {t.code}
-                            </span>
-                          </td>
-
-                          {/* İsim */}
-                          <td className="px-4 py-3 font-semibold text-slate-900">
-                            {isEditingName ? (
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="text"
-                                  value={editingTreatmentName}
-                                  onChange={(e) => setEditingTreatmentName(e.target.value)}
-                                  className="w-full max-w-sm rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-slate-900 focus:outline-hidden"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleSaveTreatmentName(treatId);
-                                    if (e.key === "Escape") setEditingTreatmentId(null);
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveTreatmentName(treatId)}
-                                  disabled={isUpdatingTreatment}
-                                  className="rounded-md bg-slate-900 p-1 text-white hover:bg-slate-800"
-                                  title="Kaydet"
-                                >
-                                  <Check className="size-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingTreatmentId(null)}
-                                  className="rounded-md bg-slate-100 p-1 text-slate-600 hover:bg-slate-200"
-                                  title="İptal"
-                                >
-                                  <X className="size-3.5" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 group">
-                                <span
-                                  className={
-                                    isPendingDelete
-                                      ? "line-through text-rose-500 font-normal"
-                                      : !t.isActive
-                                      ? "line-through text-slate-400"
-                                      : ""
-                                  }
-                                >
-                                  {t.name}
-                                </span>
-                                {isPendingDelete && (
-                                  <span className="rounded-md bg-rose-100 border border-rose-200 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
-                                    Silinecek
-                                  </span>
-                                )}
-                                {!isPendingDelete && (
+                              <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                                {t.code}
+                              </td>
+                              <td className="px-4 py-3">
+                                {isEditing ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={editingTreatmentName}
+                                      onChange={(e) =>
+                                        setEditingTreatmentName(e.target.value)
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter")
+                                          void handleSaveTreatmentName(treatId);
+                                        if (e.key === "Escape")
+                                          setEditingTreatmentId(null);
+                                      }}
+                                      className="w-full rounded-xl bg-slate-50 px-2.5 py-1.5 text-sm text-[#0b1f4d] outline-hidden ring-1 ring-[#0b1f4d]/20"
+                                      autoFocus
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={isUpdatingTreatment}
+                                      onClick={() =>
+                                        void handleSaveTreatmentName(treatId)
+                                      }
+                                      className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"
+                                    >
+                                      {isUpdatingTreatment ? (
+                                        <Loader2 className="size-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="size-3.5" />
+                                      )}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingTreatmentId(null)}
+                                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                                    >
+                                      <X className="size-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
                                   <button
                                     type="button"
+                                    disabled={isPendingDelete}
                                     onClick={() => {
                                       setEditingTreatmentId(treatId);
                                       setEditingTreatmentName(t.name);
                                     }}
-                                    className="opacity-0 group-hover:opacity-100 transition rounded p-0.5 text-slate-400 hover:text-slate-800"
-                                    title="İşlem Adını Düzenle"
+                                    className="group inline-flex max-w-full items-center gap-1.5 text-left font-semibold text-[#0b1f4d] disabled:cursor-default"
                                   >
-                                    <Pencil className="size-3" />
+                                    <span className="truncate">{t.name}</span>
+                                    <Pencil className="size-3 shrink-0 text-slate-300 opacity-0 transition group-hover:opacity-100" />
                                   </button>
                                 )}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Fiyat Input */}
-                          <td className="px-4 py-3 text-right">
-                            <div className="inline-flex items-center justify-end">
-                              <div className="relative">
+                              </td>
+                              <td className="px-4 py-3 text-right">
                                 <PriceInput
-                                  value={currentAmount}
+                                  value={displayPrice}
+                                  onChange={(val) =>
+                                    handlePriceChange(treatId, val)
+                                  }
                                   disabled={isPendingDelete}
-                                  onChange={(val) => handlePriceChange(treatId, val)}
-                                  placeholder="0"
-                                  className={`w-32 rounded-lg border px-2.5 py-1 text-right text-xs font-bold text-slate-900 shadow-2xs focus:border-slate-900 focus:outline-hidden transition ${
-                                    isPendingDelete
-                                      ? "border-rose-200 bg-rose-50/40 text-rose-400 line-through opacity-70"
-                                      : isPriceDirty
-                                      ? "border-amber-400 bg-amber-50/40 text-amber-950 font-extrabold ring-1 ring-amber-300"
-                                      : "border-slate-200 bg-white hover:bg-slate-50/50"
-                                  }`}
+                                  className="ml-auto w-36 rounded-xl bg-slate-50 px-2.5 py-1.5 text-right text-sm font-semibold tabular-nums text-[#0b1f4d] outline-hidden ring-1 ring-slate-900/[0.05] focus:bg-white focus:ring-[#0b1f4d]/20 disabled:opacity-50"
                                 />
-                                <span className="pointer-events-none absolute left-2 top-1 text-[11px] font-bold text-slate-400">
-                                  {currencySymbol}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Durum Toggle */}
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              type="button"
-                              disabled={isPendingDelete}
-                              onClick={() => handleToggleActive(treatId, t.isActive ?? true)}
-                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition ${
-                                isPendingDelete
-                                  ? "bg-slate-100 text-slate-400 border border-slate-200 opacity-50 cursor-not-allowed"
-                                  : t.isActive ?? true
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                                  : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
-                              }`}
-                            >
-                              <span
-                                className={`size-1.5 rounded-full ${
-                                  t.isActive ?? true ? "bg-emerald-500" : "bg-slate-400"
-                                }`}
-                              />
-                              {t.isActive ?? true ? "Aktif" : "Pasif"}
-                            </button>
-                          </td>
-
-                          {/* İşlemler / Silme */}
-                          <td className="px-4 py-3 text-right">
-                            {isPendingDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => handleUndoDelete(treatId)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-2xs hover:bg-slate-100 hover:text-slate-900 transition"
-                                title="Silme işlemini geri al"
-                              >
-                                <Undo2 className="size-3 text-slate-500" />
-                                <span>Geri Al</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleMarkDelete(treatId)}
-                                className="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                                title="İşlemi Sil (Kaydetmek için yukarıdaki butona tıklayın)"
-                              >
-                                <Trash2 className="size-3.5" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Bilgilendirme Notu */}
-            <div className="mt-5 flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-xs text-slate-600">
-              <Info className="size-4 shrink-0 text-slate-500 mt-0.5" />
-              <div>
-                <p className="font-semibold text-slate-800">
-                  Tedavi Planları ile Otomatik Entegrasyon
-                </p>
-                <p className="mt-0.5 text-slate-500 leading-relaxed">
-                  Bu sekmede tanımladığınız tüm işlemler ve belirlediğiniz birim fiyatlar anında senkronize olur. Hekim veya asistan bir hasta için <strong>Tedavi Planı</strong> hazırlarken &quot;Tedavi Ekle&quot; dediğinde açılır listede buradaki işlemler yer alır ve işlem seçildiği anda belirlenen standart fiyat tedavi satırına otomatik yansıtılır. Hekim dilerse plan özelinde fiyatı değiştirebilir.
-                </p>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  type="button"
+                                  disabled={isPendingDelete}
+                                  onClick={() =>
+                                    void handleToggleActive(
+                                      treatId,
+                                      t.isActive ?? true
+                                    )
+                                  }
+                                  className={`tp-tab inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                                    t.isActive ?? true
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : "bg-slate-100 text-slate-400"
+                                  }`}
+                                >
+                                  {t.isActive ?? true ? "Aktif" : "Pasif"}
+                                </button>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {isPendingDelete ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUndoDelete(treatId)}
+                                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white"
+                                  >
+                                    <Undo2 className="size-3.5" />
+                                    Geri
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMarkDelete(treatId)}
+                                    className="rounded-lg p-1.5 text-slate-300 hover:bg-rose-50 hover:text-rose-600"
+                                    title="Sil"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </section>
     </div>
   );
 }

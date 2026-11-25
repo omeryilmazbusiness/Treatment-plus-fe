@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Filter,
   Mail,
   MapPin,
   Phone,
@@ -108,8 +109,8 @@ function ActionButton({
       onClick={onClick}
       className={`tp-btn inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-xl px-6 text-base font-semibold ${
         primary
-          ? "tp-btn-primary bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/30"
-          : "text-[#0b1f4d] hover:bg-white/80"
+          ? "tp-btn-primary bg-[#0b1f4d] text-white shadow-lg shadow-[#0b1f4d]/25 hover:bg-[#132a5c]"
+          : "text-[#0b1f4d] hover:bg-slate-50"
       }`}
     >
       <Icon className="size-6" strokeWidth={1.8} />
@@ -139,13 +140,13 @@ function TabButton({
       onClick={onClick}
       className={`tp-tab -mb-px inline-flex cursor-pointer items-center gap-2.5 border-b-2 pb-4 text-base font-semibold ${
         active
-          ? "border-indigo-500 text-[#0b1f4d]"
+          ? "border-[#0b1f4d] text-[#0b1f4d]"
           : "border-transparent text-slate-400 hover:text-slate-700"
       }`}
     >
       <Icon className="size-5" strokeWidth={1.9} />
       <span>{label}</span>
-      <span className={`text-sm font-bold tabular-nums ${active ? "text-indigo-600" : "text-slate-400"}`}>
+      <span className={`text-sm font-bold tabular-nums ${active ? "text-[#0b1f4d]" : "text-slate-400"}`}>
         {count}
       </span>
     </button>
@@ -200,7 +201,41 @@ export function DashboardClient({
   }, [initialPlans]);
   const [tab, setTab] = useState<"plans" | "drafts" | null>(null);
   const activeTab = tab ?? (readyPlans.length === 0 && draftPlans.length > 0 ? "drafts" : "plans");
-  const visiblePlans = activeTab === "plans" ? readyPlans : draftPlans;
+  const tabPlans = activeTab === "plans" ? readyPlans : draftPlans;
+
+  // Planlar / Taslaklar ortak arama + soft filter
+  type PlanFilter = "all" | "patient" | "date";
+  const [planSearch, setPlanSearch] = useState("");
+  const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
+  const [planFilterOpen, setPlanFilterOpen] = useState(false);
+  const planFilterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!planFilterOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!planFilterRef.current?.contains(e.target as Node)) setPlanFilterOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [planFilterOpen]);
+
+  const visiblePlans = useMemo(() => {
+    const q = planSearch.trim().toLowerCase();
+    if (!q) return tabPlans;
+    return tabPlans.filter((p) => {
+      const patientName = (
+        p.patient?.name ||
+        patients.find((x) => x.id === p.patientId)?.name ||
+        ""
+      ).toLowerCase();
+      const title = (p.title || "").toLowerCase();
+      const dateRaw = (p.updatedAt || p.createdAt || "").toLowerCase();
+      const dateFmt = formatPlanDate(p.updatedAt || p.createdAt).toLowerCase();
+      if (planFilter === "patient") return patientName.includes(q);
+      if (planFilter === "date") return dateRaw.includes(q) || dateFmt.includes(q);
+      return patientName.includes(q) || title.includes(q) || dateRaw.includes(q) || dateFmt.includes(q);
+    });
+  }, [tabPlans, planSearch, planFilter, patients]);
 
   // Modals state
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -413,9 +448,7 @@ export function DashboardClient({
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-12.5rem)] w-full max-w-[1500px] flex-col pb-4 lg:h-[calc(100dvh-8.5rem)] lg:min-h-[480px]">
-      <section className="relative flex flex-1 flex-col overflow-hidden lg:min-h-0 rounded-[2.25rem] border border-white/70 bg-white/55 shadow-[0_20px_60px_-20px_rgba(79,70,229,0.35)] backdrop-blur-2xl">
-        <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-cyan-300/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-16 size-72 rounded-full bg-teal-200/30 blur-3xl" />
+      <section className="relative flex flex-1 flex-col overflow-hidden rounded-[2.25rem] border border-slate-200/80 bg-white shadow-[0_16px_48px_-28px_rgba(15,23,42,0.18)] lg:min-h-0">
 
         {/* ÜST: KARŞILAMA + AKSİYONLAR */}
         <div className="relative flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:py-4">
@@ -454,13 +487,13 @@ export function DashboardClient({
           </div>
         </div>
 
-        <div className="relative h-px bg-white/80" />
+        <div className="relative h-px bg-slate-100" />
 
         {/* ORTA: PLANLAR / TASLAKLAR + HASTALAR */}
         <div className="relative grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)]">
           {/* Planlar & Taslaklar */}
           <div className="flex min-h-[320px] min-w-0 flex-col px-6 py-7 sm:px-10 lg:col-span-8 lg:min-h-0 lg:overflow-x-clip lg:py-5">
-            <div role="tablist" aria-label="Planlar" className="flex gap-8 border-b border-white/80">
+            <div role="tablist" aria-label="Planlar" className="flex gap-8 border-b border-slate-100">
               <TabButton
                 active={activeTab === "plans"}
                 icon={FileText}
@@ -477,6 +510,93 @@ export function DashboardClient({
               />
             </div>
 
+            <div className="mt-3 flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  aria-label="Plan veya hasta ara"
+                  placeholder={
+                    planFilter === "patient"
+                      ? "Hastaya göre ara…"
+                      : planFilter === "date"
+                        ? "Tarihe göre ara…"
+                        : "Hasta, plan veya tarih ara…"
+                  }
+                  value={planSearch}
+                  onChange={(e) => setPlanSearch(e.target.value)}
+                  className="h-11 w-full rounded-2xl bg-slate-50 pl-10 pr-9 text-sm text-[#0b1f4d] placeholder:text-slate-400 outline-hidden ring-1 ring-slate-900/[0.05] transition focus:bg-white focus:ring-[#0b1f4d]/20"
+                />
+                {planSearch && (
+                  <button
+                    type="button"
+                    aria-label="Aramayı temizle"
+                    onClick={() => setPlanSearch("")}
+                    className="tp-icon-btn absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+
+              <div ref={planFilterRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  aria-label="Filtrele"
+                  aria-expanded={planFilterOpen}
+                  aria-haspopup="listbox"
+                  data-testid="plan-filter"
+                  onClick={() => setPlanFilterOpen((v) => !v)}
+                  className={`tp-icon-btn flex size-11 items-center justify-center rounded-2xl ring-1 transition ${
+                    planFilter !== "all" || planFilterOpen
+                      ? "bg-[#0b1f4d] text-white ring-[#0b1f4d]"
+                      : "bg-slate-50 text-[#0b1f4d] ring-slate-900/[0.05] hover:bg-white"
+                  }`}
+                >
+                  <Filter className="size-4" strokeWidth={2} />
+                </button>
+                {planFilterOpen && (
+                  <div
+                    role="listbox"
+                    aria-label="Arama filtresi"
+                    data-testid="plan-filter-menu"
+                    className="tp-panel-enter absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-2xl bg-white/95 p-1.5 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-900/[0.06] backdrop-blur-xl"
+                  >
+                    {(
+                      [
+                        { id: "all", label: "Tümü" },
+                        { id: "patient", label: "Hastaya göre" },
+                        { id: "date", label: "Tarihe göre" },
+                      ] as const
+                    ).map((opt) => {
+                      const active = planFilter === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          data-testid={`plan-filter-${opt.id}`}
+                          onClick={() => {
+                            setPlanFilter(opt.id);
+                            setPlanFilterOpen(false);
+                          }}
+                          className={`tp-tab flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${
+                            active
+                              ? "bg-[#0b1f4d] text-white"
+                              : "text-slate-600 hover:bg-slate-50 hover:text-[#0b1f4d]"
+                          }`}
+                        >
+                          {opt.label}
+                          {active && <Check className="size-4" strokeWidth={2.4} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div
               key={activeTab}
               role="tabpanel"
@@ -484,11 +604,17 @@ export function DashboardClient({
             >
               {visiblePlans.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12">
-                  {activeTab === "plans" ? (
-                    <FileText className="size-12 text-indigo-200" strokeWidth={1.4} />
+                  {planSearch.trim() ? (
+                    <>
+                      <Search className="size-12 text-slate-200" strokeWidth={1.4} />
+                      <p className="text-sm font-medium text-slate-400">Sonuç bulunamadı</p>
+                    </>
+                  ) : activeTab === "plans" ? (
+                    <FileText className="size-12 text-slate-200" strokeWidth={1.4} />
                   ) : (
-                    <PencilLine className="size-12 text-indigo-200" strokeWidth={1.4} />
+                    <PencilLine className="size-12 text-slate-200" strokeWidth={1.4} />
                   )}
+                  {!planSearch.trim() && (
                   <button
                     type="button"
                     onClick={() => {
@@ -497,11 +623,12 @@ export function DashboardClient({
                       setNewPlanTitle("");
                       setShowPlanModal(true);
                     }}
-                    className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 px-5 py-2.5 text-base font-semibold text-white shadow-md shadow-indigo-500/30"
+                    className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[#0b1f4d] px-5 py-2.5 text-base font-semibold text-white shadow-md shadow-[#0b1f4d]/25"
                   >
                     <Plus className="size-4" strokeWidth={2.2} />
                     Yeni Plan
                   </button>
+                  )}
                 </div>
               ) : (
                 visiblePlans.map((p) => {
@@ -541,7 +668,7 @@ export function DashboardClient({
                       <span className="shrink-0 text-lg font-semibold tabular-nums text-[#0b1f4d]">
                         {formatMoney(money(p.totalsGrand, p.currency))}
                       </span>
-                      <ChevronRight className="size-5 shrink-0 text-slate-300 transition duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 group-hover:text-indigo-500" />
+                      <ChevronRight className="size-5 shrink-0 text-slate-300 transition duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 group-hover:text-[#0b1f4d]" />
                     </Link>
                   );
                 })
@@ -550,10 +677,10 @@ export function DashboardClient({
           </div>
 
           {/* Hastalar */}
-          <div className="flex min-w-0 flex-col border-t border-white/80 px-6 py-7 sm:px-10 lg:col-span-4 lg:min-h-0 lg:overflow-x-clip lg:overflow-y-auto lg:border-l lg:border-t-0 lg:px-6 lg:py-5">
-            <div className="flex items-center gap-3 border-b border-white/80 pb-2">
+          <div className="flex min-w-0 flex-col border-t border-slate-100 px-6 py-7 sm:px-10 lg:col-span-4 lg:min-h-0 lg:overflow-x-clip lg:overflow-y-auto lg:border-l lg:border-slate-100 lg:border-t-0 lg:px-6 lg:py-5">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
               <div className="flex shrink-0 items-center gap-2 text-[#0b1f4d]">
-                <Users className="size-5 text-violet-500" strokeWidth={1.8} />
+                <Users className="size-5 text-[#0b1f4d]" strokeWidth={1.8} />
                 <span className="text-xl font-bold tabular-nums">{patients.length}</span>
               </div>
               <div className="relative min-w-0 flex-1">
@@ -585,7 +712,7 @@ export function DashboardClient({
                   setModalError("");
                   setShowPatientModal(true);
                 }}
-                className="tp-icon-btn flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-indigo-500 hover:bg-white/70"
+                className="tp-icon-btn flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[#0b1f4d] hover:bg-slate-50"
               >
                 <UserPlus className="size-5" strokeWidth={1.8} />
               </button>
@@ -594,7 +721,7 @@ export function DashboardClient({
             <div className="tp-stagger mt-2 flex max-h-[340px] min-h-[160px] flex-col gap-2 overflow-x-clip overflow-y-auto p-0.5 lg:min-h-[56px] lg:flex-1 [@media(max-height:800px)]:lg:min-h-0 lg:max-h-none">
               {sidebarFilteredPatients.length === 0 ? (
                 <div className="flex flex-1 items-center justify-center py-8">
-                  <User className="size-12 text-indigo-200" strokeWidth={1.4} />
+                  <User className="size-12 text-slate-200" strokeWidth={1.4} />
                 </div>
               ) : (
                 sidebarFilteredPatients.map((pat) => (
@@ -603,7 +730,7 @@ export function DashboardClient({
                     className="tp-card flex min-w-0 items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2.5 shadow-[0_10px_28px_-16px_rgba(15,23,42,0.32)] ring-1 ring-slate-900/[0.04]"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-50 to-violet-100 text-sm font-bold tracking-wide text-indigo-600">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold tracking-wide text-[#0b1f4d]">
                         {getInitials(pat.name)}
                       </span>
                       <div className="min-w-0">
@@ -621,7 +748,7 @@ export function DashboardClient({
                       onClick={() => handleStartPlanForPatient(pat.id)}
                       aria-label={`${pat.name} için tedavi planı başlat`}
                       title={`${pat.name} için tedavi planı başlat`}
-                      className="tp-icon-btn flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-indigo-50 text-indigo-500 hover:bg-indigo-500 hover:text-white"
+                      className="tp-icon-btn flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-slate-100 text-[#0b1f4d] hover:bg-[#0b1f4d] hover:text-white"
                     >
                       <Plus className="size-5" strokeWidth={2.2} />
                     </button>
@@ -634,7 +761,7 @@ export function DashboardClient({
           </div>
         </div>
 
-        <div className="relative h-px bg-white/80" />
+        <div className="relative h-px bg-slate-100" />
 
         {/* ALT: KLİNİK */}
         <div className="relative flex flex-col gap-1 px-6 py-5 sm:px-10 lg:py-3 2xl:flex-row 2xl:items-center 2xl:gap-3">
@@ -667,7 +794,7 @@ export function DashboardClient({
           <div className="grid flex-1 grid-cols-1 gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
             <InfoItem
               icon={Stethoscope}
-              tone="text-indigo-500"
+              tone="text-[#0b1f4d]"
               value={doctorName}
             />
             <InfoItem icon={Phone} tone="text-emerald-500" value={initialSettings.phone} />
@@ -679,7 +806,7 @@ export function DashboardClient({
             href="/app/clinic"
             aria-label="Profili Düzenle"
             title="Profili Düzenle"
-            className="tp-icon-btn absolute right-4 top-2.5 flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-white/70 hover:text-indigo-600 sm:right-8 2xl:static 2xl:size-11"
+            className="tp-icon-btn absolute right-4 top-2.5 flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50 hover:text-[#0b1f4d] sm:right-8 2xl:static 2xl:size-11"
           >
             <Pencil className="size-5" strokeWidth={1.8} />
           </Link>
@@ -688,12 +815,12 @@ export function DashboardClient({
 
       {/* YENİ TEDAVİ PLANI MODALI */}
       {showPlanModal && (
-        <div className="tp-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-indigo-950/25 p-4 backdrop-blur-xl">
-          <div className="tp-modal-enter w-full max-w-lg overflow-visible rounded-[2rem] border border-white/70 bg-white/75 p-7 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl">
+        <div className="tp-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-xl">
+          <div className="tp-modal-enter w-full max-w-lg overflow-visible rounded-[2rem] border border-slate-200/80 bg-white p-7 shadow-2xl shadow-slate-900/15">
             {/* Modal Üst Başlık */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex size-9 items-center justify-center text-indigo-500">
+                <div className="flex size-9 items-center justify-center text-[#0b1f4d]">
                   <FileText className="size-5" strokeWidth={1.8} />
                 </div>
                 <div>
@@ -798,7 +925,7 @@ export function DashboardClient({
                     {isPatientDropdownOpen && (
                       <div className="absolute left-0 top-full z-60 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
                         {/* Arama Girişi */}
-                        <div className="relative border-b border-white/80 pb-2">
+                        <div className="relative border-b border-slate-100 pb-2">
                           <Search className="pointer-events-none absolute left-3 top-2.5 size-3.5 text-slate-400" />
                           <input
                             type="text"
@@ -966,7 +1093,7 @@ export function DashboardClient({
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 px-6 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
+                  className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[#0b1f4d] px-6 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
                 >
                   <span>{isPending ? "Oluşturuluyor..." : "Planı Başlat & Düzenle"}</span>
                   <ArrowRight className="size-3.5" />
@@ -979,11 +1106,11 @@ export function DashboardClient({
 
       {/* YENİ HASTA EKLE MODALI */}
       {showPatientModal && (
-        <div className="tp-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-indigo-950/25 p-4 backdrop-blur-xl">
-          <div className="tp-modal-enter w-full max-w-md rounded-[2rem] border border-white/70 bg-white/75 p-7 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl">
+        <div className="tp-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-xl">
+          <div className="tp-modal-enter w-full max-w-md rounded-[2rem] border border-slate-200/80 bg-white p-7 shadow-2xl shadow-slate-900/15">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex size-9 items-center justify-center text-indigo-500">
+                <div className="flex size-9 items-center justify-center text-[#0b1f4d]">
                   <UserPlus className="size-5" strokeWidth={1.8} />
                 </div>
                 <div>
@@ -1052,7 +1179,7 @@ export function DashboardClient({
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 px-6 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
+                  className="tp-btn tp-btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-br from-[#0b1f4d] to-[#132a5c] px-6 py-2.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
                 >
                   <span>{isPending ? "Kaydediliyor..." : "Hastayı Kaydet"}</span>
                   <Check className="size-3.5" />

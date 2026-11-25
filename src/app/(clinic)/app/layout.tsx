@@ -13,17 +13,18 @@ import { MotionShell } from "./motion-shell";
 /**
  * Persistent app shell. The sidebar and header are fixed and sit above page
  * modals (z-55), so they stay visible on every /app screen.
+ *
+ * Palette: premium white field, black drawer, navy accents.
  */
 export default function ClinicLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-dvh overflow-x-hidden bg-[linear-gradient(135deg,#e0f2fe_0%,#e0e7ff_45%,#fae8ff_100%)]">
-      {/* Soft ambient light */}
-      <div className="pointer-events-none fixed -left-32 -top-32 size-[28rem] rounded-full bg-sky-300/50 blur-3xl" />
-      <div className="pointer-events-none fixed -bottom-40 right-0 size-[32rem] rounded-full bg-indigo-300/45 blur-3xl" />
-      <div className="pointer-events-none fixed left-1/3 top-1/2 size-[24rem] rounded-full bg-cyan-300/30 blur-3xl" />
+    <div className="relative min-h-dvh overflow-x-hidden bg-[#f7f8fa]">
+      {/* Çok hafif lacivert ambient — parlak renk yok */}
+      <div className="pointer-events-none fixed -left-40 -top-40 size-[26rem] rounded-full bg-[#0b1f4d]/[0.04] blur-3xl" />
+      <div className="pointer-events-none fixed -bottom-48 right-0 size-[28rem] rounded-full bg-slate-300/25 blur-3xl" />
 
-      {/* Sol sabit menü (masaüstü) / alt bar (mobil) */}
-      <aside className="fixed inset-x-3 bottom-3 z-[55] rounded-2xl bg-gradient-to-b from-[#0b1f4d] via-[#1e1b6b] to-[#4c1d95] p-1.5 shadow-[0_12px_40px_-12px_rgba(30,27,107,0.6)] lg:inset-y-0 lg:left-0 lg:right-auto lg:bottom-0 lg:flex lg:w-60 lg:flex-col lg:rounded-none lg:p-4 lg:shadow-[8px_0_40px_-16px_rgba(30,27,107,0.5)]">
+      {/* Sol sabit menü — siyah drawer */}
+      <aside className="fixed inset-x-3 bottom-3 z-[55] rounded-2xl bg-[#0a0a0a] p-1.5 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.55)] lg:inset-y-0 lg:left-0 lg:right-auto lg:bottom-0 lg:flex lg:w-60 lg:flex-col lg:rounded-none lg:border-r lg:border-white/5 lg:p-4 lg:shadow-none">
         <Link
           href="/app"
           aria-label="Treatment+"
@@ -33,15 +34,15 @@ export default function ClinicLayout({ children }: { children: ReactNode }) {
             <Mark className="size-6" />
           </span>
           <span className="text-lg font-bold tracking-tight text-white">
-            Treatment<span className="text-sky-300">+</span>
+            Treatment<span className="text-[#8eb4ff]">+</span>
           </span>
         </Link>
 
         <ClinicNav />
       </aside>
 
-      {/* Sabit header */}
-      <header className="fixed left-3 right-3 top-3 z-[55] flex h-16 items-center gap-3 rounded-2xl border border-white/70 bg-white/55 px-3 shadow-[0_10px_40px_-16px_rgba(79,70,229,0.35)] backdrop-blur-2xl sm:px-4 lg:left-[16.5rem] lg:right-5 lg:top-5">
+      {/* Sabit header — beyaz premium */}
+      <header className="fixed left-3 right-3 top-3 z-[55] flex h-16 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 shadow-[0_8px_30px_-18px_rgba(15,23,42,0.18)] sm:px-4 lg:left-[16.5rem] lg:right-5 lg:top-5">
         <Link href="/app" className="flex shrink-0 items-center lg:hidden" aria-label="Treatment+">
           <Mark className="size-7" />
         </Link>
@@ -70,15 +71,8 @@ async function SessionChip() {
   await connection();
   const { config } = getRuntime();
   const session = await readRawSession(config);
-  const email = session?.userEmail ?? "";
-
   return (
     <div className="flex shrink-0 items-center gap-1.5">
-      {email && (
-        <span className="hidden max-w-60 truncate text-sm font-medium text-slate-600 xl:inline">
-          {email}
-        </span>
-      )}
       {session && <LogoutButton />}
     </div>
   );

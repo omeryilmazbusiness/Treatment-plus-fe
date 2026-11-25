@@ -9,6 +9,7 @@ import type { Patient, Plan } from "@/modules/plan/domain/plan";
 import {
   UPGRADE_DISCOUNT_PERCENT,
   findExtraPdfPack,
+  extraPackPriceMinor,
   discountedPrice,
   isProfessionalTier,
   pickUpgradeTarget,
@@ -583,11 +584,14 @@ async function submitLead(lead: LeadKind): Promise<ActionResult<{ alreadyRequest
         `kampanya=%${UPGRADE_DISCOUNT_PERCENT}`,
       ];
     } else {
+      const pack = findExtraPdfPack(lead.pdfs);
       summary = [
         "[EXTRA_PDF] Ek PDF paketi talebi (aylık)",
         `adet=${lead.pdfs}`,
         `fiyat=${lead.priceMinor / 100} ${lead.currency}/ay`,
-      ];
+        pack ? `liste=${pack.listPriceMinor / 100} ${pack.currency}` : "",
+        pack ? `indirim=%${pack.discountPercent}` : "",
+      ].filter(Boolean);
     }
 
     await runtime.subscription.requestUpgrade({
@@ -623,5 +627,10 @@ export async function requestExtraPdfPackAction(
 ): Promise<ActionResult<{ alreadyRequested: boolean }>> {
   const pack = findExtraPdfPack(pdfs);
   if (!pack) return { success: false, error: "Geçersiz paket." };
-  return submitLead({ kind: "extra_pdf", ...pack });
+  return submitLead({
+    kind: "extra_pdf",
+    pdfs: pack.pdfs,
+    priceMinor: extraPackPriceMinor(pack),
+    currency: pack.currency,
+  });
 }

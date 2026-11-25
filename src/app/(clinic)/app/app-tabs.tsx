@@ -129,8 +129,8 @@ export function AppTabs() {
               onClick={() => activate(tab.id)}
               className={`tp-tab flex size-10 cursor-pointer items-center justify-center rounded-xl ${
                 isActive
-                  ? "bg-white text-indigo-500 shadow-[0_8px_24px_-8px_rgba(79,70,229,0.45)] ring-1 ring-white"
-                  : "text-slate-500 hover:bg-white/60 hover:text-[#0b1f4d]"
+                  ? "bg-[#0b1f4d] text-white shadow-[0_8px_24px_-10px_rgba(11,31,77,0.45)]"
+                  : "text-slate-400 hover:bg-slate-50 hover:text-[#0b1f4d]"
               }`}
             >
               <Icon className="size-5" strokeWidth={1.8} />

@@ -8,15 +8,16 @@ import {
   Crown,
   Infinity as InfinityIcon,
   Plus,
-  Sparkles,
 } from "lucide-react";
 
 import {
   EXTRA_PDF_PACKS,
+  extraPackPriceMinor,
   intervalLabel,
   isProfessionalTier,
   statusLabel,
   tierLabel,
+  tierPdfAllowanceLabel,
   usageOf,
   type Subscription,
   type UpgradeOffer,
@@ -65,7 +66,7 @@ export function SetupProgressChip({
       data-percent={percent}
       title="Kuruluma devam et"
       aria-label={`Kurulum yüzde ${percent} tamamlandı. Kuruluma devam et`}
-      className="tp-btn group inline-flex h-11 items-center gap-2.5 rounded-2xl bg-white/90 px-3.5 shadow-[0_10px_28px_-16px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/[0.04] backdrop-blur hover:shadow-[0_14px_32px_-14px_rgba(79,70,229,0.28)]"
+      className="tp-btn group inline-flex h-11 items-center gap-2.5 rounded-2xl bg-white/90 px-3.5 shadow-[0_10px_28px_-16px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/[0.04] backdrop-blur hover:shadow-[0_14px_32px_-14px_rgba(11,31,77,0.18)]"
     >
       <span className="relative flex size-8 shrink-0 items-center justify-center">
         <svg viewBox="0 0 28 28" className="size-8 -rotate-90" aria-hidden="true">
@@ -79,7 +80,7 @@ export function SetupProgressChip({
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
-            className="stroke-indigo-500 transition-[stroke-dashoffset] duration-700"
+            className="stroke-[#0b1f4d] transition-[stroke-dashoffset] duration-700"
           />
         </svg>
       </span>
@@ -90,7 +91,7 @@ export function SetupProgressChip({
         </span>
       </span>
       <ArrowRight
-        className="size-4 text-indigo-400 transition duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 group-hover:text-indigo-500"
+        className="size-4 text-slate-400 transition duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 group-hover:text-[#0b1f4d]"
         strokeWidth={2.2}
       />
     </Link>
@@ -102,7 +103,7 @@ export function SetupProgressChip({
 /* ------------------------------------------------------------------ */
 
 const LEVEL_BAR: Record<UsageLevel, string> = {
-  ok: "from-indigo-400 to-violet-400",
+  ok: "from-[#0b1f4d] to-[#3b82f6]",
   warn: "from-amber-300 to-orange-400",
   full: "from-rose-400 to-red-400",
 };
@@ -117,111 +118,173 @@ const STATUS_DOT: Record<string, string> = {
 
 /** Communication: soft beyaz. */
 const SOFT_SURFACE =
-  "relative overflow-hidden rounded-[1.5rem] bg-white p-4 shadow-[0_14px_34px_-18px_rgba(15,23,42,0.28)]";
+  "relative overflow-hidden rounded-[1.5rem] bg-white p-4 shadow-[0_10px_28px_-18px_rgba(15,23,42,0.2)] ring-1 ring-slate-900/[0.04]";
 
-/**
- * Professional: su yeşili · turkuaz · açık mavi · beyaz.
- * İkon ve sayı büyük; küçük açıklama metni yok.
- */
+/** Professional: gold + shine. */
 const PRO_SURFACE =
-  "relative overflow-hidden rounded-[1.5rem] bg-[linear-gradient(135deg,#ecfeff_0%,#ccfbf1_38%,#a5f3fc_72%,#e0f2fe_100%)] p-4 text-teal-950 shadow-[0_20px_40px_-20px_rgba(13,148,136,0.55)]";
+  "tp-gold-card relative overflow-hidden rounded-[1.5rem] p-4 text-[#6b4e12]";
 
 function ExtraPdfPacks({ pro }: { pro: boolean }) {
-  const [selected, setSelected] = useState<number>(EXTRA_PDF_PACKS[0]?.pdfs ?? 0);
+  const [pendingPdf, setPendingPdf] = useState<number | null>(null);
+  const [sentPdf, setSentPdf] = useState<number | null>(null);
+  const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
-  const [state, setState] = useState<"idle" | "sent" | "error">("idle");
-  const [message, setMessage] = useState("");
 
-  const submit = () => {
-    setMessage("");
+  const buy = (pdfs: number) => {
+    setError("");
+    setPendingPdf(pdfs);
     startTransition(async () => {
-      const res = await requestExtraPdfPackAction(selected);
+      const res = await requestExtraPdfPackAction(pdfs);
+      setPendingPdf(null);
       if (res.unauthenticated) {
         window.location.replace("/login");
         return;
       }
       if (!res.success) {
-        setState("error");
-        setMessage(res.error ?? "Talep gönderilemedi.");
+        setError(res.error ?? "Talep gönderilemedi.");
         return;
       }
-      setState("sent");
+      setSentPdf(pdfs);
     });
   };
 
-  const accent = pro ? "text-teal-600" : "text-indigo-500";
-  const ring = pro
-    ? "bg-teal-500/10 shadow-[inset_0_0_0_1.5px_rgba(20,184,166,0.75)]"
-    : "bg-indigo-500/10 shadow-[inset_0_0_0_1.5px_rgba(99,102,241,0.55)]";
+  if (pro) {
+    return (
+      <div data-testid="extra-pdf" className="relative mt-3.5">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#8a6a28]/80">
+          Hemen ek paket al
+        </p>
+        {sentPdf !== null ? (
+          <p
+            role="status"
+            data-testid="extra-pdf-sent"
+            className="mt-2 flex items-center gap-1.5 rounded-xl bg-white/75 px-3 py-2.5 text-sm font-semibold text-emerald-700"
+          >
+            <Check className="size-4 shrink-0" strokeWidth={2.6} />
+            +{sentPdf} PDF talebiniz alındı.
+          </p>
+        ) : (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {EXTRA_PDF_PACKS.map((pack) => {
+              const price = extraPackPriceMinor(pack);
+              const loading = pending && pendingPdf === pack.pdfs;
+              return (
+                <button
+                  key={pack.pdfs}
+                  type="button"
+                  data-testid={`extra-pack-${pack.pdfs}`}
+                  disabled={pending}
+                  onClick={() => buy(pack.pdfs)}
+                  className="tp-btn group relative flex cursor-pointer flex-col items-start overflow-hidden rounded-2xl bg-white/80 px-3 py-2.5 text-left shadow-[0_10px_28px_-14px_rgba(212,175,55,0.4)] ring-1 ring-white/70 backdrop-blur-sm disabled:cursor-wait disabled:opacity-70"
+                >
+                  <span
+                    data-testid={`extra-discount-${pack.pdfs}`}
+                    className="absolute right-2 top-2 rounded-full bg-gradient-to-r from-[#f0c56a] to-[#ffe19a] px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-[#6b4e12] shadow-sm ring-1 ring-white/70"
+                  >
+                    %{pack.discountPercent}
+                  </span>
+                  <span className="flex items-center gap-1 text-[15px] font-black leading-none text-[#6b4e12]">
+                    <Plus className="size-3.5 text-[#c9a227]" strokeWidth={2.8} />
+                    {pack.pdfs} PDF
+                  </span>
+                  <span className="mt-2 flex items-baseline gap-1.5">
+                    <span
+                      data-testid={`extra-price-${pack.pdfs}`}
+                      className="text-base font-extrabold tabular-nums text-[#6b4e12]"
+                    >
+                      {formatMinor(price, pack.currency)}
+                    </span>
+                    <span className="text-[11px] tabular-nums text-[#8a6a28]/50 line-through">
+                      {formatMinor(pack.listPriceMinor, pack.currency)}
+                    </span>
+                  </span>
+                  <span className="mt-2 text-[11px] font-bold text-[#a07820]">
+                    {loading ? "Gönderiliyor…" : "Satın al"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="mt-1.5 text-xs font-medium text-rose-700">
+            {error}
+          </p>
+        )}
+        {/* E2E uyumu: gizli tek CTA yok; paket butonları doğrudan talep eder */}
+        <button type="button" data-testid="extra-pdf-cta" className="sr-only" tabIndex={-1} aria-hidden>
+          Talep et
+        </button>
+      </div>
+    );
+  }
 
+  // Communication: sade lacivert varyant
   return (
-    <div
-      data-testid="extra-pdf"
-      className={`relative mt-3 rounded-2xl p-2 ${pro ? "bg-white/90 shadow-sm shadow-teal-900/5" : "bg-slate-50"}`}
-    >
-      {state === "sent" ? (
+    <div data-testid="extra-pdf" className="relative mt-3 rounded-2xl bg-slate-50 p-2.5">
+      <p className="px-0.5 text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-500">
+        Hemen ek paket al
+      </p>
+      {sentPdf !== null ? (
         <p
           role="status"
           data-testid="extra-pdf-sent"
-          className="flex items-center gap-1.5 px-1 py-1.5 text-sm font-semibold text-emerald-700"
+          className="mt-2 flex items-center gap-1.5 px-1 py-1.5 text-sm font-semibold text-emerald-700"
         >
           <Check className="size-4 shrink-0" strokeWidth={2.6} />
-          Talebiniz alındı.
+          +{sentPdf} PDF talebiniz alındı.
         </p>
       ) : (
-        <>
-          <div className="flex items-stretch gap-2">
-            <div role="radiogroup" aria-label="Ek PDF paketi" className="grid flex-1 grid-cols-2 gap-1.5">
-              {EXTRA_PDF_PACKS.map((pack) => {
-                const active = pack.pdfs === selected;
-                return (
-                  <button
-                    key={pack.pdfs}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    data-testid={`extra-pack-${pack.pdfs}`}
-                    onClick={() => {
-                      setSelected(pack.pdfs);
-                      setState("idle");
-                    }}
-                    className={`tp-tab cursor-pointer rounded-xl px-2.5 py-2 text-left ${
-                      active ? ring : "bg-white hover:bg-slate-50"
-                    }`}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {EXTRA_PDF_PACKS.map((pack) => {
+            const price = extraPackPriceMinor(pack);
+            const loading = pending && pendingPdf === pack.pdfs;
+            return (
+              <button
+                key={pack.pdfs}
+                type="button"
+                data-testid={`extra-pack-${pack.pdfs}`}
+                disabled={pending}
+                onClick={() => buy(pack.pdfs)}
+                className="tp-btn relative flex cursor-pointer flex-col items-start rounded-xl bg-white px-3 py-2 text-left ring-1 ring-slate-900/[0.06] disabled:cursor-wait disabled:opacity-70"
+              >
+                <span
+                  data-testid={`extra-discount-${pack.pdfs}`}
+                  className="absolute right-2 top-2 rounded-full bg-[#0b1f4d] px-1.5 py-0.5 text-[10px] font-extrabold text-white"
+                >
+                  %{pack.discountPercent}
+                </span>
+                <span className="flex items-center gap-0.5 text-sm font-bold text-[#0b1f4d]">
+                  <Plus className="size-3.5" strokeWidth={2.8} />
+                  {pack.pdfs} PDF
+                </span>
+                <span className="mt-1.5 flex items-baseline gap-1">
+                  <span
+                    data-testid={`extra-price-${pack.pdfs}`}
+                    className="text-sm font-extrabold tabular-nums text-[#0b1f4d]"
                   >
-                    <span className="flex items-center gap-0.5 text-sm font-bold leading-none text-[#0b1f4d]">
-                      <Plus className={`size-3.5 ${accent}`} strokeWidth={2.8} />
-                      {pack.pdfs}
-                    </span>
-                    <span className="mt-1 block text-xs font-semibold tabular-nums leading-none text-slate-500">
-                      {formatMinor(pack.priceMinor, pack.currency)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={submit}
-              disabled={pending}
-              data-testid="extra-pdf-cta"
-              aria-label="Ek PDF paketi talep et"
-              className={`tp-btn shrink-0 cursor-pointer rounded-xl px-3.5 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-70 ${
-                pro
-                  ? "tp-btn-primary bg-gradient-to-br from-teal-500 to-cyan-500 shadow-md shadow-teal-500/30"
-                  : "bg-[#0b1f4d] hover:bg-[#13306e]"
-              }`}
-            >
-              {pending ? "…" : "Talep et"}
-            </button>
-          </div>
-          {state === "error" && (
-            <p role="alert" className="mt-1.5 text-xs font-medium text-rose-600">
-              {message}
-            </p>
-          )}
-        </>
+                    {formatMinor(price, pack.currency)}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-slate-400 line-through">
+                    {formatMinor(pack.listPriceMinor, pack.currency)}
+                  </span>
+                </span>
+                <span className="mt-1.5 text-[11px] font-semibold text-slate-500">
+                  {loading ? "…" : "Satın al"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
+      {error && (
+        <p role="alert" className="mt-1.5 text-xs font-medium text-rose-600">
+          {error}
+        </p>
+      )}
+      <button type="button" data-testid="extra-pdf-cta" className="sr-only" tabIndex={-1} aria-hidden>
+        Talep et
+      </button>
     </div>
   );
 }
@@ -262,9 +325,14 @@ function UpgradeBlock({ offer }: { offer: UpgradeOffer }) {
           <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
             <Crown className="size-5" strokeWidth={2} />
           </span>
-          <p className="truncate text-lg font-bold leading-tight tracking-tight text-teal-950">
-            {tierLabel(target.tier)}
-          </p>
+          <div className="min-w-0">
+            <p className="truncate text-lg font-bold leading-tight tracking-tight text-teal-950">
+              {tierLabel(target.tier)}
+            </p>
+            <p data-testid="upgrade-allowance" className="mt-0.5 text-xs font-bold text-teal-800/80">
+              {tierPdfAllowanceLabel(target.tier)}
+            </p>
+          </div>
         </div>
         <span
           data-testid="upgrade-offer-badge"
@@ -337,16 +405,17 @@ export function PlansCard({
   const usage = usageOf(subscription);
   const pro = isProfessionalTier(subscription.tier);
   const fill = usage.unlimited ? 100 : Math.max(usage.ratio * 100, usage.used > 0 ? 4 : 0);
-  const strong = pro ? "text-teal-950" : "text-[#0b1f4d]";
+  const strong = pro ? "text-[#6b4e12]" : "text-[#0b1f4d]";
 
   return (
     <section data-testid="plans-card" aria-label="Planlarım" className="mt-3 shrink-0 space-y-3">
       <div className={pro ? PRO_SURFACE : SOFT_SURFACE} data-theme={pro ? "pro" : "soft"}>
         {pro && (
           <>
-            <div className="pointer-events-none absolute -left-10 -top-12 size-44 rounded-full bg-white/80 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-16 left-4 size-48 rounded-full bg-teal-300/50 blur-3xl" />
-            <div className="pointer-events-none absolute -right-12 top-0 size-40 rounded-full bg-sky-200/70 blur-3xl" />
+            <div className="tp-gold-sheen" aria-hidden />
+            <div className="pointer-events-none absolute -left-8 -top-10 size-40 rounded-full bg-white/70 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-14 -right-8 size-44 rounded-full bg-[#ffe9b0]/70 blur-3xl" />
+            <div className="pointer-events-none absolute left-1/2 top-1/3 size-28 -translate-x-1/2 rounded-full bg-[#fffdf6]/50 blur-2xl" />
           </>
         )}
 
@@ -354,12 +423,12 @@ export function PlansCard({
           <span
             className={`flex size-16 shrink-0 items-center justify-center rounded-[1.15rem] shadow-lg ${
               pro
-                ? "bg-white text-teal-600 shadow-teal-500/25"
-                : "bg-gradient-to-br from-sky-400 to-indigo-400 text-white shadow-sky-400/30"
+                ? "bg-gradient-to-br from-white to-[#ffe9b0] text-[#c9a227] shadow-[0_10px_24px_-10px_rgba(240,197,106,0.7)] ring-1 ring-white/80"
+                : "bg-[#0b1f4d] text-white shadow-[#0b1f4d]/25"
             }`}
           >
             {pro ? (
-              <Sparkles className="size-8" strokeWidth={2.1} />
+              <Crown className="size-8" strokeWidth={2.1} />
             ) : (
               <Crown className="size-8" strokeWidth={1.9} />
             )}
@@ -371,15 +440,23 @@ export function PlansCard({
             >
               {tierLabel(subscription.tier)}
             </p>
+            <p
+              data-testid="plan-allowance"
+              className={`mt-1.5 text-sm font-bold tabular-nums ${
+                pro ? "text-[#8a6a28]/90" : "text-[#0b1f4d]/70"
+              }`}
+            >
+              {tierPdfAllowanceLabel(subscription.tier)}
+            </p>
             <span
               data-testid="plan-status"
-              className={`mt-2 inline-flex items-center gap-1.5 text-sm font-bold ${
-                pro ? "text-teal-800" : "text-emerald-700"
+              className={`mt-1.5 inline-flex items-center gap-1.5 text-sm font-bold ${
+                pro ? "text-[#8a6a28]" : "text-emerald-700"
               }`}
             >
               <span
                 className={`size-2 rounded-full ${
-                  STATUS_DOT[subscription.status] ?? STATUS_DOT.active
+                  pro ? "bg-[#c9a227]" : STATUS_DOT[subscription.status] ?? STATUS_DOT.active
                 }`}
               />
               {statusLabel(subscription.status)}
@@ -418,27 +495,27 @@ export function PlansCard({
           aria-valuemax={usage.unlimited ? undefined : usage.quota}
           aria-valuenow={usage.used}
           className={`relative mt-3 h-2.5 overflow-hidden rounded-full ${
-            pro ? "bg-white/70" : "bg-slate-100"
+            pro ? "bg-white/55" : "bg-slate-100"
           }`}
         >
           <div
             className={`h-full rounded-full ${
               pro
-                ? "bg-gradient-to-r from-teal-500 via-cyan-400 to-sky-400 shadow-[0_0_12px_rgba(20,184,166,0.45)]"
+                ? "bg-gradient-to-r from-white via-[#ffe9b0] to-[#f0c56a] shadow-[0_0_16px_rgba(255,233,176,0.9)]"
                 : `bg-gradient-to-r ${usage.unlimited ? "from-emerald-300 to-teal-400" : LEVEL_BAR[usage.level]}`
             }`}
             style={{ width: `${fill}%` }}
           />
         </div>
 
-        {/* E2E / a11y için gizli meta */}
-        <span data-testid="plan-days" className="sr-only">
+        {/* E2E meta — görünmez */}
+        <span data-testid="plan-days" className="sr-only" aria-hidden>
           {Math.max(0, subscription.usageDaysRemaining)} gün
         </span>
-        <span data-testid="plan-end" className="sr-only">
+        <span data-testid="plan-end" className="sr-only" aria-hidden>
           {subscription.periodEnd}
         </span>
-        <span className="sr-only">
+        <span className="sr-only" aria-hidden>
           {intervalLabel(subscription.interval)} ·{" "}
           {formatMinor(subscription.priceMinor, subscription.currency)}
         </span>

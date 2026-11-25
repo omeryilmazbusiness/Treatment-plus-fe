@@ -43,8 +43,8 @@ const TONE_GLYPH: Record<Tone, string> = {
   amber: "from-amber-400 to-orange-500",
   sky: "from-sky-400 to-blue-600",
   emerald: "from-emerald-400 to-emerald-600",
-  violet: "from-violet-400 to-purple-600",
-  indigo: "from-indigo-400 to-indigo-600",
+  violet: "from-slate-500 to-[#0b1f4d]",
+  indigo: "from-[#3b82f6] to-[#0b1f4d]",
   teal: "from-teal-400 to-cyan-600",
   zinc: "from-zinc-400 to-zinc-600",
 };
