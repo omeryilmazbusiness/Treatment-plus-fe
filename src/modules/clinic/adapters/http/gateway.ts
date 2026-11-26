@@ -63,6 +63,8 @@ type RawClinicSettings = {
   lab?: RawLab;
   awards?: RawAwards;
   hotel?: RawHotel;
+  template_id?: string;
+  show_motifs?: boolean;
 };
 
 export class ClinicHttpGateway implements ClinicReader, ClinicWriter {
@@ -153,6 +155,8 @@ function toDomain(raw: RawClinicSettings): ClinicSettings {
       text: raw.hotel?.text ?? "",
       imageKey: raw.hotel?.image_key ?? "",
     },
+    templateId: (raw.template_id as any) ?? "klinik-minimal",
+    showMotifs: raw.show_motifs ?? true,
   };
 }
 
@@ -179,6 +183,8 @@ function toBackendBody(patch: Partial<ClinicSettings>): Record<string, unknown> 
   if (patch.welcomeBody !== undefined) body.welcome_body = patch.welcomeBody;
   if (patch.signerName !== undefined) body.signer_name = patch.signerName;
   if (patch.signerTitle !== undefined) body.signer_title = patch.signerTitle;
+  if (patch.templateId !== undefined) body.template_id = patch.templateId;
+  if (patch.showMotifs !== undefined) body.show_motifs = patch.showMotifs;
   if (patch.highlights !== undefined) body.highlights = patch.highlights;
   if (patch.doctor !== undefined) {
     body.doctor = {

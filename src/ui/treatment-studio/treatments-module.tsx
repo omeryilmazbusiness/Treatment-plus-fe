@@ -515,7 +515,7 @@ export function TreatmentsModule({
                     type="button"
                     onClick={() => void handleAddTreatmentItem(tr)}
                     className="group w-full flex items-center justify-between gap-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 text-left transition shadow-2xs hover:border-slate-400 hover:bg-slate-100/70 hover:shadow-xs active:scale-[0.99] cursor-pointer"
-                    title={`${tr.name} - ${currSymbol} ${tr.price.toLocaleString()}`}
+                    title={`${tr.name} - ${currSymbol} ${tr.price.toLocaleString("tr-TR")}`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {tr.code && (
@@ -529,7 +529,7 @@ export function TreatmentsModule({
                     </div>
                     <div className="shrink-0 text-right">
                       <span className="text-xs font-bold text-slate-900">
-                        {tr.price > 0 ? `${currSymbol} ${tr.price.toLocaleString()}` : `0 ${currSymbol}`}
+                        {tr.price > 0 ? `${currSymbol} ${tr.price.toLocaleString("tr-TR")}` : `0 ${currSymbol}`}
                       </span>
                     </div>
                   </button>
@@ -678,10 +678,10 @@ export function TreatmentsModule({
                           </div>
                         </td>
                         <td className="py-3 px-3 text-right font-medium text-slate-600">
-                          {item.unitPrice ? `${currSymbol} ${item.unitPrice.toLocaleString()}` : "Dahil"}
+                          {item.unitPrice ? `${currSymbol} ${item.unitPrice.toLocaleString("tr-TR")}` : "Dahil"}
                         </td>
                         <td className="py-3 px-3 text-right font-bold text-slate-900">
-                          {lineTotal > 0 ? `${currSymbol} ${lineTotal.toLocaleString()}` : "—"}
+                          {lineTotal > 0 ? `${currSymbol} ${lineTotal.toLocaleString("tr-TR")}` : "—"}
                         </td>
                         <td className="py-3 px-3 text-center">
                           {!isLocked ? (

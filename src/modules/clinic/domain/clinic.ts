@@ -17,6 +17,22 @@ export const Palette = {
 
 export type Palette = (typeof Palette)[keyof typeof Palette];
 
+export const TemplateId = {
+  KLINIK_MINIMAL: "klinik-minimal",
+  MODERN_GEOMETRIC: "modern-geometric",
+  BOTANICAL_SERENITY: "botanical-serenity",
+  LIQUID_ART: "liquid-art",
+  NOIR_GOLD: "noir-gold",
+  ROYAL_GOLD: "royal-gold",
+  CLASSIC_RIBBON: "classic-ribbon",
+  EXECUTIVE_SPLIT: "executive-split",
+  BOTANICAL_AESTHETIC: "botanical-aesthetic",
+  PEDIATRIC_JOY: "pediatric-joy",
+  PRESTIGE_MINIMAL: "prestige-minimal",
+} as const;
+
+export type TemplateId = (typeof TemplateId)[keyof typeof TemplateId];
+
 export type Product = {
   id: "classic" | "ultimate";
   open: boolean;
@@ -85,4 +101,6 @@ export type ClinicSettings = {
   lab: ClinicLab;
   awards: ClinicAwards;
   hotel: ClinicHotel;
+  templateId: TemplateId;
+  showMotifs: boolean;
 };

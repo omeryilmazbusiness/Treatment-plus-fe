@@ -248,6 +248,8 @@ export async function updateClinicSettingsAction(
     );
     revalidatePath("/app");
     revalidatePath("/app/clinic");
+    revalidatePath("/app/plans");
+    revalidatePath("/app/plans/[id]", "page");
     return { success: true, data: updated };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Ayarlar kaydedilemedi";

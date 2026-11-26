@@ -1056,6 +1056,7 @@ export function ClassicPlanClient({
           onVisitsChange={handleStudioVisitsChange}
           onConditionsChange={setConditions}
           isSaving={isPending}
+          clinicSettings={clinicSettings}
         />
 
         {showShareModal && (

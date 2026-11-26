@@ -8,10 +8,12 @@ import {
   Check,
   CheckCircle2,
   Coins,
+  Download,
   FileCheck2,
   FileText,
   Globe,
   ImageIcon,
+  Layers,
   Loader2,
   Mail,
   MapPin,
@@ -21,12 +23,24 @@ import {
   Plus,
   Save,
   Search,
+  Sparkles,
   Trash2,
   Undo2,
   Upload,
   UserCheck,
   X,
 } from "lucide-react";
+
+import {
+  A4Document,
+  exportPlanElementToPdf,
+  SAMPLE_TREATMENT_ITEMS,
+  SAMPLE_TREATMENT_ITEMS_EN,
+  TEMPLATE_META,
+  normalizeTemplateId,
+  type TemplateId,
+  type PdfPlanData,
+} from "@/ui/pdf-templates";
 
 import {
   batchSaveTreatmentPricesAction,
@@ -151,6 +165,8 @@ function getMediaUrl(key?: string | null): string | null {
 
 export function ClinicSettingsView({
   initialSettings,
+  userEmail,
+  workspaceId: _workspaceId,
   initialTreatments = [],
   initialPriceList = null,
   initialTab = "general",
@@ -186,13 +202,125 @@ export function ClinicSettingsView({
     return () => window.removeEventListener("popstate", onPopState);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [settings, setSettings] = useState<ClinicSettings>(initialSettings);
-  const [savedSettings, setSavedSettings] = useState<ClinicSettings>(initialSettings);
+  const [settings, setSettings] = useState<ClinicSettings>(() => ({
+    ...initialSettings,
+    templateId: normalizeTemplateId(initialSettings.templateId),
+    showMotifs: initialSettings.showMotifs !== false,
+  }));
+  const [savedSettings, setSavedSettings] = useState<ClinicSettings>(() => ({
+    ...initialSettings,
+    templateId: normalizeTemplateId(initialSettings.templateId),
+    showMotifs: initialSettings.showMotifs !== false,
+  }));
   const [isPending, startTransition] = useTransition();
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [uploadingKind, setUploadingKind] = useState<string | null>(null);
   const [pdfTextTab, setPdfTextTab] = useState<"welcome" | "legal">("welcome");
+  const [pdfFormat, setPdfFormat] = useState<"booklet" | "summary">("booklet");
+  const [pdfPreviewPage, setPdfPreviewPage] = useState<number>(1);
+  const [pdfZoom, setPdfZoom] = useState<number>(62);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const printAllRef = useRef<HTMLDivElement>(null);
+
+  const PAGE_TITLES = [
+    "1. Kapak",
+    "2. Sıcak Bir Karşılama",
+    "3. Hasta Koordinatörü & VIP Destek",
+    "4. Kliniğimiz Hakkında",
+    "5. Klinik Rakamları & Kapasite",
+    "6. Baş Cerrah & Hekim Profili",
+    "7. Hekim Fotoğrafı & Uzmanlık",
+    "8. Mevcut Durum & Diş Haritası",
+    "9. Teşhis & Detaylı İnceleme",
+    "10. 1. Seans: Cerrahi & İmplant",
+    "11. All-on-4 Biyomekanik Konsept",
+    "12. 2. Seans: Kalıcı Zirkonyum Köprü",
+    "13. Kalıcı Köprü Uygulaması & Takip",
+    "14. Tedavi Planınızı 3D İzleyin",
+    "15. 3D Cerrahi Simülasyon Oynatıcı",
+    "16. Neden Zirkonyum Köprü?",
+    "17. Sonuç: Kusursuz Gülüş Dönüşümü",
+    "18. Kendi Bünyemizdeki Laboratuvar",
+    "19. Laboratuvar Standartlarımız",
+    "20. Uluslararası Akreditasyon & Ödüller",
+    "21. Avrupa Sağlık Ödülleri",
+    "22. Konaklamanız: 5 Yıldızlı Otel",
+    "23. 5 Yıldızlı Rezidans & VIP Transfer",
+    "24. İletişim, Kroki & Randevu",
+  ];
+
+  const livePdfData = useMemo<PdfPlanData>(() => {
+    const isEn = settings.locale === "en";
+    const items = isEn ? SAMPLE_TREATMENT_ITEMS_EN : SAMPLE_TREATMENT_ITEMS;
+    const grandTotal = items.reduce((sum, item) => sum + item.amount, 0);
+
+    return {
+      templateId: (settings.templateId as TemplateId) || "klinik-minimal",
+      palette: settings.palette,
+      paletteKey: settings.palette,
+      clinicName: settings.name || (isEn ? "Modern Dental Clinic" : "Modern Diş Kliniği"),
+      slogan: settings.slogan || (isEn ? "Excellence in Dental Care" : "Gülüşünüz Bizim Tutkumuz"),
+      phone: settings.phone || "+90 212 555 0100",
+      email: settings.email || userEmail || "info@klinik.com",
+      website: settings.website || "www.treatment-plus.com",
+      address: settings.address || (isEn ? "Nisantasi, Istanbul" : "Nişantaşı, İstanbul"),
+      logoUrl: getMediaUrl(settings.logoKey) || undefined,
+      doctorName: settings.doctor?.name || "Dr. Dt. Selin Arslan",
+      doctorTitle:
+        settings.signerTitle ||
+        settings.doctor?.title ||
+        (isEn ? "Chief Oral Surgeon" : "Klinik Direktörü"),
+      doctorBio: settings.doctor?.bio,
+      doctorPhotoUrl: getMediaUrl(settings.doctor?.photoKey),
+      doctorStats: settings.doctor?.stats,
+      aboutText: settings.aboutText,
+      highlights: settings.highlights,
+      labStats: settings.lab?.stats,
+      hotelDetails: settings.hotel
+        ? {
+            name: settings.hotel.name,
+            text: settings.hotel.text,
+            imageKey: settings.hotel.imageKey,
+          }
+        : undefined,
+      patientName: isEn ? "John Doe" : "Ali Yılmaz",
+      patientId: "#P-2026-089",
+      planNo: "TP-2026-0842",
+      dateStr: new Date().toLocaleDateString(isEn ? "en-US" : "tr-TR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
+      locale: settings.locale,
+      currency: settings.currency,
+      welcomeText: settings.welcomeBody || "",
+      welcomeBody: settings.welcomeBody || "",
+      kvkkText: settings.legal || "",
+      legalText: settings.legal || "",
+      showMotifs: settings.showMotifs !== false,
+      format: pdfFormat,
+      activePage: pdfFormat === "booklet" ? pdfPreviewPage : undefined,
+      items,
+      grandTotal,
+    };
+  }, [settings, pdfFormat, pdfPreviewPage, userEmail]);
+
+  const handleExportSamplePdf = async () => {
+    if (!printAllRef.current) return;
+    try {
+      setIsExportingPdf(true);
+      await exportPlanElementToPdf(
+        printAllRef.current,
+        `${settings.name || "Klinik"}-Tedavi-Plani-Ornek.pdf`
+      );
+    } catch (err) {
+      console.error("PDF indirme hatası:", err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // Treatments & Pricing tab state
   const [treatmentsList, setTreatmentsList] = useState<Treatment[]>(initialTreatments || []);
@@ -1024,6 +1152,7 @@ export function ClinicSettingsView({
           {activeTab === "pdf" && (
             <div className="tp-stagger mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-6 md:grid-cols-12">
               <div className="space-y-4 md:col-span-5">
+                {/* Dil, Para Birimi, Palet */}
                 <div className={softCard}>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -1108,6 +1237,194 @@ export function ClinicSettingsView({
                   </div>
                 </div>
 
+                {/* 6 Şablon Seçici & Dekoratif Yan Motifler */}
+                <div className={softCard}>
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <span className={`${labelCls} inline-flex items-center gap-1.5`}>
+                      <Layers className="size-3.5" /> Şablon Tasarımı (6 Tema)
+                    </span>
+                    <span className="text-[10px] font-medium text-slate-400">
+                      {TEMPLATE_META.find((t) => t.id === (settings.templateId || "klinik-minimal"))?.name}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    {TEMPLATE_META.map((tmpl) => {
+                      const isSelected = (settings.templateId || "klinik-minimal") === tmpl.id;
+
+                      return (
+                        <button
+                          key={tmpl.id}
+                          type="button"
+                          onClick={() => handleFieldChange("templateId", tmpl.id as TemplateId)}
+                          className={`group relative flex flex-col justify-between rounded-2xl border p-3 text-left transition cursor-pointer ${
+                            isSelected
+                              ? "border-[#0b1f4d] bg-white shadow-md ring-2 ring-[#0b1f4d]/20"
+                              : "border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-white"
+                          }`}
+                        >
+                          {/* Üst Kısım: Mini Wireframe & Rozet */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div
+                              className="flex h-12 w-16 shrink-0 items-center justify-center rounded-xl border overflow-hidden relative shadow-2xs transition-colors"
+                              style={{
+                                backgroundColor: isSelected ? currentPalette.bgSoft : "#f8fafc",
+                                borderColor: isSelected ? currentPalette.primaryHex : "#e2e8f0",
+                              }}
+                            >
+                              {/* Şablona Özel Mini Tel Çerçeve Çizimi */}
+                              <div className="relative size-full flex flex-col overflow-hidden">
+                                {tmpl.id === "modern-geometric" && (
+                                  <div className="size-full flex flex-col bg-white relative">
+                                    <div className="h-4 w-full bg-[#0B2570] flex items-center px-1">
+                                      <div className="size-1.5 rounded-xs bg-[#00A3FF]" />
+                                    </div>
+                                    <div className="absolute top-0 right-0 w-3 h-3 bg-[#00A3FF]/30 [clip-path:polygon(100%_0,0_0,100%_100%)]" />
+                                    <div className="flex-1 p-1 space-y-0.5">
+                                      <div className="h-1 w-3/4 bg-blue-100 rounded-2xs" />
+                                      <div className="h-1 w-1/2 bg-slate-200 rounded-2xs" />
+                                    </div>
+                                  </div>
+                                )}
+                                {tmpl.id === "botanical-serenity" && (
+                                  <div className="size-full bg-[#F7F6F2] p-1 flex flex-col justify-between border border-[#5F7161]/30">
+                                    <div className="flex justify-between items-center">
+                                      <div className="size-2 rounded-full border border-[#5F7161] flex items-center justify-center">
+                                        <div className="size-1 rounded-full bg-[#5F7161]" />
+                                      </div>
+                                      <div className="h-0.5 w-6 bg-[#5F7161]/40" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                      <div className="h-1 w-2/3 bg-[#5F7161]/30 rounded-2xs" />
+                                      <div className="h-1 w-1/2 bg-[#5F7161]/20 rounded-2xs" />
+                                    </div>
+                                  </div>
+                                )}
+                                {tmpl.id === "liquid-art" && (
+                                  <div className="size-full bg-[#120E24] p-1 flex flex-col justify-between relative overflow-hidden">
+                                    <div className="h-3.5 w-full bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400" />
+                                    <div className="flex-1 p-1 flex flex-col justify-center space-y-0.5">
+                                      <div className="h-1 w-3/4 bg-white/20 rounded-2xs" />
+                                      <div className="h-1 w-1/2 bg-cyan-400/40 rounded-2xs" />
+                                    </div>
+                                    <div className="h-2 w-full bg-gradient-to-r from-cyan-400 to-purple-600" />
+                                  </div>
+                                )}
+                                {tmpl.id === "noir-gold" && (
+                                  <div className="size-full bg-[#0A0A0A] p-1 border border-[#F5C842]/40 flex flex-col justify-between relative overflow-hidden">
+                                    <div className="absolute -top-2 -left-2 w-6 h-6 border-b-2 border-r-2 border-[#F5C842] rotate-45 opacity-60" />
+                                    <div className="h-2.5 w-full bg-[#F5C842] flex items-center px-1">
+                                      <div className="size-1 rounded-full bg-black" />
+                                    </div>
+                                    <div className="flex-1 py-1 space-y-0.5">
+                                      <div className="h-1 w-2/3 bg-[#F5C842]/40 rounded-2xs" />
+                                    </div>
+                                  </div>
+                                )}
+                                {tmpl.id === "royal-gold" && (
+                                  <div className="size-full bg-[#070709] p-1 border border-[#D4AF37]/50 flex flex-col justify-between relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-3.5 h-3.5 bg-gradient-to-bl from-[#001845] to-transparent border-b border-l border-[#D4AF37]" />
+                                    <div className="h-2.5 w-full bg-gradient-to-r from-[#D4AF37] via-[#FFF2B2] to-[#AA771C] flex items-center px-1">
+                                      <div className="size-1 rounded-full bg-[#001845]" />
+                                    </div>
+                                    <div className="flex-1 py-1 space-y-0.5">
+                                      <div className="h-1 w-2/3 bg-[#D4AF37]/50 rounded-2xs" />
+                                      <div className="h-1 w-1/2 bg-[#001845]/60 rounded-2xs" />
+                                    </div>
+                                  </div>
+                                )}
+                                {tmpl.id === "klinik-minimal" && (
+                                  <div className="relative size-full flex flex-col bg-white">
+                                    <div className="h-4 w-full flex flex-col items-center justify-center bg-slate-900">
+                                      <div className="h-0.5 w-6 bg-white/80 rounded-2xs mb-0.5" />
+                                      <div className="size-2 rounded-full bg-sky-500 flex items-center justify-center">
+                                        <div className="size-1 rounded-full bg-white" />
+                                      </div>
+                                    </div>
+                                    <div className="flex-1 p-1 space-y-0.5 flex flex-col justify-around">
+                                      <div className="h-1 w-3/4 bg-slate-300 rounded-2xs" />
+                                      <div className="flex gap-0.5">
+                                        <div className="h-1 flex-1 bg-sky-100 rounded-2xs" />
+                                        <div className="h-1 flex-1 bg-sky-100 rounded-2xs" />
+                                        <div className="h-1 flex-1 bg-sky-100 rounded-2xs" />
+                                      </div>
+                                      <div className="h-1 w-1/2 bg-slate-200 rounded-2xs" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-wide uppercase ${
+                                  isSelected
+                                    ? "bg-[#0b1f4d] text-white"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {tmpl.badge}
+                              </span>
+                              {isSelected && (
+                                <div className="flex size-4 items-center justify-center rounded-full bg-[#0b1f4d] text-white">
+                                  <Check className="size-2.5" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Alt Kısım: Başlık & Açıklama */}
+                          <div className="mt-2.5">
+                            <h4
+                              className={`text-xs ${
+                                isSelected ? "font-bold text-[#0b1f4d]" : "font-semibold text-slate-800"
+                              }`}
+                            >
+                              {tmpl.name}
+                            </h4>
+                            <p className="mt-0.5 text-[10px] text-slate-500 leading-tight">
+                              {tmpl.subtitle}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Dekoratif Yan Motifler Toggle */}
+                  <div className="mt-3.5 rounded-2xl border border-slate-200/90 bg-white p-3.5 flex items-center justify-between">
+                    <div className="flex items-start gap-2.5">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+                        <Sparkles className="size-3.5" />
+                      </div>
+                      <div>
+                        <span className="block text-xs font-semibold text-slate-800">
+                          Dekoratif Yan Motifleri Göster
+                        </span>
+                        <p className="text-[10.5px] text-slate-500 leading-tight">
+                          Çiçek, yaprak, balon veya geometrik filigran gibi tematik SVG motiflerini gösterir.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleFieldChange("showMotifs", !(settings.showMotifs !== false))}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                        settings.showMotifs !== false ? "bg-[#0b1f4d]" : "bg-slate-300"
+                      }`}
+                      aria-pressed={settings.showMotifs !== false}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          settings.showMotifs !== false ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Karşılama ve Yasal Metinler */}
                 <div className={softCard}>
                   <div className="flex rounded-2xl bg-white p-1 ring-1 ring-slate-900/[0.05]">
                     {(
@@ -1152,128 +1469,171 @@ export function ClinicSettingsView({
                 </div>
               </div>
 
-              {/* Live preview */}
-              <div className="md:col-span-7 md:sticky md:top-2">
-                <div className="overflow-hidden rounded-[1.75rem] bg-white p-6 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/[0.06] sm:p-7">
-                  <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-                    <div className="flex items-center gap-3">
+              {/* Canlı Önizleme (Sağ Kolon) */}
+              <div className="space-y-4 md:col-span-7 md:sticky md:top-2">
+                {/* Önizleme Kontrol Üst Barı */}
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.75rem] bg-white p-4 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/[0.06]">
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        Canlı Önizleme (A4)
+                      </h4>
+                      <p className="text-[10px] text-slate-500">
+                        210 × 297 mm • 24 Sayfalık Kapsamlı Kitapçık
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Format Switcher */}
+                    <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-[10px] font-semibold text-slate-600">
+                      <button
+                        type="button"
+                        onClick={() => setPdfFormat("booklet")}
+                        className={`tp-tab rounded-lg px-2.5 py-1.5 transition ${
+                          pdfFormat === "booklet"
+                            ? "bg-[#0b1f4d] text-white font-bold"
+                            : "hover:text-[#0b1f4d]"
+                        }`}
+                      >
+                        24 Sayfa Kitapçık
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPdfFormat("summary")}
+                        className={`tp-tab rounded-lg px-2.5 py-1.5 transition ${
+                          pdfFormat === "summary"
+                            ? "bg-[#0b1f4d] text-white font-bold"
+                            : "hover:text-[#0b1f4d]"
+                        }`}
+                      >
+                        1 Sayfa Özet
+                      </button>
+                    </div>
+
+                    {/* Zoom Switcher */}
+                    <div className="hidden sm:flex items-center rounded-xl bg-slate-100 p-0.5 text-[10px] font-semibold text-slate-600">
+                      {[50, 62, 75, 100].map((sc) => (
+                        <button
+                          key={sc}
+                          type="button"
+                          onClick={() => setPdfZoom(sc)}
+                          className={`tp-tab rounded-lg px-2 py-1 transition ${
+                            pdfZoom === sc
+                              ? "bg-white text-slate-900 font-bold shadow-2xs"
+                              : "hover:text-slate-900"
+                          }`}
+                        >
+                          %{sc}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Download Sample PDF Button */}
+                    <button
+                      type="button"
+                      onClick={handleExportSamplePdf}
+                      disabled={isExportingPdf}
+                      className="tp-btn tp-btn-primary inline-flex items-center gap-1.5 rounded-xl bg-[#0b1f4d] px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-[#0b1f4d]/25 hover:bg-[#08173d] transition active:scale-95 disabled:opacity-60"
+                      title="Mevcut tasarım ve verilerle 24 sayfalık vektörel PDF çıktısını test edin"
+                    >
+                      {isExportingPdf ? (
+                        <Loader2 className="size-3.5 animate-spin text-white" />
+                      ) : (
+                        <Download className="size-3.5 text-white" />
+                      )}
+                      <span>Örnek PDF İndir</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Kitapçık Modunda Sayfa Gezinti Çubuğu */}
+                {pdfFormat === "booklet" && (
+                  <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white px-4 py-2.5 text-xs shadow-xs">
+                    <button
+                      type="button"
+                      disabled={pdfPreviewPage <= 1}
+                      onClick={() => setPdfPreviewPage((p) => Math.max(1, p - 1))}
+                      className="tp-btn cursor-pointer rounded-xl bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    >
+                      &larr; Önceki
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={pdfPreviewPage}
+                        onChange={(e) => setPdfPreviewPage(Number(e.target.value))}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 focus:outline-hidden"
+                      >
+                        {PAGE_TITLES.map((t, idx) => (
+                          <option key={idx + 1} value={idx + 1}>
+                            {t} ({idx + 1} / 24)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={pdfPreviewPage >= 24}
+                      onClick={() => setPdfPreviewPage((p) => Math.min(24, p + 1))}
+                      className="tp-btn cursor-pointer rounded-xl bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    >
+                      Sonraki &rarr;
+                    </button>
+                  </div>
+                )}
+
+                {/* A4 Çalışma Masası (Viewport Container) */}
+                <div className="relative rounded-[1.75rem] border border-slate-200/90 bg-slate-100/90 p-4 sm:p-6 overflow-hidden flex flex-col items-center justify-start shadow-inner">
+                  <div
+                    className="transition-all duration-200 ease-out flex justify-center w-full"
+                    style={{
+                      height: `calc(297mm * ${pdfZoom / 100} + 16px)`,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        transform: `scale(${pdfZoom / 100})`,
+                        transformOrigin: "top center",
+                        width: "210mm",
+                        minHeight: "297mm",
+                      }}
+                      className="shadow-2xl ring-1 ring-black/5"
+                    >
                       <div
-                        className="flex size-11 items-center justify-center overflow-hidden rounded-xl font-bold text-white"
-                        style={{
-                          backgroundColor: settings.logoKey
-                            ? "#ffffff"
-                            : currentPalette.primaryHex,
-                          border: settings.logoKey ? "1px solid #e2e8f0" : undefined,
-                        }}
+                        ref={previewRef}
+                        className={
+                          (settings.templateId || "klinik-minimal") === "noir-gold"
+                            ? "bg-[#0A0A0A]"
+                            : (settings.templateId || "klinik-minimal") === "royal-gold"
+                            ? pdfPreviewPage === 1
+                              ? "bg-[#070709]"
+                              : "bg-white"
+                            : (settings.templateId || "klinik-minimal") === "botanical-serenity"
+                            ? "bg-[#F7F6F2]"
+                            : "bg-white"
+                        }
                       >
-                        {settings.logoKey ? (
-                          <img
-                            src={getMediaUrl(settings.logoKey)!}
-                            alt=""
-                            className="size-full object-contain p-1"
-                          />
-                        ) : (
-                          (settings.name || "D").charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900">
-                          {settings.name || "Klinik Adı"}
-                        </h4>
-                        <p className="text-[11px] text-slate-500">
-                          {settings.slogan || "Slogan"}
-                        </p>
+                        <A4Document data={livePdfData} />
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span
-                        className="inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                        style={{
-                          backgroundColor: currentPalette.bgSoft,
-                          color: currentPalette.primaryHex,
-                        }}
-                      >
-                        {settings.locale === "en" ? "TREATMENT PLAN" : "TEDAVİ PLANI"}
-                      </span>
-                      <p className="mt-1 text-[10px] text-slate-400" suppressHydrationWarning>
-                        {new Date().toLocaleDateString(
-                          settings.locale === "en" ? "en-GB" : "tr-TR"
-                        )}
-                      </p>
+                  </div>
+
+                  {/* Gizli Tüm Sayfalar (Yazdırma & İndirme İçin) */}
+                  <div style={{ display: "none" }}>
+                    <div ref={printAllRef}>
+                      <A4Document
+                        data={{ ...livePdfData, activePage: undefined, format: "booklet" }}
+                      />
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-xl bg-slate-50/80 p-3 text-[11px] leading-relaxed text-slate-600">
-                    {settings.welcomeBody ||
-                      "Değerli hastamız, size özel hazırlanan tedavi planı aşağıda sunulmuştur."}
-                  </div>
-
-                  <div className="mt-5 overflow-hidden rounded-xl ring-1 ring-slate-100">
-                    <table className="w-full text-left text-[11px]">
-                      <thead
-                        style={{
-                          backgroundColor: currentPalette.bgSoft,
-                          color: currentPalette.primaryHex,
-                        }}
-                        className="font-bold"
-                      >
-                        <tr>
-                          <th className="px-3 py-2">
-                            {settings.locale === "en" ? "Procedure" : "İşlem"}
-                          </th>
-                          <th className="px-3 py-2 text-center">
-                            {settings.locale === "en" ? "Session" : "Seans"}
-                          </th>
-                          <th className="px-3 py-2 text-right">
-                            {settings.locale === "en" ? "Amount" : "Tutar"} (
-                            {settings.currency})
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-600">
-                        <tr>
-                          <td className="px-3 py-2 font-medium text-slate-900">
-                            Titanyum İmplant
-                          </td>
-                          <td className="px-3 py-2 text-center">1</td>
-                          <td className="px-3 py-2 text-right font-semibold text-slate-900">
-                            {currencySymbol} 18.000
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-3 py-2 font-medium text-slate-900">
-                            Zirkonyum Kron
-                          </td>
-                          <td className="px-3 py-2 text-center">2</td>
-                          <td className="px-3 py-2 text-right font-semibold text-slate-900">
-                            {currencySymbol} 12.500
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-                    <p className="max-w-[55%] text-[10px] leading-relaxed text-slate-400">
-                      {settings.legal ||
-                        (settings.locale === "en"
-                          ? "Prices may vary based on clinical findings."
-                          : "Fiyatlar klinik bulgulara göre değişiklik gösterebilir.")}
-                    </p>
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-400">
-                        {settings.locale === "en" ? "Total" : "Toplam"}
-                      </p>
-                      <p
-                        className="text-base font-bold tabular-nums"
-                        style={{ color: currentPalette.primaryHex }}
-                      >
-                        {currencySymbol} 30.500
-                      </p>
-                      <p className="mt-2 text-[10px] font-semibold text-slate-700">
-                        {settings.doctor.name || settings.signerTitle || "Hekim"}
-                      </p>
-                    </div>
+                  <div className="mt-3 flex items-center justify-between w-full text-[10px] text-slate-400 font-medium px-2">
+                    <span>Vektörel Keskinlik • Türkçe UTF-8 Karakter & Para Birimi Destekli</span>
+                    <span className="font-mono">1:1 Canlı Eşleşme</span>
                   </div>
                 </div>
               </div>

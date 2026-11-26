@@ -43,6 +43,7 @@ import type {
   ToothCondition,
 } from "./types";
 import type { Treatment } from "@/modules/catalog/domain/catalog";
+import type { ClinicSettings } from "@/modules/clinic/domain/clinic";
 import { DiagnosisModule } from "./diagnosis-module";
 import { TreatmentsModule } from "./treatments-module";
 import { SimulationModule, DEFAULT_ANIMATION_STAGES } from "./simulation-module";
@@ -86,6 +87,7 @@ export interface TreatmentStudioProps {
   onViewModeChange?: (mode: "studio" | "table") => void;
   treatmentsCatalog?: Treatment[];
   priceMap?: Map<string, number>;
+  clinicSettings?: ClinicSettings;
 }
 
 export function TreatmentStudio({
@@ -117,6 +119,7 @@ export function TreatmentStudio({
   treatmentsCatalog,
   priceMap,
   initialTab,
+  clinicSettings,
 }: TreatmentStudioProps) {
   // Navigation & Tabs with URL and Storage Persistence
   const [activeTab, setActiveTabState] = useState<StudioTab>(initialTab || "diagnosis");
@@ -758,6 +761,7 @@ export function TreatmentStudio({
             isLocked={isPlanLocked}
             onLockReady={handleStudioLockAndReady}
             onPatientDobChange={(dob) => setPatient({ ...patient, dob })}
+            clinicSettings={clinicSettings}
           />
         )}
       </div>

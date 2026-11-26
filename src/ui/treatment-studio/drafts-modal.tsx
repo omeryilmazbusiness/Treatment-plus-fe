@@ -226,7 +226,7 @@ export function DraftsModal({ isOpen, onClose, onApplyTemplate }: DraftsModalPro
                         {activeTemplate.title} — Üst Çene Paketi
                       </span>
                       <span className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-black text-white shadow-2xs">
-                        € {activeTemplate.packageUpperPrice.toLocaleString()}
+                        € {activeTemplate.packageUpperPrice.toLocaleString("tr-TR")}
                       </span>
                     </div>
                   )}
@@ -237,7 +237,7 @@ export function DraftsModal({ isOpen, onClose, onApplyTemplate }: DraftsModalPro
                         {activeTemplate.title} — Alt Çene Paketi
                       </span>
                       <span className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-black text-white shadow-2xs">
-                        € {activeTemplate.packageLowerPrice.toLocaleString()}
+                        € {activeTemplate.packageLowerPrice.toLocaleString("tr-TR")}
                       </span>
                     </div>
                   )}

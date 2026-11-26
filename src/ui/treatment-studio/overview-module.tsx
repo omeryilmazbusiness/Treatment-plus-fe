@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useTransition } from "react";
+import React, { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -20,6 +20,7 @@ import {
   Layers,
   Loader2,
   Lock,
+  Maximize2,
   MessageCircle,
   Phone,
   QrCode,
@@ -30,6 +31,8 @@ import {
   Stethoscope,
   Trash2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -48,6 +51,17 @@ function InstagramIcon({ className }: { className?: string }) {
   );
 }
 import type { ClinicBrandInfo, PatientInfo, StudioPlanItem, StudioVisit } from "./types";
+import type { ClinicSettings } from "@/modules/clinic/domain/clinic";
+import {
+  A4Document,
+  exportPlanElementToPdf,
+  TEMPLATE_META,
+  normalizeTemplateId,
+  type TemplateId,
+  type PaletteKey,
+  type TreatmentItem,
+  type PdfPlanData,
+} from "@/ui/pdf-templates";
 import {
   createShareLinkAction,
   generatePdfAction,
@@ -56,6 +70,21 @@ import {
   readyPlanAction,
   revokeShareLinkAction,
 } from "@/app/(clinic)/app/plans/actions";
+
+function getMediaUrl(key?: string | null): string | null {
+  if (!key || !key.trim()) return null;
+  const trimmed = key.trim();
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
+  }
+  const cleanKey = trimmed.replace(/\\/g, "/").replace(/^\/+/, "");
+  return `/api/media/${cleanKey}`;
+}
 
 interface OverviewModuleProps {
   patient: PatientInfo;
@@ -69,6 +98,7 @@ interface OverviewModuleProps {
   isLocked?: boolean;
   onLockReady?: () => Promise<void> | void;
   onPatientDobChange?: (dob: string) => void;
+  clinicSettings?: ClinicSettings;
 }
 
 export function OverviewModule({
@@ -82,6 +112,7 @@ export function OverviewModule({
   planStatus,
   isLocked: isLockedProp,
   onLockReady,
+  clinicSettings,
 }: OverviewModuleProps) {
   const isInitiallyLocked = Boolean(
     isLockedProp ?? (planStatus && planStatus.toLowerCase() !== "draft")
@@ -119,6 +150,136 @@ export function OverviewModule({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfSuccessMsg, setPdfSuccessMsg] = useState<string | null>(null);
 
+  const pdfPrintRef = useRef<HTMLDivElement>(null);
+  const fullScreenPdfRef = useRef<HTMLDivElement>(null);
+  const [showFullScreenPdf, setShowFullScreenPdf] = useState(false);
+  const [fullScreenScale, setFullScreenScale] = useState(0.85);
+  const [modalPdfFormat, setModalPdfFormat] = useState<"booklet" | "summary">("booklet");
+  const [phonePdfPage, setPhonePdfPage] = useState<number>(1);
+  const [activeTemplateId, setActiveTemplateId] = useState<TemplateId>(() => {
+    return normalizeTemplateId(
+      (clinicSettings as any)?.template_id || clinicSettings?.templateId
+    );
+  });
+
+  useEffect(() => {
+    const nextTpl = (clinicSettings as any)?.template_id || clinicSettings?.templateId;
+    if (nextTpl) {
+      setActiveTemplateId(normalizeTemplateId(nextTpl));
+    }
+  }, [clinicSettings]);
+
+  const pdfPlanData: PdfPlanData = useMemo(() => {
+    const isEn = clinicSettings?.locale === "en";
+    const mappedItems: TreatmentItem[] = items.map((it) => {
+      const visitMatch = visits.find((v) => v.id === it.visitId);
+      return {
+        name: it.treatmentName || "Tedavi Kalemi",
+        session: visitMatch?.title || "1. Seans",
+        toothNumber: it.teeth && it.teeth.length > 0 ? it.teeth.join(", ") : undefined,
+        teeth: it.teeth,
+        quantity: it.quantity || 1,
+        amount: (it.unitPrice || 0) * (it.quantity || 1),
+        category: typeof it.treatmentType === "string" ? it.treatmentType : undefined,
+      };
+    });
+
+    const grandTotal = mappedItems.reduce((acc, it) => acc + (it.amount || 0), 0);
+
+    const visit1Items = mappedItems.filter((it) => it.session?.includes("1") || !it.session?.includes("2"));
+    const visit2Items = mappedItems.filter((it) => it.session?.includes("2"));
+
+    const mappedVisits = [
+      {
+        id: "v1",
+        title: isEn ? "1st Visit: Surgical & Provisional Phase" : "1. Seans: Cerrahi ve Geçici Diş Aşaması",
+        phaseLabel: isEn ? "Day 1 - 3" : "1. - 3. Gün",
+        duration: isEn ? "3 Days Stay" : "3 Günlük Süreç",
+        healingPeriod: isEn ? "3 Months Osseointegration" : "3 Aylık Kemik Kaynaşma Dönemi",
+        items: visit1Items,
+        subtotal: visit1Items.reduce((s, it) => s + it.amount, 0),
+        note: isEn
+          ? "Surgical tooth extractions, computer-guided implant placement, and fixed screw-retained provisional delivery."
+          : "Gerekli cerrahi diş çekimleri, 3D cerrahi rehberli implant yerleşimi ve 24 saat içinde sabit estetik geçici diş teslimi.",
+      },
+      {
+        id: "v2",
+        title: isEn ? "2nd Visit: Permanent Prosthetic Delivery" : "2. Seans: Kalıcı Zirkonyum Teslim Aşaması",
+        phaseLabel: isEn ? "After 3 Months" : "3 Ay Sonra",
+        duration: isEn ? "5 - 7 Days Stay" : "5 - 7 Günlük Süreç",
+        items: visit2Items.length > 0 ? visit2Items : mappedItems.slice(Math.max(1, mappedItems.length - 2)),
+        subtotal: visit2Items.reduce((s, it) => s + it.amount, 0),
+        note: isEn
+          ? "Final digital impressions, dynamic bite registration, try-in, and final torque delivery of permanent monolithic bridge."
+          : "Kemikleşme kontrolü, mikron hassasiyetinde dijital ölçü, estetik prova ve kalıcı monolitik zirkonyum köprünün teslimi.",
+      },
+    ];
+
+    const mappedDiagnoses = mappedItems.flatMap((it) => {
+      const teethList = it.teeth || (it.toothNumber ? it.toothNumber.split(/[,;\s]+/) : []);
+      return teethList.map((t) => ({
+        toothNumber: t.trim(),
+        condition: it.name,
+        treatment: it.name,
+        status: (it.name.toLowerCase().includes("implant")
+          ? "implant"
+          : it.name.toLowerCase().includes("zirkonyum") || it.name.toLowerCase().includes("kron")
+          ? "crown"
+          : it.name.toLowerCase().includes("dolgu") || it.name.toLowerCase().includes("çürük")
+          ? "cavity"
+          : "implant") as "implant" | "crown" | "cavity" | "missing" | "healthy",
+      }));
+    });
+
+    return {
+      templateId: activeTemplateId,
+      paletteKey: (clinicSettings?.palette as PaletteKey) || "navy",
+      palette: (clinicSettings?.palette as PaletteKey) || "navy",
+      clinicName: clinicSettings?.name || clinic.name || "Klinik Adı",
+      slogan: clinicSettings?.slogan || "Gülüşünüz Estetikle Buluşuyor",
+      logoUrl: getMediaUrl(clinicSettings?.logoKey) || "",
+      phone: clinicSettings?.phone || clinic.phone || "+90 (212) 555 0199",
+      email: clinicSettings?.email || "info@klinik.com",
+      website: clinicSettings?.website || "www.klinik.com",
+      address: clinicSettings?.address || clinic.address || "İstanbul",
+      doctorName:
+        clinicSettings?.doctor?.name ||
+        clinicSettings?.signerName ||
+        clinic.doctorName ||
+        "Dr. Sorumlu Hekim",
+      doctorTitle:
+        clinicSettings?.signerTitle ||
+        clinicSettings?.doctor?.title ||
+        (isEn ? "Medical Director" : "Klinik Direktörü"),
+      doctorBio: clinicSettings?.doctor?.bio,
+      doctorPhotoUrl: getMediaUrl(clinicSettings?.doctor?.photoKey),
+      doctorStats: clinicSettings?.doctor?.stats,
+      aboutText: clinicSettings?.aboutText,
+      highlights: clinicSettings?.highlights,
+      labStats: clinicSettings?.lab?.stats,
+      hotelDetails: clinicSettings?.hotel,
+      patientName: patient?.name || "Sayın Hastamız",
+      planNo: planId ? `#TP-${planId.slice(0, 8).toUpperCase()}` : "#TP-2026-001",
+      dateStr: new Date().toLocaleDateString(isEn ? "en-US" : "tr-TR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
+      locale: (clinicSettings?.locale || "tr") as "tr" | "en",
+      currency: (currency || clinicSettings?.currency || "TRY") as "TRY" | "EUR" | "USD",
+      welcomeText: clinicSettings?.welcomeBody || "",
+      welcomeBody: clinicSettings?.welcomeBody || "",
+      kvkkText: clinicSettings?.legal || "",
+      legalText: clinicSettings?.legal || "",
+      showMotifs: clinicSettings?.showMotifs !== false,
+      format: modalPdfFormat,
+      items: mappedItems,
+      grandTotal,
+      visits: mappedVisits,
+      diagnoses: mappedDiagnoses,
+    };
+  }, [activeTemplateId, clinicSettings, clinic, items, visits, currency, patient?.name, planId, modalPdfFormat]);
+
   const currSymbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "₺";
   const subtotal = items.reduce(
     (acc, it) => acc + (it.unitPrice || 0) * (it.quantity || 1),
@@ -128,10 +289,10 @@ export function OverviewModule({
   // Clean Patient Display Name (Title Cased)
   const patientDisplayName = patient?.name
     ? patient.name
-        .trim()
-        .split(/\s+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(" ")
+      .trim()
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ")
     : "Sayın Hastamız";
 
   const appBase = typeof window !== "undefined" ? window.location.origin : "";
@@ -221,11 +382,11 @@ export function OverviewModule({
     : null;
   const formattedLastViewed = lastViewed
     ? new Date(lastViewed).toLocaleDateString("tr-TR", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
     : null;
 
   const handleCopyLink = () => {
@@ -287,7 +448,7 @@ export function OverviewModule({
         await onLockReady();
       } else if (effectivePlanId) {
         await readyPlanAction(effectivePlanId);
-        await generatePdfAction(effectivePlanId).catch(() => {});
+        await generatePdfAction(effectivePlanId).catch(() => { });
       }
 
       // Ensure active presentation share link is available
@@ -317,29 +478,41 @@ export function OverviewModule({
     }
   };
 
-  const handleDownloadPdf = async () => {
-    if (!effectivePlanId) {
-      window.print();
-      return;
-    }
-
+  const handleDownloadPdf = async (format: "booklet" | "summary" = "booklet") => {
     try {
       setIsGeneratingPdf(true);
       setErrorMsg(null);
 
-      if (isLocked) {
-        // 1. Ensure plan is finalized / ready (creates backend snapshot)
-        await readyPlanAction(effectivePlanId);
-        // 2. Generate PDF document in backend
-        await generatePdfAction(effectivePlanId);
+      // Trigger backend ready action in background if needed
+      if (effectivePlanId && isLocked) {
+        readyPlanAction(effectivePlanId).catch(() => { });
       }
-      // 3. Refresh embedded PDF iframe
-      setPdfKey((prev) => prev + 1);
 
-      // 4. Open PDF stream in new tab
-      window.open(`/api/plans/${effectivePlanId}/pdf`, "_blank");
-    } catch {
-      window.open(`/api/plans/${effectivePlanId}/pdf`, "_blank");
+      if (effectivePlanId) {
+        if (format === "summary") {
+          window.open(`/api/plans/${effectivePlanId}/pdf?format=summary&download=1`, "_blank");
+        } else {
+          // Kapsamlı sunum kitapçığını yeni sekmede aç ve yazdır/indir
+          window.open(`/api/plans/${effectivePlanId}/pdf?download=1`, "_blank");
+        }
+        setPdfSuccessMsg("PDF başarıyla indiriliyor.");
+        setTimeout(() => setPdfSuccessMsg(null), 3000);
+      } else {
+        const targetEl = fullScreenPdfRef.current || pdfPrintRef.current;
+        if (targetEl) {
+          await exportPlanElementToPdf(
+            targetEl,
+            `${pdfPlanData.clinicName}-${pdfPlanData.patientName}-Tedavi-Plani.pdf`
+          );
+          setPdfSuccessMsg("PDF başarıyla oluşturuldu.");
+          setTimeout(() => setPdfSuccessMsg(null), 3000);
+        } else {
+          window.print();
+        }
+      }
+    } catch (err: any) {
+      console.error("PDF download error:", err);
+      setErrorMsg("PDF oluşturulurken bir hata oluştu.");
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -383,23 +556,23 @@ export function OverviewModule({
     visits && visits.length > 0
       ? visits
       : [
-          {
-            id: "v-1",
-            orderNum: 1,
-            title: "1. Seans: Cerrahi, Çekim & İmplantasyon",
-            phaseLabel: "1. Cerrahi Aşama",
-            chartTeeth: ["11", "12", "14", "21", "22", "24"],
-          },
-          {
-            id: "v-2",
-            orderNum: 2,
-            title: "2. Seans: Kalıcı Zirkonyum Köprü Simantasyonu",
-            phaseLabel: "2. Protetik Tamamlama",
-            healingNote: "6 Ay İyileşme ve Osteointegrasyon Süresi",
-            healingMonths: 6,
-            chartTeeth: ["16", "26", "36", "46"],
-          },
-        ];
+        {
+          id: "v-1",
+          orderNum: 1,
+          title: "1. Seans: Cerrahi, Çekim & İmplantasyon",
+          phaseLabel: "1. Cerrahi Aşama",
+          chartTeeth: ["11", "12", "14", "21", "22", "24"],
+        },
+        {
+          id: "v-2",
+          orderNum: 2,
+          title: "2. Seans: Kalıcı Zirkonyum Köprü Simantasyonu",
+          phaseLabel: "2. Protetik Tamamlama",
+          healingNote: "6 Ay İyileşme ve Osteointegrasyon Süresi",
+          healingMonths: 6,
+          chartTeeth: ["16", "26", "36", "46"],
+        },
+      ];
 
   // Distinct treated teeth set
   const allTreatedTeeth = Array.from(
@@ -415,11 +588,10 @@ export function OverviewModule({
           <button
             type="button"
             onClick={() => setPreviewMode("pdf")}
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition cursor-pointer ${
-              previewMode === "pdf"
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition cursor-pointer ${previewMode === "pdf"
                 ? "bg-white text-slate-900 shadow-2xs font-bold"
                 : "text-slate-500 hover:text-slate-900"
-            }`}
+              }`}
           >
             <FileText className="size-3.5 text-slate-800" />
             <span>PDF Sunumu</span>
@@ -427,11 +599,10 @@ export function OverviewModule({
           <button
             type="button"
             onClick={() => setPreviewMode("web")}
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition cursor-pointer ${
-              previewMode === "web"
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition cursor-pointer ${previewMode === "web"
                 ? "bg-white text-slate-900 shadow-2xs font-bold"
                 : "text-slate-500 hover:text-slate-900"
-            }`}
+              }`}
           >
             <Globe className="size-3.5 text-blue-600" />
             <span>Web Sunumu</span>
@@ -448,9 +619,8 @@ export function OverviewModule({
 
           {/* Screen Display Container (Scrollable with NO scrollbar visible) */}
           <div
-            className={`relative w-full h-full rounded-[40px] select-none font-sans flex flex-col justify-between no-scrollbar transition-colors ${
-              previewMode === "pdf" ? "bg-slate-950 overflow-hidden" : "bg-white overflow-y-auto scroll-smooth"
-            }`}
+            className={`relative w-full h-full rounded-[40px] select-none font-sans flex flex-col justify-between no-scrollbar transition-colors ${previewMode === "pdf" ? "bg-slate-950 overflow-hidden" : "bg-white overflow-y-auto scroll-smooth"
+              }`}
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",
@@ -458,11 +628,10 @@ export function OverviewModule({
           >
             {/* Top Status Bar */}
             <div
-              className={`sticky top-0 z-30 px-6 pt-3 pb-2 flex items-center justify-between text-[11px] font-bold border-b transition-colors ${
-                previewMode === "pdf"
+              className={`sticky top-0 z-30 px-6 pt-3 pb-2 flex items-center justify-between text-[11px] font-bold border-b transition-colors ${previewMode === "pdf"
                   ? "bg-slate-950 text-white border-white/10"
                   : "bg-white/90 backdrop-blur-md text-slate-800 border-slate-100/80"
-              }`}
+                }`}
             >
               <span>09:41</span>
               <div className="flex items-center gap-1.5">
@@ -563,7 +732,7 @@ export function OverviewModule({
                           Toplam Tutar
                         </span>
                         <p className="mt-0.5 text-xs font-extrabold text-white">
-                          {currSymbol} {subtotal.toLocaleString()}
+                          {currSymbol} {subtotal.toLocaleString("tr-TR")}
                         </p>
                       </div>
                     </div>
@@ -591,9 +760,8 @@ export function OverviewModule({
                         >
                           <div className="flex items-center gap-2">
                             <span
-                              className={`size-1.5 rounded-full ${
-                                idx === 0 ? "bg-blue-400" : "bg-emerald-400"
-                              }`}
+                              className={`size-1.5 rounded-full ${idx === 0 ? "bg-blue-400" : "bg-emerald-400"
+                                }`}
                             />
                             <span className="font-medium text-slate-200">
                               {v.title}
@@ -644,8 +812,8 @@ export function OverviewModule({
                       items.filter((it) => it.visitId === v.id).length > 0
                         ? items.filter((it) => it.visitId === v.id)
                         : vIdx === 0
-                        ? items
-                        : [];
+                          ? items
+                          : [];
 
                     return (
                       <div
@@ -683,7 +851,7 @@ export function OverviewModule({
                               </div>
                               <span className="font-bold text-slate-900 shrink-0">
                                 {it.unitPrice
-                                  ? `${currSymbol} ${((it.unitPrice || 0) * (it.quantity || 1)).toLocaleString()}`
+                                  ? `${currSymbol} ${((it.unitPrice || 0) * (it.quantity || 1)).toLocaleString("tr-TR")}`
                                   : "Dahil"}
                               </span>
                             </div>
@@ -703,7 +871,7 @@ export function OverviewModule({
                     <div className="flex items-baseline justify-between pt-1 border-t border-slate-800">
                       <span className="text-xs text-slate-300">Toplam Tedavi Tutarı:</span>
                       <span className="text-base font-black text-white">
-                        {currSymbol} {subtotal.toLocaleString()}
+                        {currSymbol} {subtotal.toLocaleString("tr-TR")}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400">
@@ -744,85 +912,183 @@ export function OverviewModule({
                   </a>
                 </div>
               </div>
-            ) : effectivePlanId ? (
+            ) : (
               /* ============================================================== */
-              /* 2. SEÇENEK: OLUŞTURULAN GERÇEK KURUMSAL TEKLİF PDF'İ           */
+              /* 2. SEÇENEK: DETAYLI 24 SAYFALIK KURUMSAL SUNUM KİTAPÇIĞI       */
               /* ============================================================== */
-              <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden relative no-scrollbar">
+              <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden relative no-scrollbar">
                 {/* Floating Top Mini Toolbar */}
-                <div className="z-30 flex items-center justify-between bg-slate-950/90 backdrop-blur-md px-4 py-2 border-b border-white/10 text-white shrink-0">
-                  <div className="flex items-center gap-1.5 text-xs font-bold">
-                    <FileText className="size-3.5 text-cyan-400" />
-                    <span className="truncate max-w-[130px]">Kurumsal Teklif PDF&apos;i</span>
+                <div className="z-30 flex items-center justify-between bg-slate-950/95 backdrop-blur-md px-3 py-2 border-b border-white/10 text-white shrink-0">
+                  <div className="flex items-center gap-1.5 text-xs font-bold min-w-0">
+                    <FileText className="size-3.5 text-cyan-400 shrink-0" />
+                    <select
+                      value={activeTemplateId}
+                      onChange={(e) => setActiveTemplateId(e.target.value as TemplateId)}
+                      className="bg-white/10 text-cyan-300 font-bold text-[10px] rounded px-1.5 py-0.5 border border-white/10 outline-none cursor-pointer max-w-[125px] truncate"
+                      title="Hasta Sunumu Şablonu"
+                    >
+                      {TEMPLATE_META.map((t) => (
+                        <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold shrink-0">
+                      24S
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
-                      disabled={isGeneratingPdf}
-                      onClick={handleRegeneratePdf}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-white/10 hover:bg-white/20 px-2 py-1 text-[10px] font-semibold text-white transition active:scale-95 disabled:opacity-50"
-                      title="PDF'i Yeniden Derle"
+                      onClick={() => {
+                        setModalPdfFormat("booklet");
+                        setShowFullScreenPdf(true);
+                      }}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-white/10 hover:bg-white/20 px-2 py-1 text-[10px] font-semibold text-white transition active:scale-95"
+                      title="Büyük Ekranda İncele"
                     >
-                      <RefreshCw
-                        className={`size-3 ${isGeneratingPdf ? "animate-spin text-cyan-400" : ""}`}
-                      />
-                      <span>Yenile</span>
+                      <Maximize2 className="size-3 text-cyan-400" />
+                      <span>Tam Ekran</span>
                     </button>
                     <button
                       type="button"
                       disabled={isGeneratingPdf}
-                      onClick={handleDownloadPdf}
+                      onClick={() => handleDownloadPdf("booklet")}
                       className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 px-2.5 py-1 text-[10px] font-bold text-white transition active:scale-95 shadow-xs disabled:opacity-50"
-                      title="Yeni Sekmede Aç / İndir"
+                      title="PDF Olarak İndir"
                     >
-                      <ExternalLink className="size-3" />
-                      <span>Tam Ekran</span>
+                      {isGeneratingPdf ? (
+                        <Loader2 className="size-3 animate-spin text-white" />
+                      ) : (
+                        <Download className="size-3 text-white" />
+                      )}
+                      <span>İndir</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Real Generated PDF Embed (Scrollbar clipped via overflow-hidden) */}
-                <div className="flex-1 w-full h-full relative bg-slate-950 overflow-hidden">
-                  <iframe
-                    key={pdfKey}
-                    src={`/api/plans/${effectivePlanId}/pdf?v=${pdfKey}#toolbar=0&navpanes=0&view=FitH`}
-                    className="h-full border-0 no-scrollbar"
+                {/* Sayfa Değiştirici Bar (Önceki / Sayfa Seçici / Sonraki) */}
+                <div className="z-20 flex items-center justify-between px-2.5 py-1.5 bg-slate-900 border-b border-white/10 text-[11px] text-white shrink-0">
+                  <button
+                    type="button"
+                    disabled={phonePdfPage <= 1}
+                    onClick={() => setPhonePdfPage((p) => Math.max(1, p - 1))}
+                    className="cursor-pointer rounded-md bg-white/10 hover:bg-white/20 px-2 py-0.5 disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-[10px] text-slate-200 transition"
+                  >
+                    &larr; Önceki
+                  </button>
+                  <select
+                    value={phonePdfPage}
+                    onChange={(e) => setPhonePdfPage(Number(e.target.value))}
+                    className="bg-white/10 text-cyan-300 font-mono text-[10px] font-bold rounded px-1.5 py-0.5 border border-white/10 outline-none cursor-pointer max-w-[140px] truncate"
+                  >
+                    <option value={1} className="bg-slate-900 text-white">1. Kapak</option>
+                    <option value={2} className="bg-slate-900 text-white">2. Sıcak Bir Karşılama</option>
+                    <option value={3} className="bg-slate-900 text-white">3. Hasta Koordinatörü &amp; VIP Destek</option>
+                    <option value={4} className="bg-slate-900 text-white">4. Kliniğimiz Hakkında</option>
+                    <option value={5} className="bg-slate-900 text-white">5. Klinik Rakamları &amp; Kapasite</option>
+                    <option value={6} className="bg-slate-900 text-white">6. Baş Cerrah &amp; Hekim Profili</option>
+                    <option value={7} className="bg-slate-900 text-white">7. Hekim Fotoğrafı &amp; Uzmanlık</option>
+                    <option value={8} className="bg-slate-900 text-white">8. Mevcut Durum &amp; Diş Haritası</option>
+                    <option value={9} className="bg-slate-900 text-white">9. Teşhis &amp; Detaylı İnceleme</option>
+                    <option value={10} className="bg-slate-900 text-white">10. 1. Seans: Cerrahi &amp; İmplant</option>
+                    <option value={11} className="bg-slate-900 text-white">11. All-on-4 Biyomekanik Konsept</option>
+                    <option value={12} className="bg-slate-900 text-white">12. 2. Seans: Kalıcı Zirkonyum Köprü</option>
+                    <option value={13} className="bg-slate-900 text-white">13. Kalıcı Köprü Uygulaması &amp; Takip</option>
+                    <option value={14} className="bg-slate-900 text-white">14. Tedavi Planınızı 3D İzleyin</option>
+                    <option value={15} className="bg-slate-900 text-white">15. 3D Cerrahi Simülasyon Oynatıcı</option>
+                    <option value={16} className="bg-slate-900 text-white">16. Neden Zirkonyum Köprü?</option>
+                    <option value={17} className="bg-slate-900 text-white">17. Sonuç: Kusursuz Gülüş Dönüşümü</option>
+                    <option value={18} className="bg-slate-900 text-white">18. Kendi Bünyemizdeki Laboratuvar</option>
+                    <option value={19} className="bg-slate-900 text-white">19. Laboratuvar Standartlarımız</option>
+                    <option value={20} className="bg-slate-900 text-white">20. Uluslararası Akreditasyon &amp; Ödüller</option>
+                    <option value={21} className="bg-slate-900 text-white">21. Avrupa Sağlık Ödülleri</option>
+                    <option value={22} className="bg-slate-900 text-white">22. Konaklamanız: 5 Yıldızlı Otel</option>
+                    <option value={23} className="bg-slate-900 text-white">23. 5 Yıldızlı Rezidans &amp; VIP Transfer</option>
+                    <option value={24} className="bg-slate-900 text-white">24. İletişim, Kroki &amp; Randevu</option>
+                  </select>
+                  <button
+                    type="button"
+                    disabled={phonePdfPage >= 24}
+                    onClick={() => setPhonePdfPage((p) => Math.min(24, p + 1))}
+                    className="cursor-pointer rounded-md bg-white/10 hover:bg-white/20 px-2 py-0.5 disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-[10px] text-slate-200 transition"
+                  >
+                    Sonraki &rarr;
+                  </button>
+                </div>
+
+                {/* Scaled A4 Sheet to fit Phone Frame perfectly without horizontal overflow */}
+                <div className="flex-1 w-full h-full overflow-hidden flex justify-center items-start pt-1.5 pb-2 bg-slate-900 select-none">
+                  <div
+                    className={`relative overflow-hidden rounded-lg shadow-2xl shrink-0 ${
+                      activeTemplateId === "noir-gold"
+                        ? "bg-[#0A0A0A]"
+                        : activeTemplateId === "royal-gold"
+                        ? (phonePdfPage === 1 ? "bg-[#070709]" : "bg-white")
+                        : activeTemplateId === "botanical-serenity"
+                        ? "bg-[#F7F6F2]"
+                        : "bg-white"
+                    }`}
                     style={{
-                      width: "calc(100% + 24px)",
-                      height: "100%",
+                      width: "306px",
+                      height: "433px",
                     }}
-                    title="Oluşturulan Kurumsal PDF"
-                  />
+                  >
+                    <div
+                      style={{
+                        width: "210mm",
+                        height: "297mm",
+                        transform: "scale(0.3855)",
+                        transformOrigin: "top left",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <A4Document data={{ ...pdfPlanData, templateId: activeTemplateId, activePage: phonePdfPage, format: "booklet" }} />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              /* ============================================================== */
-              /* 2B. YEDEK SEÇENEK: PLAN HENÜZ OLUŞTURULMADI                    */
-              /* ============================================================== */
-              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 bg-slate-900 no-scrollbar">
-                <div className="size-14 rounded-2xl bg-white/10 flex items-center justify-center mb-3 text-cyan-400">
-                  <FileText className="size-7" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-100">Kurumsal PDF Önizlemesi</h4>
-                <p className="text-xs text-slate-400 mt-1.5 max-w-[220px] leading-relaxed">
-                  Gerçek teklif PDF&apos;ini görüntülemek için lütfen bir tedavi planı açınız veya kaydediniz.
-                </p>
               </div>
             )}
 
             {/* Bottom Home Indicator */}
             <div
-              className={`py-2 flex justify-center pointer-events-none transition-colors ${
-                previewMode === "pdf" ? "bg-slate-950" : "bg-white"
-              }`}
+              className={`py-2 flex justify-center pointer-events-none transition-colors ${previewMode === "pdf" ? "bg-slate-950" : "bg-white"
+                }`}
             >
               <div
-                className={`w-28 h-1 rounded-full ${
-                  previewMode === "pdf" ? "bg-slate-700" : "bg-slate-300"
-                }`}
+                className={`w-28 h-1 rounded-full ${previewMode === "pdf" ? "bg-slate-700" : "bg-slate-300"
+                  }`}
               ></div>
             </div>
           </div>
+        </div>
+
+        {/* Phone Altı: Hızlı Önizleme ve İndirme Düğmeleri */}
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setModalPdfFormat("booklet");
+              setShowFullScreenPdf(true);
+            }}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+          >
+            <Eye className="size-3.5 text-blue-600" />
+            <span>24 Sayfayı İncele</span>
+          </button>
+          <button
+            type="button"
+            disabled={isGeneratingPdf}
+            onClick={() => handleDownloadPdf("booklet")}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-slate-800 transition disabled:opacity-50"
+          >
+            {isGeneratingPdf ? (
+              <Loader2 className="size-3.5 animate-spin text-cyan-400" />
+            ) : (
+              <Download className="size-3.5 text-cyan-400" />
+            )}
+            <span>PDF İndir (24 Sayfa)</span>
+          </button>
         </div>
       </div>
 
@@ -925,275 +1191,291 @@ export function OverviewModule({
           /* ONAYLAYINCA GELEN KISIM: SUNUMLAR & DOKÜMANLAR                 */
           /* ============================================================== */
           <>
-            {/* 1. Kurumsal Teklif PDF'i Kartı */}
+            {/* 1. Kapsamlı Hasta Sunum Kitapçığı (24 Sayfa) & Teklif Kartı */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3.5 transition hover:border-slate-300">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3.5">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-xs">
-                <FileText className="size-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">Kurumsal Teklif PDF&apos;i</h4>
-                <p className="text-xs text-slate-500">
-                  Resmi tedavi planı, seans takvimi ve fiyat dökümü
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {effectivePlanId && (
-                <button
-                  type="button"
-                  disabled={isGeneratingPdf}
-                  onClick={handleRegeneratePdf}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition active:scale-95 disabled:opacity-50"
-                  title="PDF'i Yeniden Oluştur"
-                >
-                  <RefreshCw
-                    className={`size-3.5 ${isGeneratingPdf ? "animate-spin text-blue-600" : ""}`}
-                  />
-                  <span>Yenile</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                disabled={isGeneratingPdf}
-                onClick={handleDownloadPdf}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition active:scale-95 disabled:opacity-50"
-              >
-                {isGeneratingPdf ? (
-                  <Loader2 className="size-3.5 animate-spin text-cyan-400" />
-                ) : (
-                  <Download className="size-3.5" />
-                )}
-                <span>{isGeneratingPdf ? "Hazırlanıyor..." : "PDF İndir"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 2. İnteraktif Web Sunumu Kartı */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-xs">
-                <Globe className="size-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-slate-900">İnteraktif Web Sunumu</h4>
-                  <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                    Şifresiz Doğrudan Erişim
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Hastaya özel 3D tedavi simülasyonu ve mobil deneyim
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {loadingLinks ? (
-            <div className="flex items-center justify-center py-6 text-slate-400">
-              <Loader2 className="size-5 animate-spin text-cyan-600" />
-              <span className="ml-2 text-xs font-medium">Bağlantılar yükleniyor...</span>
-            </div>
-          ) : activeLink || !effectivePlanId ? (
-            <div className="space-y-3.5 pt-1">
-              {/* URL Girişi ve Paylaş Butonu */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={shareUrl}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                  className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-mono text-slate-700 select-all focus:outline-hidden"
-                />
-
-                {/* Paylaş Butonu (Popup Açar) */}
-                <button
-                  type="button"
-                  onClick={() => setShowShareModal(true)}
-                  className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 hover:text-slate-900 transition active:scale-95 shrink-0"
-                  title="Sunumu Paylaş"
-                >
-                  <Share2 className="size-3.5 text-slate-500" />
-                  <span>Paylaş</span>
-                </button>
-              </div>
-
-              {/* Hasta Etkileşim & Takip Şeridi */}
-              <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 px-3.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  {totalViews > 0 ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200/80 bg-cyan-50/80 px-2.5 py-1 text-[11px] font-bold text-cyan-800">
-                      <span className="relative flex size-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-                        <span className="relative inline-flex size-2 rounded-full bg-cyan-500" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-xs">
+                    <FileText className="size-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-900">Kapsamlı Hasta Sunumu (24 Sayfa)</h4>
+                      <span className="rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700 border border-cyan-200">
+                        Detaylı Kitapçık
                       </span>
-                      <span>{totalViews} Görüntülenme</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500">
-                      <span className="size-1.5 rounded-full bg-slate-300" />
-                      <span>Henüz açılmadı</span>
-                    </span>
-                  )}
-
-                  {formattedLastViewed && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                      <Clock className="size-3 text-slate-400" />
-                      <span>Son: {formattedLastViewed}</span>
-                    </span>
-                  )}
-
-                  {analytics?.accepted_signature && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
-                      <CheckCircle2 className="size-3 text-emerald-600" />
-                      <span>İmza: {analytics.accepted_signature}</span>
-                    </span>
-                  )}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Kapak, klinik ve hekim tanıtımı, odontogram, seanslar, 3D görselleştirme, lab ve otel
+                    </p>
+                  </div>
                 </div>
 
-                {activeLink && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalPdfFormat("booklet");
+                      setShowFullScreenPdf(true);
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition active:scale-95"
+                    title="24 Sayfalık Kitapçığı Tam Ekran İncele"
+                  >
+                    <Eye className="size-3.5 text-blue-600" />
+                    <span>24 Sayfayı İncele</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalPdfFormat("summary");
+                      setShowFullScreenPdf(true);
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition active:scale-95"
+                    title="1 Sayfalık Hızlı Fiyat Özetini İncele"
+                  >
+                    <FileText className="size-3.5 text-slate-600" />
+                    <span>1 Sayfa Özet</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isGeneratingPdf}
+                    onClick={() => handleDownloadPdf("booklet")}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition active:scale-95 disabled:opacity-50"
+                  >
+                    {isGeneratingPdf ? (
+                      <Loader2 className="size-3.5 animate-spin text-cyan-400" />
+                    ) : (
+                      <Download className="size-3.5 text-cyan-400" />
+                    )}
+                    <span>{isGeneratingPdf ? "Hazırlanıyor..." : "PDF İndir (24 Sayfa)"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. İnteraktif Web Sunumu Kartı */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-xs">
+                    <Globe className="size-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-900">İnteraktif Web Sunumu</h4>
+                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                        Şifresiz Doğrudan Erişim
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Hastaya özel 3D tedavi simülasyonu ve mobil deneyim
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {loadingLinks ? (
+                <div className="flex items-center justify-center py-6 text-slate-400">
+                  <Loader2 className="size-5 animate-spin text-cyan-600" />
+                  <span className="ml-2 text-xs font-medium">Bağlantılar yükleniyor...</span>
+                </div>
+              ) : activeLink || !effectivePlanId ? (
+                <div className="space-y-3.5 pt-1">
+                  {/* URL Girişi ve Paylaş Butonu */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={shareUrl}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-mono text-slate-700 select-all focus:outline-hidden"
+                    />
+
+                    {/* Paylaş Butonu (Popup Açar) */}
+                    <button
+                      type="button"
+                      onClick={() => setShowShareModal(true)}
+                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 hover:text-slate-900 transition active:scale-95 shrink-0"
+                      title="Sunumu Paylaş"
+                    >
+                      <Share2 className="size-3.5 text-slate-500" />
+                      <span>Paylaş</span>
+                    </button>
+                  </div>
+
+                  {/* Hasta Etkileşim & Takip Şeridi */}
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 px-3.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {totalViews > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200/80 bg-cyan-50/80 px-2.5 py-1 text-[11px] font-bold text-cyan-800">
+                          <span className="relative flex size-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
+                            <span className="relative inline-flex size-2 rounded-full bg-cyan-500" />
+                          </span>
+                          <span>{totalViews} Görüntülenme</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                          <span className="size-1.5 rounded-full bg-slate-300" />
+                          <span>Henüz açılmadı</span>
+                        </span>
+                      )}
+
+                      {formattedLastViewed && (
+                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                          <Clock className="size-3 text-slate-400" />
+                          <span>Son: {formattedLastViewed}</span>
+                        </span>
+                      )}
+
+                      {analytics?.accepted_signature && (
+                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
+                          <CheckCircle2 className="size-3 text-emerald-600" />
+                          <span>İmza: {analytics.accepted_signature}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {activeLink && (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => setShowRevokeConfirm(true)}
+                        title="Paylaşım linkini sil"
+                        className="flex size-7 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 transition active:scale-95 shadow-2xs disabled:opacity-50"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                  <span className="text-xs text-slate-500">
+                    Hastanın görüntüleyebileceği aktif bir web bağlantısı bulunmuyor.
+                  </span>
                   <button
                     type="button"
                     disabled={isPending}
-                    onClick={() => setShowRevokeConfirm(true)}
-                    title="Paylaşım linkini sil"
-                    className="flex size-7 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 transition active:scale-95 shadow-2xs disabled:opacity-50"
+                    onClick={handleCreateLink}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition active:scale-95 disabled:opacity-50"
                   >
-                    <Trash2 className="size-3.5" />
+                    {isPending ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" />
+                        <span>Oluşturuluyor...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="size-3.5 text-cyan-400" />
+                        <span>Sunum Linki Oluştur</span>
+                      </>
+                    )}
                   </button>
-                )}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Klinik & Sunum Bilgileri Özeti */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-3 text-xs">
+              <div className="font-bold text-slate-800">Klinik &amp; Karşılama Bilgileri</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-slate-600">
+                <div>
+                  <span className="block font-medium text-slate-400 text-[10px]">Sorumlu Hekim</span>
+                  <span className="font-bold text-slate-900">{clinic.doctorName || "Dr. Selin Yılmaz"}</span>
+                </div>
+                <div>
+                  <span className="block font-medium text-slate-400 text-[10px]">Klinik Adı</span>
+                  <span className="font-bold text-slate-900">{clinic.name || "Avcı Klinik"}</span>
+                </div>
+                <div>
+                  <span className="block font-medium text-slate-400 text-[10px]">İletişim Tel</span>
+                  <span className="font-bold text-slate-900">{clinic.phone || "+90 212 555 0100"}</span>
+                </div>
+                <div>
+                  <span className="block font-medium text-slate-400 text-[10px]">Toplam Bütçe</span>
+                  <span className="font-bold text-slate-900">
+                    {currSymbol} {subtotal.toLocaleString("tr-TR")}
+                  </span>
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <span className="text-xs text-slate-500">
-                Hastanın görüntüleyebileceği aktif bir web bağlantısı bulunmuyor.
+          </>
+        )}
+      </div>
+
+      {/* Taslağı Kilitleme ve Sunumları Oluşturma Onay Modalı */}
+      {showConfirmLock && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md transition-all duration-300"
+          onClick={() => setShowConfirmLock(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-slate-900 text-white ring-8 ring-slate-100 mb-4">
+              <FileCheck2 className="size-5" />
+            </div>
+
+            <h3 className="text-base font-bold text-slate-900">
+              Tedavi Planını Onaylamak İstiyor musunuz?
+            </h3>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+              Bu işlem planı taslak aşamasından çıkarıp resmi teklif haline getirir:
+            </p>
+
+            <div className="mt-3.5 space-y-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-xs text-slate-700">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-600 mt-0.5" />
+                <span>Hastaya özel <strong>interaktif web sunumu</strong> ve <strong>kurumsal PDF teklif belgesi</strong> derlenir.</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-600 mt-0.5" />
+                <span>WhatsApp, SMS ve QR kod ile hasta paylaşımı aktifleşir.</span>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 p-2.5 text-[11px] text-amber-900 leading-relaxed">
+              <AlertCircle className="size-4 shrink-0 text-amber-600 mt-0.5" />
+              <span>
+                <strong>Bilgi:</strong> Onay sonrasında tedavi kalemleri ve seanslar düzenlemeye kapatılır.
               </span>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2.5">
               <button
                 type="button"
-                disabled={isPending}
-                onClick={handleCreateLink}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition active:scale-95 disabled:opacity-50"
+                disabled={isLocking}
+                onClick={() => setShowConfirmLock(false)}
+                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
               >
-                {isPending ? (
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                disabled={isLocking}
+                onClick={handleLockAndGenerate}
+                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50 transition active:scale-98"
+              >
+                {isLocking ? (
                   <>
-                    <Loader2 className="size-3.5 animate-spin" />
-                    <span>Oluşturuluyor...</span>
+                    <Loader2 className="size-3.5 animate-spin text-cyan-400" />
+                    <span>Hazırlanıyor...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="size-3.5 text-cyan-400" />
-                    <span>Sunum Linki Oluştur</span>
+                    <FileCheck2 className="size-3.5 text-emerald-400" />
+                    <span>Onayla ve Sunumları Oluştur</span>
                   </>
                 )}
               </button>
             </div>
-          )}
-        </div>
-
-        {/* 3. Klinik & Sunum Bilgileri Özeti */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-3 text-xs">
-          <div className="font-bold text-slate-800">Klinik &amp; Karşılama Bilgileri</div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-slate-600">
-            <div>
-              <span className="block font-medium text-slate-400 text-[10px]">Sorumlu Hekim</span>
-              <span className="font-bold text-slate-900">{clinic.doctorName || "Dr. Selin Yılmaz"}</span>
-            </div>
-            <div>
-              <span className="block font-medium text-slate-400 text-[10px]">Klinik Adı</span>
-              <span className="font-bold text-slate-900">{clinic.name || "Avcı Klinik"}</span>
-            </div>
-            <div>
-              <span className="block font-medium text-slate-400 text-[10px]">İletişim Tel</span>
-              <span className="font-bold text-slate-900">{clinic.phone || "+90 212 555 0100"}</span>
-            </div>
-            <div>
-              <span className="block font-medium text-slate-400 text-[10px]">Toplam Bütçe</span>
-              <span className="font-bold text-slate-900">
-                {currSymbol} {subtotal.toLocaleString()}
-              </span>
-            </div>
           </div>
         </div>
-      </>
-    )}
-  </div>
-
-  {/* Taslağı Kilitleme ve Sunumları Oluşturma Onay Modalı */}
-  {showConfirmLock && (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md transition-all duration-300"
-      onClick={() => setShowConfirmLock(false)}
-    >
-      <div
-        className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex size-11 items-center justify-center rounded-2xl bg-slate-900 text-white ring-8 ring-slate-100 mb-4">
-          <FileCheck2 className="size-5" />
-        </div>
-
-        <h3 className="text-base font-bold text-slate-900">
-          Tedavi Planını Onaylamak İstiyor musunuz?
-        </h3>
-        <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-          Bu işlem planı taslak aşamasından çıkarıp resmi teklif haline getirir:
-        </p>
-
-        <div className="mt-3.5 space-y-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-xs text-slate-700">
-          <div className="flex items-start gap-2.5">
-            <CheckCircle2 className="size-4 shrink-0 text-emerald-600 mt-0.5" />
-            <span>Hastaya özel <strong>interaktif web sunumu</strong> ve <strong>kurumsal PDF teklif belgesi</strong> derlenir.</span>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <CheckCircle2 className="size-4 shrink-0 text-emerald-600 mt-0.5" />
-            <span>WhatsApp, SMS ve QR kod ile hasta paylaşımı aktifleşir.</span>
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 p-2.5 text-[11px] text-amber-900 leading-relaxed">
-          <AlertCircle className="size-4 shrink-0 text-amber-600 mt-0.5" />
-          <span>
-            <strong>Bilgi:</strong> Onay sonrasında tedavi kalemleri ve seanslar düzenlemeye kapatılır.
-          </span>
-        </div>
-
-        <div className="mt-5 flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            disabled={isLocking}
-            onClick={() => setShowConfirmLock(false)}
-            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
-          >
-            Vazgeç
-          </button>
-          <button
-            type="button"
-            disabled={isLocking}
-            onClick={handleLockAndGenerate}
-            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50 transition active:scale-98"
-          >
-            {isLocking ? (
-              <>
-                <Loader2 className="size-3.5 animate-spin text-cyan-400" />
-                <span>Hazırlanıyor...</span>
-              </>
-            ) : (
-              <>
-                <FileCheck2 className="size-3.5 text-emerald-400" />
-                <span>Onayla ve Sunumları Oluştur</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  )}
+      )}
 
       {/* Silme Onay Uyarısı Modalı */}
       {showRevokeConfirm && (
@@ -1354,7 +1636,7 @@ export function OverviewModule({
                       await navigator.clipboard?.writeText(shareUrl);
                       setShareToast("Link kopyalandı! Instagram açılıyor...");
                       setTimeout(() => setShareToast(null), 3000);
-                    } catch (err) {}
+                    } catch (err) { }
                     window.open("https://www.instagram.com/direct/inbox/", "_blank");
                   }}
                   className="group flex flex-col items-center justify-center rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 hover:border-rose-300 p-4 transition cursor-pointer text-center shadow-2xs"
@@ -1369,16 +1651,14 @@ export function OverviewModule({
                 <button
                   type="button"
                   onClick={() => setShowQrInline((prev) => !prev)}
-                  className={`group flex flex-col items-center justify-center rounded-2xl border p-4 transition cursor-pointer text-center shadow-2xs ${
-                    showQrInline
+                  className={`group flex flex-col items-center justify-center rounded-2xl border p-4 transition cursor-pointer text-center shadow-2xs ${showQrInline
                       ? "border-slate-900 bg-slate-900 text-white"
                       : "border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-slate-900"
-                  }`}
+                    }`}
                 >
                   <div
-                    className={`flex size-11 items-center justify-center rounded-2xl shadow-2xs group-hover:scale-105 transition-transform ${
-                      showQrInline ? "bg-white text-slate-900" : "bg-slate-800 text-white"
-                    }`}
+                    className={`flex size-11 items-center justify-center rounded-2xl shadow-2xs group-hover:scale-105 transition-transform ${showQrInline ? "bg-white text-slate-900" : "bg-slate-800 text-white"
+                      }`}
                   >
                     <QrCode className="size-6" />
                   </div>
@@ -1410,6 +1690,147 @@ export function OverviewModule({
           </div>
         </div>
       )}
+      {/* A4 Şablonu Tam Ekran Önizleme Modalı */}
+      {showFullScreenPdf && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-start bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 overflow-hidden">
+          {/* Modal Header */}
+          <div className="w-full max-w-5xl flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-3 border-b border-white/10 text-white shrink-0 gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                <FileCheck2 className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Hasta Sunum Dokümanı Önizlemesi</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold">
+                    {modalPdfFormat === "booklet" ? "24 Sayfa" : "A4 Özet"}
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {pdfPlanData.clinicName} • {pdfPlanData.patientName}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              {/* Şablon Seçici Dropdown */}
+              <div className="flex items-center rounded-xl bg-white/10 px-2.5 py-1 text-xs">
+                <span className="text-[11px] text-slate-300 font-semibold mr-1.5 hidden md:inline">Şablon:</span>
+                <select
+                  value={activeTemplateId}
+                  onChange={(e) => setActiveTemplateId(e.target.value as TemplateId)}
+                  className="bg-transparent text-cyan-300 text-xs font-bold outline-none cursor-pointer"
+                >
+                  {TEMPLATE_META.map((t) => (
+                    <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Format Toggle */}
+              <div className="flex items-center rounded-xl bg-white/10 p-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setModalPdfFormat("booklet")}
+                  className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold transition ${modalPdfFormat === "booklet"
+                      ? "bg-cyan-500 text-white shadow-xs"
+                      : "text-slate-300 hover:text-white"
+                    }`}
+                >
+                  24 Sayfalık Kitapçık
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalPdfFormat("summary")}
+                  className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold transition ${modalPdfFormat === "summary"
+                      ? "bg-cyan-500 text-white shadow-xs"
+                      : "text-slate-300 hover:text-white"
+                    }`}
+                >
+                  1 Sayfa Özet
+                </button>
+              </div>
+
+              {/* Zoom Buttons (Available for both booklet and summary) */}
+              <div className="hidden sm:flex items-center rounded-lg bg-white/10 p-0.5 text-xs">
+                {[0.6, 0.75, 0.85, 1.0].map((sc) => (
+                  <button
+                    key={sc}
+                    type="button"
+                    onClick={() => setFullScreenScale(sc)}
+                    className={`cursor-pointer px-2 py-1 rounded-md transition ${fullScreenScale === sc ? "bg-white text-slate-900 font-bold" : "text-slate-300 hover:text-white"
+                      }`}
+                  >
+                    {Math.round(sc * 100)}%
+                  </button>
+                ))}
+              </div>
+
+              {effectivePlanId && (
+                <button
+                  type="button"
+                  onClick={() => window.open(`/api/plans/${effectivePlanId}/pdf`, "_blank")}
+                  className="hidden sm:inline-flex cursor-pointer items-center gap-1 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-xs font-semibold text-white transition active:scale-95"
+                  title="Yeni Sekmede Aç"
+                >
+                  <ExternalLink className="size-3.5 text-cyan-400" />
+                  <span>Sekmede Aç</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={isGeneratingPdf}
+                onClick={() => handleDownloadPdf(modalPdfFormat)}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 px-4 py-2 text-xs font-bold text-white shadow-xs transition active:scale-95 disabled:opacity-50"
+              >
+                {isGeneratingPdf ? (
+                  <Loader2 className="size-3.5 animate-spin text-white" />
+                ) : (
+                  <Download className="size-3.5 text-white" />
+                )}
+                <span>İndir</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowFullScreenPdf(false)}
+                className="cursor-pointer rounded-xl bg-white/10 hover:bg-white/20 p-2 text-slate-400 hover:text-white transition"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Body: Direct Vector A4 Rendering with Full Zoom Support */}
+          <div className="flex-1 w-full max-w-5xl overflow-y-auto no-scrollbar flex justify-center py-2">
+            <div
+              style={{
+                transform: `scale(${fullScreenScale})`,
+                transformOrigin: "top center",
+                width: "210mm",
+                marginBottom: fullScreenScale < 1 ? `calc(297mm * ${fullScreenScale - 1})` : "20px",
+              }}
+              className={`shadow-2xl ring-1 ring-white/10 ${
+                activeTemplateId === "noir-gold"
+                  ? "bg-[#0A0A0A]"
+                  : activeTemplateId === "royal-gold"
+                  ? "bg-[#070709]"
+                  : activeTemplateId === "botanical-serenity"
+                  ? "bg-[#F7F6F2]"
+                  : "bg-white"
+              }`}
+            >
+              <div ref={fullScreenPdfRef}>
+                <A4Document data={{ ...pdfPlanData, templateId: activeTemplateId, format: modalPdfFormat, activePage: undefined }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Paylaşım Toast Bildirimi */}
       {shareToast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-2xl bg-slate-900 text-white px-4 py-3 text-xs font-bold shadow-2xl animate-in slide-in-from-bottom duration-200">
