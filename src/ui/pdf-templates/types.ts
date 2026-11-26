@@ -43,6 +43,7 @@ export interface TreatmentItem {
   notes?: string;
   toothNumber?: string;
   quantity?: number;
+  qty?: number;
   teeth?: string[];
   category?: string;
 }
@@ -74,6 +75,7 @@ export interface StatItem {
 export interface PdfPlanData {
   clinicName: string;
   slogan?: string;
+  clinicSlogan?: string;
   phone?: string;
   email?: string;
   website?: string;
@@ -83,6 +85,11 @@ export interface PdfPlanData {
   doctorTitle?: string;
   doctorBio?: string;
   doctorPhotoUrl?: string | null;
+  coordinatorName?: string;
+  coordinatorPhotoUrl?: string | null;
+  patientPhotoUrl?: string | null;
+  planTitle?: string;
+  proposalNo?: string;
   doctorStats?: StatItem[];
   welcomeBody?: string;
   welcomeText?: string;

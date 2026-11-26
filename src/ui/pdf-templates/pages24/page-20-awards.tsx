@@ -1,7 +1,6 @@
 import React from "react";
 import type { PdfPalette, PdfPlanData } from "../types";
-import { PageFrame } from "../page-frame";
-import { Award, ShieldCheck, CheckCircle2, Sparkles } from "../icons";
+import { WisePageWrapper, WiseHeader, WiseFooter, getThemeColor } from "../wise-frame";
 
 export function Booklet24Page20Awards({
   data,
@@ -11,120 +10,84 @@ export function Booklet24Page20Awards({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
-
-  const accreditations = [
-    { code: "Temos", title: "Temos International", sub: "Excellence in Medical Tourism" },
-    { code: "JCI", title: "JCI Quality", sub: "Joint Commission International Approval" },
-    { code: "ISO", title: "ISO 9001 / 13485", sub: "Certified Quality & Device Management" },
-    { code: "Invisalign", title: "Platinum Elite", sub: "Recognized Orthodontic Provider" },
-    { code: "BDA", title: "BDA Member", sub: "British Dental Association Protocols" },
-    { code: "ITI", title: "ITI Member", sub: "International Team for Implantology" },
-    { code: "AGD", title: "AGD Standard", sub: "Academy of General Dentistry" },
-    { code: "ADA", title: "ADA Affiliate", sub: "American Dental Association Standards" },
-  ];
+  const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
-    <PageFrame
-      data={data}
-      palette={palette}
-      pageNumber={20}
-      totalPages={24}
-      pageTitle={isEn ? "International Recognitions & Awards" : "Uluslararası Akreditasyonlar & Ödüllerimiz"}
+    <WisePageWrapper
+      bgImage="/pdf-assets/wise/page_20.jpg"
+      className="flex flex-col justify-between"
     >
-      <div className="size-full flex flex-col justify-between py-2 space-y-4">
-        {/* Başlık ve Açıklama Metni (wise_2.pdf sayfa 20) */}
-        <div className="space-y-2.5">
-          <div
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
-            style={{ backgroundColor: palette.light, color: palette.primary }}
-          >
-            <Award className="size-3.5" style={{ color: palette.accent }} />
-            <span>{isEn ? "PROVEN GLOBAL RECOGNITION" : "ULUSLARARASI KANITLANMIŞ KALİTE"}</span>
-          </div>
+      {/* 1. Eğimli Başlık Bandı (80.1mm) */}
+      <WiseHeader
+        eyebrow={isEn ? "OUR RECOGNITIONS" : "AKREDİTASYONLARIMIZ"}
+        title={isEn ? "AWARDS" : "ÖDÜLLERİMİZ"}
+        themeColor={themeColor}
+      />
 
-          <h2
-            className="text-3xl font-extrabold tracking-tight"
-            style={{ color: palette.primary, fontFamily: palette.headingFont }}
-          >
-            {isEn ? "Our Recognitions & Awards" : "Akreditasyonlarımız & Ödüllerimiz"}
-          </h2>
+      {/* 2. Açıklama Metni (temizlenmiş page_20.jpg üzerinde y: 340..715 aralığında yer alır) */}
+      <div className="flex-1 px-[76px] pt-[18px] select-none z-10 space-y-5 text-[15px] leading-[1.58] text-[#222222] text-justify">
+        <p>
+          {isEn ? (
+            <>
+              {"At our clinic, "}
+              <span className="font-bold text-black">
+                {"excellence isn't just a promise—it's a proven standard."}
+              </span>{" "}
+              Recognized for outstanding patient care and dental expertise, we have earned prestigious awards that set us apart in the field of dental tourism.
+            </>
+          ) : (
+            <>
+              Kliniğimizde{" "}
+              <span className="font-bold text-black">
+                mükemmeliyet yalnızca bir vaat değil, kanıtlanmış bir standarttır.
+              </span>{" "}
+              Üstün hasta bakımı ve dental uzmanlığımız sayesinde sağlık turizmi alanında bizi öne çıkaran prestijli uluslararası ödüllere layık görüldük.
+            </>
+          )}
+        </p>
 
-          <p className="text-sm text-slate-700 leading-relaxed font-normal">
-            {isEn
-              ? "At our clinic, excellence isn't just a promise—it's a proven standard. Recognized for outstanding patient care and dental expertise, we have earned prestigious awards that set us apart in the field of dental tourism."
-              : "Kliniğimizde mükemmellik sadece bir vaat değil, tescillenmiş bir çalışma standardıdır. Üstün hasta bakımı, cerrahi başarı ve diş hekimliği uzmanlığımız ile sağlık turizmi alanında uluslararası ölçekte en prestijli ödüllere layık görüldük."}
-          </p>
-
-          <p className="text-xs text-slate-600 leading-relaxed">
-            {isEn
-              ? "Our commitment to quality is backed by internationally accredited certifications, ensuring that every treatment meets the highest standards of safety, hygiene, and precision. We adhere to strict protocols, use only premium materials, and stay ahead with cutting-edge technology. Because when it comes to your smile, only the best will do."
-              : "Kaliteye olan bağlılığımız, dünya çapında kabul gören akreditasyonlarla tescillenmiştir. Her tedavinin en yüksek güvenlik, hijyen ve hassasiyet standartlarında gerçekleştiğini garanti ediyoruz. Yalnızca birinci sınıf sertifikalı materyaller kullanıyor ve tıp teknolojisini yakından takip ediyoruz."}
-          </p>
-        </div>
-
-        {/* Akreditasyon Logoları Grid (Temos, JCI, ISO, Invisalign, BDA, ITI, AGD, ADA) */}
-        <div className="grid grid-cols-4 gap-3">
-          {accreditations.map((ac, idx) => (
-            <div
-              key={idx}
-              className="rounded-2xl border p-3 flex flex-col items-center text-center justify-between shadow-2xs hover:shadow-xs transition"
-              style={{ backgroundColor: palette.cardBg, borderColor: palette.border }}
-            >
-              <div className="size-11 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center font-black font-mono text-sm tracking-wider text-slate-800 shadow-2xs">
-                {ac.code}
-              </div>
-              <div className="mt-2">
-                <span className="text-[11px] font-bold text-slate-900 block leading-tight">
-                  {ac.title}
-                </span>
-                <span className="text-[9px] text-slate-500 mt-0.5 block leading-tight">
-                  {ac.sub}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Swiss Perio Education & Sürekli Eğitim Çubuğu */}
-        <div
-          className="rounded-2xl border p-3.5 flex items-center justify-between shadow-xs"
-          style={{ backgroundColor: palette.cardBg, borderColor: palette.border }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="size-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0"
-              style={{ backgroundColor: palette.primary, color: "#FFFFFF" }}
-            >
-              +
-            </div>
-            <div>
-              <span className="text-xs font-bold text-slate-900 block">
-                swiss+perio EDUCATION &amp; RESIDENCY
+        <p>
+          {isEn ? (
+            <>
+              Our commitment to quality is backed by{" "}
+              <span className="font-bold text-black">
+                internationally accredited certifications,
+              </span>{" "}
+              ensuring that every treatment meets the highest standards of safety, hygiene, and precision. We adhere to{" "}
+              <span className="font-bold text-black">
+                strict protocols, use only premium materials,
+              </span>{" "}
+              and stay ahead with cutting-edge technology. Because{" "}
+              <span className="font-bold text-black">
+                when it comes to your smile, only the best will do.
               </span>
-              <span className="text-[11px] text-slate-500">
-                {isEn
-                  ? "Surgical faculty participating in continuous advanced Swiss periodontal training."
-                  : "Cerrahi ekibimiz İsviçre menşeili ileri periodontal cerrahi ve implantoloji eğitimlerine düzenli olarak katılmaktadır."}
+            </>
+          ) : (
+            <>
+              Kaliteye olan bağlılığımız{" "}
+              <span className="font-bold text-black">
+                uluslararası akreditasyon sertifikalarıyla
+              </span>{" "}
+              desteklenmekte olup her tedavinin en yüksek güvenlik, hijyen ve hassasiyet standartlarını karşılamasını sağlar.{" "}
+              <span className="font-bold text-black">
+                Katı klinik protokollere bağlı kalıyor, yalnızca birinci sınıf materyaller kullanıyoruz.
               </span>
-            </div>
-          </div>
-          <span className="text-[10px] font-mono px-2 py-1 rounded bg-slate-100 text-slate-700 font-bold shrink-0">
-            CONTINUOUS CPD
-          </span>
-        </div>
-
-        {/* Alt Bilgi */}
-        <div
-          className="rounded-xl border p-2.5 flex items-center justify-between text-xs"
-          style={{ backgroundColor: palette.cardBg, borderColor: palette.border }}
-        >
-          <span className="text-slate-600 flex items-center gap-1.5">
-            <ShieldCheck className="size-3.5 text-emerald-600" />
-            {isEn ? "Audit-verified hygiene & clinical sterilization standards." : "Düzenli denetlenen hijyen ve hastane tipi sterilizasyon protokolleri."}
-          </span>
-          <span className="text-[10px] font-mono font-bold text-slate-700">GLOBAL ACCREDITED</span>
-        </div>
+            </>
+          )}
+        </p>
       </div>
-    </PageFrame>
+
+      {/* Akreditasyon Logoları Alanı (temizlenmiş page_20.jpg üzerinde y: 745..1065 aralığında yer alır) */}
+      <div className="h-[96mm] shrink-0" />
+
+      {/* 3. Çift Sayfa Sağ Alt Köşe Takozu */}
+      <WiseFooter
+        clinicName={data.clinicName || "Wise Dental"}
+        slogan={data.slogan || data.clinicSlogan || "Every Smile Matters!!"}
+        logoUrl={data.logoUrl}
+        themeColor={themeColor}
+        variant="even"
+      />
+    </WisePageWrapper>
   );
 }

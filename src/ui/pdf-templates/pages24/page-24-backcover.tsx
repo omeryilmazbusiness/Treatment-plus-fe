@@ -1,170 +1,112 @@
+/* eslint-disable @next/next/no-img-element */
 import React from "react";
 import type { PdfPalette, PdfPlanData } from "../types";
-import { Phone, Mail, Globe, MapPin, Clock, QrCode } from "../icons";
+import { WisePageWrapper, WiseToothLogo } from "../wise-frame";
 
 export function Booklet24Page24BackCover({
   data,
-  palette,
 }: {
   data: PdfPlanData;
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const clinicName = (data.clinicName || "Wise Dental").trim();
+  const slogan = data.slogan || data.clinicSlogan || "Every Smile Matters!!";
 
-  const clinicName = data.clinicName || "Modern Dental Clinic";
-  const doctorName = data.doctorName || "Dr. Dt. Lead Surgeon";
-  const address = data.clinicAddress || data.address || "Barbaros Bulvarı No: 142/A, Beşiktaş, İstanbul";
-  const phone = data.clinicPhone || data.phone || "+90 212 555 0100";
-  const email = data.clinicEmail || data.email || "info@moderndental.com";
-  const website = data.clinicWebsite || data.website || "www.moderndental.com";
-  const logoUrl = data.clinicLogoUrl || data.logoUrl;
+  const address = data.clinicAddress || data.address || "123 Main St. Anytown, Country";
+  const phone = data.clinicPhone || data.phone || "+1 234 567890";
+  const email = data.clinicEmail || data.email || "contact@wisedental.com";
+  const website = data.clinicWebsite || data.website || "wisedental.com";
+
+  const words = clinicName.split(/\s+/);
+  const firstWord = words[0] || "Wise";
+  const restWords = words.slice(1).join(" ");
 
   return (
-    <div
-      className="a4-page relative flex flex-col justify-between overflow-hidden text-white"
-      style={{
-        width: "210mm",
-        height: "297mm",
-        backgroundColor: palette.coverBg || "#0F172A",
-        padding: "24mm 20mm",
-        boxSizing: "border-box",
-        pageBreakAfter: "always",
-        breakAfter: "page",
-        backgroundImage:
-          "radial-gradient(circle at 50% 20%, rgba(2,132,199,0.18) 0%, rgba(15,23,42,0.95) 75%)",
-      }}
+    <WisePageWrapper
+      bgImage="/pdf-assets/wise/page_24.jpg"
+      className="flex flex-col justify-between"
     >
-      {/* Üst Logo ve Marka Bilgisi */}
-      <div className="flex flex-col items-center text-center space-y-3 pt-6">
-        <div
-          className="size-20 rounded-3xl flex items-center justify-center shadow-2xl border border-white/20"
-          style={{ backgroundColor: palette.accent }}
-        >
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl}
-              alt={clinicName}
-              className="size-14 object-contain"
-            />
-          ) : (
-            <svg viewBox="0 0 24 24" className="size-12 fill-white">
-              <path d="M12 2C8.5 2 6 4.5 6 8c0 3 1.5 5 2.5 7.5.8 2 1.5 4.5 3.5 4.5s2.7-2.5 3.5-4.5C16.5 13 18 11 18 8c0-3.5-2.5-6-6-6zm0 2c2.5 0 4 2 4 4.5 0 2-.9 3.5-2 5.5-.7 1.5-1.3 3-2 3s-1.3-1.5-2-3c-1.1-2-2-3.5-2-5.5C8 6 9.5 4 12 4z" />
-            </svg>
-          )}
+      {/* Üst Boşluk */}
+      <div className="h-32" />
+
+      {/* İletişim Bilgileri (temizlenmiş page_24.jpg üzerinde wise_2.pdf orijinal tipografisiyle) */}
+      <div className="flex-1 flex flex-col items-center justify-start text-center px-12 select-none z-10 text-white space-y-7">
+        <div>
+          <h3 className="text-[19px] font-bold tracking-tight text-white mb-1">
+            {isEn ? "Clinic Address" : "Klinik Adresi"}
+          </h3>
+          <p className="text-[18px] text-white/90 font-extralight max-w-[460px] leading-snug">
+            {address}
+          </p>
         </div>
 
         <div>
-          <h1
-            className="text-3xl font-extrabold tracking-tight text-white"
-            style={{ fontFamily: palette.headingFont }}
-          >
-            {clinicName}
-          </h1>
-          <p className="text-xs uppercase tracking-widest text-slate-300 mt-1 font-semibold">
-            {isEn ? "Advanced Oral Surgery & Implantology Center" : "Ağız, Diş Sağlığı ve İleri Cerrahi Merkezi"}
+          <h3 className="text-[19px] font-bold tracking-tight text-white mb-1">
+            {isEn ? "Phone" : "Telefon"}
+          </h3>
+          <p className="text-[18px] text-white/90 font-extralight">
+            {phone}
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-[19px] font-bold tracking-tight text-white mb-1">
+            {isEn ? "Email" : "E-posta"}
+          </h3>
+          <p className="text-[18px] text-white/90 font-extralight">
+            {email}
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-[19px] font-bold tracking-tight text-white mb-1">
+            {isEn ? "Website" : "Web Sitesi"}
+          </h3>
+          <p className="text-[18px] text-white/90 font-extralight">
+            {website}
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-[19px] font-bold tracking-tight text-white mb-1">
+            {isEn ? "Opening Hours" : "Çalışma Saatleri"}
+          </h3>
+          <p className="text-[18px] text-white/90 font-extralight leading-snug">
+            {isEn ? "Monday – Friday: 10:00–19:00" : "Pazartesi – Cuma: 10:00–19:00"}
+            <br />
+            {isEn ? "Saturday – Sunday: Closed" : "Cumartesi – Pazar: Kapalı"}
           </p>
         </div>
       </div>
 
-      {/* Orta İletişim & Lokasyon Kartı (wise_2.pdf sayfa 24 formatı) */}
-      <div className="w-full max-w-md mx-auto bg-slate-900/80 backdrop-blur-md rounded-3xl border border-white/10 p-6 space-y-4 shadow-2xl">
-        {/* Adres */}
-        <div className="flex items-start gap-3">
-          <div className="size-8 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-cyan-400">
-            <MapPin className="size-4" />
+      {/* Alt: Altın Diş Logosu ve Klinik Adı (wise_2.pdf orijinal konumunda) */}
+      <div className="flex flex-col items-center justify-center text-center pb-28 select-none z-10">
+        {data.logoUrl ? (
+          <img
+            src={data.logoUrl}
+            alt={clinicName}
+            className="h-20 object-contain mb-3 drop-shadow-lg"
+          />
+        ) : (
+          <div className="mb-2 drop-shadow-xl">
+            <WiseToothLogo className="size-24" color="#E5B94E" />
           </div>
-          <div className="text-xs">
-            <span className="font-bold text-white block uppercase tracking-wider text-[10px] text-slate-400">
-              {isEn ? "Clinic Address" : "Klinik Adresi"}
-            </span>
-            <span className="text-slate-200 mt-0.5 block leading-relaxed font-normal">
-              {address}
-            </span>
-          </div>
-        </div>
-
-        {/* Telefon */}
-        <div className="flex items-center gap-3">
-          <div className="size-8 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-cyan-400">
-            <Phone className="size-4" />
-          </div>
-          <div className="text-xs">
-            <span className="font-bold text-white block uppercase tracking-wider text-[10px] text-slate-400">
-              {isEn ? "Phone" : "Telefon"}
-            </span>
-            <span className="text-slate-200 mt-0.5 block font-mono">
-              {phone}
-            </span>
-          </div>
-        </div>
-
-        {/* E-posta */}
-        <div className="flex items-center gap-3">
-          <div className="size-8 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-cyan-400">
-            <Mail className="size-4" />
-          </div>
-          <div className="text-xs">
-            <span className="font-bold text-white block uppercase tracking-wider text-[10px] text-slate-400">
-              {isEn ? "Email" : "E-posta"}
-            </span>
-            <span className="text-slate-200 mt-0.5 block">
-              {email}
-            </span>
-          </div>
-        </div>
-
-        {/* Web Sitesi */}
-        <div className="flex items-center gap-3">
-          <div className="size-8 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-cyan-400">
-            <Globe className="size-4" />
-          </div>
-          <div className="text-xs">
-            <span className="font-bold text-white block uppercase tracking-wider text-[10px] text-slate-400">
-              {isEn ? "Website" : "Web Sitesi"}
-            </span>
-            <span className="text-slate-200 mt-0.5 block font-mono">
-              {website}
-            </span>
-          </div>
-        </div>
-
-        {/* Çalışma Saatleri */}
-        <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <Clock className="size-4 text-cyan-400" />
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                {isEn ? "Opening Hours" : "Çalışma Saatleri"}
-              </span>
-              <span className="text-slate-200">
-                {isEn ? "Mon - Fri: 10:00 - 19:00" : "Hafta İçi: 09:30 - 19:30"}
-              </span>
-            </div>
-          </div>
-          <span className="text-[10px] text-slate-400 font-medium">
-            {isEn ? "Sat: 10:00 - 16:00" : "Cumartesi: 10:00 - 17:00"}
-          </span>
-        </div>
-      </div>
-
-      {/* Alt Kısım: QR Kod ve Slogan */}
-      <div className="flex flex-col items-center text-center space-y-3 pb-2">
-        <div className="size-24 rounded-2xl bg-white p-2 flex items-center justify-center shadow-2xl">
-          <QrCode className="size-20 text-slate-900" />
-        </div>
-
-        <p className="text-[11px] text-slate-400 max-w-xs">
-          {isEn
-            ? "Scan the QR code to navigate to the clinic or reach out directly on WhatsApp."
-            : "Haritada yol tarifi almak veya WhatsApp hattımıza doğrudan bağlanmak için QR kodu taratabilirsiniz."}
+        )}
+        <h2
+          className="tracking-tight leading-none mb-1.5"
+          style={{
+            fontSize: clinicName.length > 18 ? "32px" : "40px",
+            color: "#E6BC53",
+          }}
+        >
+          <span className="font-black">{firstWord}</span>
+          {restWords ? <span className="font-extralight ml-1.5">{restWords}</span> : null}
+        </h2>
+        <p className="text-[10.5px] font-light tracking-[0.38em] text-[#E8D292]">
+          {slogan}
         </p>
-
-        <div className="pt-2 border-t border-white/10 w-full flex items-center justify-between text-[10px] text-slate-400">
-          <span>&copy; {new Date().getFullYear()} {clinicName}</span>
-          <span>{isEn ? "Every Smile Matters" : "Sağlıklı Gülüşler, Mutlu Hayatlar"}</span>
-        </div>
       </div>
-    </div>
+    </WisePageWrapper>
   );
 }

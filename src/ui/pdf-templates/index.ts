@@ -3,6 +3,7 @@ export * from "./palettes";
 export * from "./motifs";
 export * from "./sample-data";
 export * from "./page-frame";
+export * from "./wise-frame";
 export * from "./pages24";
 export * from "./a4-document";
 export * from "./pdf-export";
