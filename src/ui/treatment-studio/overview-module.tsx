@@ -50,7 +50,14 @@ function InstagramIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import type { ClinicBrandInfo, PatientInfo, StudioPlanItem, StudioVisit } from "./types";
+import type {
+  ClinicBrandInfo,
+  PatientInfo,
+  PlanDiscount,
+  StudioPlanItem,
+  StudioVisit,
+  ToothCondition,
+} from "./types";
 import type { ClinicSettings } from "@/modules/clinic/domain/clinic";
 import {
   A4Document,
@@ -61,6 +68,9 @@ import {
   type PaletteKey,
   type TreatmentItem,
   type PdfPlanData,
+  type PdfToothCondition,
+  type ToothFinding,
+  type PlanVisit,
 } from "@/ui/pdf-templates";
 import {
   createShareLinkAction,
@@ -91,6 +101,10 @@ interface OverviewModuleProps {
   clinic: ClinicBrandInfo;
   items: StudioPlanItem[];
   visits: StudioVisit[];
+  conditions?: Record<string, ToothCondition>;
+  discounts?: PlanDiscount[];
+  generalDiagnoses?: string[];
+  xrayUrl?: string | null;
   currency?: "EUR" | "USD" | "TRY";
   planId?: string;
   planTitle?: string;
@@ -106,6 +120,10 @@ export function OverviewModule({
   clinic,
   items,
   visits,
+  conditions = {},
+  discounts = [],
+  generalDiagnoses = [],
+  xrayUrl,
   currency = "EUR",
   planId,
   planTitle,
@@ -169,67 +187,102 @@ export function OverviewModule({
     }
   }, [clinicSettings]);
 
+  const appBase = typeof window !== "undefined" ? window.location.origin : "";
+
+  // Effective plan id (fallback to patient.id if it's a valid ULID)
+  const effectivePlanId =
+    planId || (patient?.id && patient.id.length >= 20 ? patient.id : undefined);
+
+  // Current Share & 3D Simulation URL
+  const currentToken =
+    activeToken ||
+    activeLink?.token_prefix ||
+    (patient?.id ? `demo-${patient.id}` : "demo-preview");
+  const shareUrl = `${appBase}/p/${currentToken}`;
+  const simulationUrl = `${shareUrl}?viz=1`;
+
   const pdfPlanData: PdfPlanData = useMemo(() => {
     const isEn = clinicSettings?.locale === "en";
+    const defaultVisitId = visits[0]?.id;
+    const defaultVisitTitle = visits[0]?.title || (isEn ? "1st Visit" : "1. Seans");
+
     const mappedItems: TreatmentItem[] = items.map((it) => {
-      const visitMatch = visits.find((v) => v.id === it.visitId);
+      const visitMatch = visits.find((v) => v.id === it.visitId) || visits[0];
+      const qty = it.quantity || 1;
+      const unitPrice = it.unitPrice || 0;
+      const amount = it.isPackage ? 0 : unitPrice * qty;
       return {
-        name: it.treatmentName || "Tedavi Kalemi",
-        session: visitMatch?.title || "1. Seans",
+        name: it.treatmentName || (isEn ? "Treatment Item" : "Tedavi Kalemi"),
+        treatmentName: it.treatmentName || (isEn ? "Treatment Item" : "Tedavi Kalemi"),
+        treatmentType: typeof it.treatmentType === "string" ? it.treatmentType : undefined,
+        session: visitMatch?.title || defaultVisitTitle,
+        visitId: visitMatch?.id || it.visitId || defaultVisitId,
         toothNumber: it.teeth && it.teeth.length > 0 ? it.teeth.join(", ") : undefined,
         teeth: it.teeth,
-        quantity: it.quantity || 1,
-        amount: (it.unitPrice || 0) * (it.quantity || 1),
+        quantity: qty,
+        qty,
+        unitPrice,
+        amount,
+        description: it.description,
+        isPackage: Boolean(it.isPackage),
         category: typeof it.treatmentType === "string" ? it.treatmentType : undefined,
       };
     });
 
-    const grandTotal = mappedItems.reduce((acc, it) => acc + (it.amount || 0), 0);
+    const subtotal = mappedItems.reduce(
+      (acc, it) => acc + (it.isPackage ? 0 : it.amount || 0),
+      0
+    );
+    const mappedDiscounts = (discounts || []).map((d) => ({
+      id: d.id,
+      label: d.label || (isEn ? "Discount" : "İndirim"),
+      amount: (Number(d.amount) || 0) / 100,
+    }));
+    const discountTotal = mappedDiscounts.reduce((acc, d) => acc + (d.amount || 0), 0);
+    const grandTotal = Math.max(0, subtotal - discountTotal);
 
-    const visit1Items = mappedItems.filter((it) => it.session?.includes("1") || !it.session?.includes("2"));
-    const visit2Items = mappedItems.filter((it) => it.session?.includes("2"));
+    const mappedVisits: PlanVisit[] =
+      visits && visits.length > 0
+        ? visits.map((v, vIdx) => {
+            const vItems = mappedItems.filter(
+              (it) =>
+                it.visitId === v.id ||
+                (!it.visitId && vIdx === 0) ||
+                (!visits.some((vis) => vis.id === it.visitId) && vIdx === 0)
+            );
+            return {
+              id: v.id || `v-${vIdx + 1}`,
+              title: v.title || `${vIdx + 1}. Seans`,
+              phaseLabel: v.phaseLabel || `${vIdx + 1}. Aşama`,
+              healingPeriod: v.healingNote || undefined,
+              chartTeeth: v.chartTeeth || [],
+              items: vItems,
+              subtotal: vItems.reduce((s, it) => s + (it.isPackage ? 0 : it.amount || 0), 0),
+              note: v.healingNote || undefined,
+            };
+          })
+        : [
+            {
+              id: "v1",
+              title: isEn ? "1st Visit: Planned Treatments" : "1. Seans: Planlanan Tedaviler",
+              phaseLabel: isEn ? "Phase 1" : "1. Aşama",
+              items: mappedItems,
+              subtotal,
+            },
+          ];
 
-    const mappedVisits = [
-      {
-        id: "v1",
-        title: isEn ? "1st Visit: Surgical & Provisional Phase" : "1. Seans: Cerrahi ve Geçici Diş Aşaması",
-        phaseLabel: isEn ? "Day 1 - 3" : "1. - 3. Gün",
-        duration: isEn ? "3 Days Stay" : "3 Günlük Süreç",
-        healingPeriod: isEn ? "3 Months Osseointegration" : "3 Aylık Kemik Kaynaşma Dönemi",
-        items: visit1Items,
-        subtotal: visit1Items.reduce((s, it) => s + it.amount, 0),
-        note: isEn
-          ? "Surgical tooth extractions, computer-guided implant placement, and fixed screw-retained provisional delivery."
-          : "Gerekli cerrahi diş çekimleri, 3D cerrahi rehberli implant yerleşimi ve 24 saat içinde sabit estetik geçici diş teslimi.",
-      },
-      {
-        id: "v2",
-        title: isEn ? "2nd Visit: Permanent Prosthetic Delivery" : "2. Seans: Kalıcı Zirkonyum Teslim Aşaması",
-        phaseLabel: isEn ? "After 3 Months" : "3 Ay Sonra",
-        duration: isEn ? "5 - 7 Days Stay" : "5 - 7 Günlük Süreç",
-        items: visit2Items.length > 0 ? visit2Items : mappedItems.slice(Math.max(1, mappedItems.length - 2)),
-        subtotal: visit2Items.reduce((s, it) => s + it.amount, 0),
-        note: isEn
-          ? "Final digital impressions, dynamic bite registration, try-in, and final torque delivery of permanent monolithic bridge."
-          : "Kemikleşme kontrolü, mikron hassasiyetinde dijital ölçü, estetik prova ve kalıcı monolitik zirkonyum köprünün teslimi.",
-      },
-    ];
+    const toothConditions: Record<string, PdfToothCondition> = {};
+    const mappedDiagnoses: ToothFinding[] = [];
 
-    const mappedDiagnoses = mappedItems.flatMap((it) => {
-      const teethList = it.teeth || (it.toothNumber ? it.toothNumber.split(/[,;\s]+/) : []);
-      return teethList.map((t) => ({
-        toothNumber: t.trim(),
-        condition: it.name,
-        treatment: it.name,
-        status: (it.name.toLowerCase().includes("implant")
-          ? "implant"
-          : it.name.toLowerCase().includes("zirkonyum") || it.name.toLowerCase().includes("kron")
-          ? "crown"
-          : it.name.toLowerCase().includes("dolgu") || it.name.toLowerCase().includes("çürük")
-          ? "cavity"
-          : "implant") as "implant" | "crown" | "cavity" | "missing" | "healthy",
-      }));
-    });
+    for (const [tooth, cond] of Object.entries(conditions || {})) {
+      if (!tooth || !cond) continue;
+      toothConditions[tooth] = cond as PdfToothCondition;
+      mappedDiagnoses.push({
+        toothNumber: tooth,
+        condition: cond,
+        status: cond as ToothFinding["status"],
+      });
+    }
 
     return {
       templateId: activeTemplateId,
@@ -242,6 +295,7 @@ export function OverviewModule({
       email: clinicSettings?.email || "info@klinik.com",
       website: clinicSettings?.website || "www.klinik.com",
       address: clinicSettings?.address || clinic.address || "İstanbul",
+      hours: clinicSettings?.hours,
       doctorName:
         clinicSettings?.doctor?.name ||
         clinicSettings?.signerName ||
@@ -259,6 +313,7 @@ export function OverviewModule({
       labStats: clinicSettings?.lab?.stats,
       hotelDetails: clinicSettings?.hotel,
       patientName: patient?.name || "Sayın Hastamız",
+      planTitle: planTitle || "Kişiye Özel Tedavi Planı",
       planNo: planId ? `#TP-${planId.slice(0, 8).toUpperCase()}` : "#TP-2026-001",
       dateStr: new Date().toLocaleDateString(isEn ? "en-US" : "tr-TR", {
         day: "numeric",
@@ -273,12 +328,37 @@ export function OverviewModule({
       legalText: clinicSettings?.legal || "",
       showMotifs: clinicSettings?.showMotifs !== false,
       format: modalPdfFormat,
+      xrayUrl: xrayUrl || null,
       items: mappedItems,
+      discounts: mappedDiscounts,
+      subtotal,
+      discountTotal,
       grandTotal,
       visits: mappedVisits,
+      toothConditions,
+      generalDiagnoses,
       diagnoses: mappedDiagnoses,
+      shareUrl,
+      simulationUrl,
     };
-  }, [activeTemplateId, clinicSettings, clinic, items, visits, currency, patient?.name, planId, modalPdfFormat]);
+  }, [
+    activeTemplateId,
+    clinicSettings,
+    clinic,
+    items,
+    visits,
+    conditions,
+    discounts,
+    generalDiagnoses,
+    xrayUrl,
+    currency,
+    patient?.name,
+    planId,
+    planTitle,
+    modalPdfFormat,
+    shareUrl,
+    simulationUrl,
+  ]);
 
   const currSymbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "₺";
   const subtotal = items.reduce(
@@ -294,12 +374,6 @@ export function OverviewModule({
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
       .join(" ")
     : "Sayın Hastamız";
-
-  const appBase = typeof window !== "undefined" ? window.location.origin : "";
-
-  // Effective plan id (fallback to patient.id if it's a valid ULID)
-  const effectivePlanId =
-    planId || (patient?.id && patient.id.length >= 20 ? patient.id : undefined);
 
   // Load existing links and analytics when effectivePlanId is available
   useEffect(() => {
@@ -333,13 +407,26 @@ export function OverviewModule({
           );
           if (valid) {
             setActiveLink(valid);
-            if (savedToken && savedToken.startsWith(valid.token_prefix || "")) {
+            if (
+              savedToken &&
+              savedToken.length >= 16 &&
+              savedToken.startsWith(valid.token_prefix || "")
+            ) {
               setActiveToken(savedToken);
-            } else if (valid.token_prefix) {
-              setActiveToken(valid.token_prefix);
+            } else if (effectivePlanId) {
+              // Tarayıcıda tam token yoksa karekodun çalışması için yeni tam token oluştur
+              createShareLinkAction(effectivePlanId, 720).then((res) => {
+                if (res.success && res.data && mounted) {
+                  setActiveLink(res.data.link);
+                  setActiveToken(res.data.token);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem(`tp_share_token_${effectivePlanId}`, res.data.token);
+                  }
+                }
+              });
             }
-          } else if (isLocked && effectivePlanId) {
-            // Plan is locked / approved -> automatically generate the presentation share link so it's ready
+          } else if (effectivePlanId) {
+            // Plan için aktif paylaşım linki yoksa karekod ve 3D simülasyon yönlendirmesi için otomatik oluştur
             createShareLinkAction(effectivePlanId, 720).then((res) => {
               if (res.success && res.data && mounted) {
                 setActiveLink(res.data.link);
@@ -366,13 +453,6 @@ export function OverviewModule({
       mounted = false;
     };
   }, [effectivePlanId, isLocked]);
-
-  // Current Share URL
-  const currentToken =
-    activeToken ||
-    activeLink?.token_prefix ||
-    (patient?.id ? `demo-${patient.id}` : "demo-preview");
-  const shareUrl = `${appBase}/p/${currentToken}`;
 
   const totalViews = activeLink
     ? analytics?.total_views ?? activeLink.views_count ?? 0
@@ -489,11 +569,21 @@ export function OverviewModule({
       }
 
       if (effectivePlanId) {
+        const tokenQuery =
+          activeToken && activeToken.length >= 16
+            ? `&token=${encodeURIComponent(activeToken)}`
+            : "";
         if (format === "summary") {
-          window.open(`/api/plans/${effectivePlanId}/pdf?format=summary&download=1`, "_blank");
+          window.open(
+            `/api/plans/${effectivePlanId}/pdf?format=summary&download=1${tokenQuery}`,
+            "_blank"
+          );
         } else {
           // Kapsamlı sunum kitapçığını yeni sekmede aç ve yazdır/indir
-          window.open(`/api/plans/${effectivePlanId}/pdf?download=1`, "_blank");
+          window.open(
+            `/api/plans/${effectivePlanId}/pdf?download=1${tokenQuery}`,
+            "_blank"
+          );
         }
         setPdfSuccessMsg("PDF başarıyla indiriliyor.");
         setTimeout(() => setPdfSuccessMsg(null), 3000);

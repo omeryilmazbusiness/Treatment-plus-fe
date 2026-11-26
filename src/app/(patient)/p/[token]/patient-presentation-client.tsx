@@ -109,10 +109,15 @@ export function PatientPresentationClient({ data, token }: Props) {
   const visits = Array.isArray(plan?.visits) ? plan.visits : [];
   const allItems = useMemo(() => {
     const list: any[] = [];
-    visits.forEach((v: any) => {
+    visits.forEach((v: any, vIdx: number) => {
+      const parentVisitId = v?.id || `visit-${vIdx + 1}`;
       if (Array.isArray(v?.items)) {
         v.items.forEach((it: any) => {
-          list.push({ ...it, visitTitle: v.title || `${v.order_num}. Seans` });
+          list.push({
+            ...it,
+            visit_id: it.visit_id || it.visitId || parentVisitId,
+            visitTitle: v.title || `${v.order_num || vIdx + 1}. Seans`,
+          });
         });
       }
     });
@@ -250,13 +255,31 @@ export function PatientPresentationClient({ data, token }: Props) {
     }
   }, [allTreatedTeeth, selectedTooth]);
 
-  // Send telemetry: opened
+  // Send telemetry: opened & check if direct 3D simulation launch was requested via QR code (?viz=1 / ?sim=1 / #3d)
   useEffect(() => {
     if (!token) return;
     recordPublicEventAction(token, "opened", {
       screen_width: typeof window !== "undefined" ? window.innerWidth : 0,
       user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
     });
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const hash = window.location.hash.toLowerCase();
+      const shouldAutoOpen3D =
+        params.get("viz") === "1" ||
+        params.get("sim") === "1" ||
+        params.get("3d") === "1" ||
+        params.get("view") === "3d" ||
+        hash === "#3d" ||
+        hash === "#viz" ||
+        hash === "#simulation";
+
+      if (shouldAutoOpen3D) {
+        setShow3DModal(true);
+        recordPublicEventAction(token, "viz_played", { source: "qr_direct" });
+      }
+    }
   }, [token]);
 
   const handleTrackCTA = (ctaType: string) => {
@@ -1220,6 +1243,7 @@ export function PatientPresentationClient({ data, token }: Props) {
                   ])
                 )}
                 darkMode
+                autoPlay
               />
             </div>
           </div>

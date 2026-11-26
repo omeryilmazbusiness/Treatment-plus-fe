@@ -219,6 +219,8 @@ export function getSamplePdfData(overrides?: Partial<PdfPlanData>): PdfPlanData 
     format: "booklet",
     items,
     grandTotal,
+    shareUrl: "https://treatmentplus.app/p/TP-2026-0842",
+    simulationUrl: "https://treatmentplus.app/p/TP-2026-0842?viz=1",
     ...overrides,
   };
 }

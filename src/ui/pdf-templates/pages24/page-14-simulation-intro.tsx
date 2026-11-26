@@ -53,14 +53,24 @@ export function Booklet24Page14SimulationIntro({
         </div>
 
         {/* wise_2.pdf Orijinal Turuncu WATCH NOW Butonu */}
-        <div className="inline-flex items-center gap-5 px-8 py-4 rounded-[18px] bg-gradient-to-b from-[#FFA33B] to-[#F47B00] text-white font-bold text-[21px] shadow-md">
+        <a
+          href={
+            data.simulationUrl ||
+            (data.shareUrl
+              ? `${data.shareUrl}${data.shareUrl.includes("?") ? "&" : "?"}viz=1`
+              : "#")
+          }
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-5 px-8 py-4 rounded-[18px] bg-gradient-to-b from-[#FFA33B] to-[#F47B00] text-white font-bold text-[21px] shadow-md hover:opacity-95 transition"
+        >
           <svg className="size-8 fill-white shrink-0" viewBox="0 0 24 24">
             <polygon points="5 3 20 12 5 21 5 3" />
           </svg>
           <span className="tracking-wide uppercase">
             {isEn ? "WATCH NOW" : "ŞİMDİ İZLE"}
           </span>
-        </div>
+        </a>
       </div>
 
       {/* Alt 3D Film Şeridi (temizlenmiş page_14.jpg üzerinde y: 835..1132 aralığında yer alır) */}

@@ -14,7 +14,15 @@ export type PlanStatus = (typeof PlanStatus)[keyof typeof PlanStatus];
 
 export type ToothFinding = {
   tooth: string;
-  status: "intact" | "missing" | "filled" | "crown";
+  status:
+    | "intact"
+    | "missing"
+    | "filled"
+    | "caries"
+    | "root_canal"
+    | "implant"
+    | "crown"
+    | "bridge";
   note?: string;
 };
 

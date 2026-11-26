@@ -8,18 +8,18 @@ import {
   TEMPLATE_META,
   type PaletteKey,
   type PdfPlanData,
+  type PdfToothCondition,
   type TemplateId,
   type TreatmentItem,
   type PlanVisit,
   type ToothFinding,
+  type PdfDiscountItem,
   SAMPLE_CLINIC_HIGHLIGHTS,
   SAMPLE_CLINIC_HIGHLIGHTS_EN,
   SAMPLE_DOCTOR_STATS,
   SAMPLE_DOCTOR_STATS_EN,
   SAMPLE_LAB_STATS,
   SAMPLE_LAB_STATS_EN,
-  SAMPLE_TOOTH_DIAGNOSES,
-  SAMPLE_TOOTH_DIAGNOSES_EN,
 } from "@/ui/pdf-templates";
 
 function getMediaUrl(key?: string | null): string | null {
@@ -83,89 +83,196 @@ export async function GET(
     const plan = await planRes.json();
     const clinicSettings = clinicRes && clinicRes.ok ? await clinicRes.json() : null;
 
+    // 15. sayfadaki 3D simülasyon karekodu için geçerli hasta paylaşım token'ı hazırla
+    const origin = request.nextUrl.origin;
+    let shareToken = (searchParams.get("token") || "").trim();
+    if (shareToken.length < 16) {
+      try {
+        const shareCreateRes = await fetch(`${backendUrl}/v1/plans/${id}/share`, {
+          method: "POST",
+          headers: {
+            ...authHeaders,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ttl_hours: 720 }),
+        });
+        if (shareCreateRes.ok) {
+          const shareData = await shareCreateRes.json();
+          if (shareData?.token) {
+            shareToken = String(shareData.token);
+          }
+        }
+      } catch {
+        // ignore fallback
+      }
+    }
+    const shareUrl = shareToken
+      ? `${origin}/p/${shareToken}`
+      : `${origin}/app/plans/${id}`;
+    const simulationUrl = shareToken
+      ? `${origin}/p/${shareToken}?viz=1`
+      : `${origin}/app/plans/${id}`;
+
     const isEn = plan.locale === "en" || clinicSettings?.locale === "en";
+
+    // Plan seanslarını (visits) hazırla
+    const rawVisits: any[] = Array.isArray(plan.visits) ? plan.visits : [];
+    const visitTitleById = new Map<string, string>();
+    rawVisits.forEach((v: any, idx: number) => {
+      if (v.id) {
+        visitTitleById.set(String(v.id), v.title || `${idx + 1}. Seans`);
+      }
+    });
+    const defaultVisitId = rawVisits[0]?.id ? String(rawVisits[0].id) : undefined;
+    const defaultVisitTitle = rawVisits[0]?.title || (isEn ? "1st Visit" : "1. Seans");
 
     // Items mapping
     const rawItems = plan.items || [];
     const items: TreatmentItem[] = rawItems.map((it: any) => {
       const qty = it.quantity || 1;
       const unitPriceMajor = (Number(it.unit_price) || 0) / 100;
-      const amountMajor = it.amount !== undefined ? Number(it.amount) : unitPriceMajor * qty;
+      const isPkg = Boolean(it.is_package || it.isPackage);
+      const amountMajor = isPkg
+        ? 0
+        : it.amount !== undefined
+        ? Number(it.amount)
+        : unitPriceMajor * qty;
+      const rawVId = it.visit_id || it.visitId;
+      const vId = rawVId ? String(rawVId) : defaultVisitId;
+      const vTitle =
+        (vId && visitTitleById.get(vId)) ||
+        it.visit_title ||
+        it.session_label ||
+        it.session ||
+        defaultVisitTitle;
+
       return {
         name: it.treatment_name || it.name || (isEn ? "Treatment Item" : "Tedavi Kalemi"),
-        session: it.session_label || it.session || (isEn ? "1st Visit" : "1. Seans"),
+        treatmentName: it.treatment_name || it.name || (isEn ? "Treatment Item" : "Tedavi Kalemi"),
+        session: vTitle,
+        visitId: vId,
         toothNumber:
           it.tooth_number ||
           (Array.isArray(it.teeth) && it.teeth.length > 0 ? it.teeth.join(", ") : undefined),
         teeth: Array.isArray(it.teeth) ? it.teeth : undefined,
         quantity: qty,
+        qty,
+        unitPrice: unitPriceMajor,
         amount: amountMajor,
+        description: it.description,
+        isPackage: isPkg,
         category: it.category,
       };
     });
 
-    const calculatedTotal = items.reduce((sum, it) => sum + (it.amount || 0), 0);
+    const calculatedSubtotal = items.reduce((sum, it) => sum + (it.isPackage ? 0 : it.amount || 0), 0);
+    const rawSub = plan.totals?.subtotal ?? plan.totals_subtotal;
+    const subtotal =
+      rawSub !== undefined && rawSub !== null && Number(rawSub) > 0
+        ? Number(rawSub) / 100
+        : calculatedSubtotal;
+
+    const rawDiscounts: any[] = Array.isArray(plan.discounts) ? plan.discounts : [];
+    const discounts: PdfDiscountItem[] = rawDiscounts.map((d: any) => ({
+      id: d.id ? String(d.id) : undefined,
+      label: d.label || (isEn ? "Discount" : "İndirim"),
+      amount: (Number(d.amount) || 0) / 100,
+    }));
+    const calculatedDiscount = discounts.reduce((sum, d) => sum + (d.amount || 0), 0);
+    const rawDisc = plan.totals?.discount ?? plan.totals_discount;
+    const discountTotal =
+      rawDisc !== undefined && rawDisc !== null && Number(rawDisc) > 0
+        ? Number(rawDisc) / 100
+        : calculatedDiscount;
+
     const rawGrand = plan.totals?.grand ?? plan.totals_grand;
     const grandTotal =
-      rawGrand !== undefined && rawGrand !== null
+      rawGrand !== undefined && rawGrand !== null && (Number(rawGrand) > 0 || calculatedSubtotal === 0)
         ? Number(rawGrand) / 100
-        : calculatedTotal > 0
-          ? calculatedTotal
-          : undefined;
+        : Math.max(0, subtotal - discountTotal);
 
-    // Seansları oluştur
-    const visit1Items = items.filter((it) => it.session?.includes("1") || !it.session?.includes("2"));
-    const visit2Items = items.filter((it) => it.session?.includes("2"));
+    // Gerçek hasta seanslarını (visits) oluştur
+    const visits: PlanVisit[] =
+      rawVisits.length > 0
+        ? rawVisits.map((v: any, vIdx: number) => {
+            const vIdStr = v.id ? String(v.id) : `v-${vIdx + 1}`;
+            const vTitleStr = v.title || `${vIdx + 1}. Seans`;
+            const vItems = items.filter((it) => {
+              if (it.visitId && v.id) {
+                return it.visitId === vIdStr;
+              }
+              if (it.session && v.title && it.session === v.title) {
+                return true;
+              }
+              if (vIdx === 0 && (!it.visitId || !visitTitleById.has(it.visitId))) {
+                return true;
+              }
+              return false;
+            });
+            const chartTeeth = Array.isArray(v.chart_teeth)
+              ? v.chart_teeth
+              : Array.isArray(v.chartTeeth)
+              ? v.chartTeeth
+              : [];
 
-    const visits: PlanVisit[] = [
-      {
-        id: "v1",
-        title: isEn ? "1st Visit: Surgical & Provisional Phase" : "1. Seans: Cerrahi ve Geçici Diş Aşaması",
-        phaseLabel: isEn ? "Day 1 - 3" : "1. - 3. Gün",
-        duration: isEn ? "3 Days Stay" : "3 Günlük Süreç",
-        healingPeriod: isEn ? "3 Months Osseointegration" : "3 Aylık Kemik Kaynaşma Dönemi",
-        items: visit1Items,
-        subtotal: visit1Items.reduce((s, it) => s + it.amount, 0),
-        note: isEn
-          ? "Surgical tooth extractions, computer-guided implant placement, and fixed screw-retained provisional delivery."
-          : "Gerekli cerrahi diş çekimleri, 3D cerrahi rehberli implant yerleşimi ve 24 saat içinde sabit estetik geçici diş teslimi.",
-      },
-      {
-        id: "v2",
-        title: isEn ? "2nd Visit: Permanent Prosthetic Delivery" : "2. Seans: Kalıcı Zirkonyum Teslim Aşaması",
-        phaseLabel: isEn ? "After 3 Months" : "3 Ay Sonra",
-        duration: isEn ? "5 - 7 Days Stay" : "5 - 7 Günlük Süreç",
-        items: visit2Items.length > 0 ? visit2Items : items.slice(Math.max(1, items.length - 2)),
-        subtotal: visit2Items.reduce((s, it) => s + it.amount, 0),
-        note: isEn
-          ? "Final digital impressions, dynamic bite registration, try-in, and final torque delivery of permanent monolithic bridge."
-          : "Kemikleşme kontrolü, mikron hassasiyetinde dijital ölçü, estetik prova ve kalıcı monolitik zirkonyum köprünün teslimi.",
-      },
-    ];
+            return {
+              id: vIdStr,
+              title: vTitleStr,
+              phaseLabel: v.phase_label || v.phaseLabel || `${vIdx + 1}. Aşama`,
+              healingPeriod: v.healing_note || v.healingNote || undefined,
+              chartTeeth,
+              items: vItems,
+              subtotal: vItems.reduce((s, it) => s + (it.isPackage ? 0 : it.amount || 0), 0),
+              note: v.healing_note || v.healingNote || undefined,
+            };
+          })
+        : [
+            {
+              id: "v1",
+              title: isEn ? "1st Visit: Planned Treatments" : "1. Seans: Planlanan Tedaviler",
+              phaseLabel: isEn ? "Phase 1" : "1. Aşama",
+              items,
+              subtotal,
+            },
+          ];
 
-    // Diş teşhislerini hazırla
-    const rawDiagnoses = items.flatMap((it) => {
-      const teethList = it.teeth || (it.toothNumber ? it.toothNumber.split(/[,;\s]+/) : []);
-      return teethList.map((t) => ({
-        toothNumber: t.trim(),
-        condition: it.name,
-        treatment: it.name,
-        status: (it.name.toLowerCase().includes("implant")
-          ? "implant"
-          : it.name.toLowerCase().includes("zirkonyum") || it.name.toLowerCase().includes("kron")
-          ? "crown"
-          : it.name.toLowerCase().includes("dolgu") || it.name.toLowerCase().includes("çürük")
-          ? "cavity"
-          : "implant") as "implant" | "crown" | "cavity" | "missing" | "healthy",
-      }));
-    });
+    // Doktorun girdiği gerçek diş teşhislerini (situation.tooth_findings) hazırla
+    const rawSituation = plan.situation || {};
+    const rawToothFindings: any[] =
+      rawSituation.tooth_findings || rawSituation.toothFindings || [];
 
-    const diagnoses: ToothFinding[] =
-      rawDiagnoses.length > 0
-        ? rawDiagnoses
-        : isEn
-        ? SAMPLE_TOOTH_DIAGNOSES_EN
-        : SAMPLE_TOOTH_DIAGNOSES;
+    const toothConditions: Record<string, PdfToothCondition> = {};
+    const diagnoses: ToothFinding[] = [];
+
+    for (const tf of rawToothFindings) {
+      const tooth = String(tf.tooth || tf.toothNumber || "").trim();
+      const status = String(tf.status || tf.condition || "intact")
+        .trim()
+        .toLowerCase();
+      if (!tooth) continue;
+      toothConditions[tooth] = status as PdfToothCondition;
+      diagnoses.push({
+        toothNumber: tooth,
+        condition: tf.note || status,
+        note: tf.note,
+        status: status as ToothFinding["status"],
+      });
+    }
+
+    const generalDiagnoses: string[] = Array.from(
+      new Set([
+        ...(Array.isArray(rawSituation.general_diagnoses)
+          ? rawSituation.general_diagnoses
+          : Array.isArray(rawSituation.generalDiagnoses)
+          ? rawSituation.generalDiagnoses
+          : []),
+        ...(Array.isArray(plan.diagnoses) ? plan.diagnoses : []),
+      ])
+    )
+      .map((d) => String(d || "").trim())
+      .filter(Boolean);
+
+    const xrayUrl = getMediaUrl(rawSituation.xray_key || rawSituation.xrayKey);
 
     const highlights =
       clinicSettings?.highlights && clinicSettings.highlights.length >= 4
@@ -231,10 +338,18 @@ export async function GET(
       showMotifs: clinicSettings?.show_motifs !== false && clinicSettings?.showMotifs !== false,
       format: wantsSummary ? "summary" : "booklet",
       activePage: activePage,
+      xrayUrl,
       items,
+      discounts,
+      subtotal,
+      discountTotal,
       grandTotal,
       visits,
+      toothConditions,
+      generalDiagnoses,
       diagnoses,
+      shareUrl,
+      simulationUrl,
     };
 
     const templateMeta =

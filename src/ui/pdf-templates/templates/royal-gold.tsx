@@ -14,10 +14,13 @@ export function RoyalGoldTemplate({
   const isEn = data.locale === "en";
   const curr = data.currency || "TRY";
 
-  const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.amount || 0), 0);
-  const grandTotal = data.grandTotal !== undefined && data.grandTotal !== null ? data.grandTotal : totalCalculated;
-  const subtotal = Math.round(grandTotal * 1.15);
-  const discount = subtotal - grandTotal;
+  const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.isPackage ? 0 : it.amount || 0), 0);
+  const subtotal = data.subtotal !== undefined && data.subtotal !== null ? data.subtotal : totalCalculated;
+  const discount = data.discountTotal !== undefined && data.discountTotal !== null ? data.discountTotal : 0;
+  const grandTotal =
+    data.grandTotal !== undefined && data.grandTotal !== null
+      ? data.grandTotal
+      : Math.max(0, subtotal - discount);
 
   return (
     <div

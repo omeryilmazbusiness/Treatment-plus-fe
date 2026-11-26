@@ -57,6 +57,8 @@ export interface TreatmentStudioProps {
   initialPatient?: PatientInfo;
   initialClinic?: ClinicBrandInfo;
   initialConditions?: Record<string, ToothCondition>;
+  initialGeneralDiagnoses?: string[];
+  initialXrayUrl?: string;
   initialItems?: StudioPlanItem[];
   initialVisits?: StudioVisit[];
   initialCurrency?: "EUR" | "USD" | "TRY";
@@ -73,6 +75,8 @@ export interface TreatmentStudioProps {
     items: StudioPlanItem[];
     visits: StudioVisit[];
     discounts?: PlanDiscount[];
+    generalDiagnoses?: string[];
+    xrayUrl?: string;
   }) => Promise<void> | void;
   isSaving?: boolean;
   onItemsChange?: (items: StudioPlanItem[]) => void;
@@ -94,6 +98,8 @@ export function TreatmentStudio({
   initialPatient,
   initialClinic,
   initialConditions,
+  initialGeneralDiagnoses,
+  initialXrayUrl,
   initialItems,
   initialVisits,
   initialDiscounts,
@@ -243,6 +249,10 @@ export function TreatmentStudio({
       "46": "root_canal",
     })
   );
+  const [generalDiagnoses, setGeneralDiagnoses] = useState<string[]>(
+    initialGeneralDiagnoses || []
+  );
+  const [xrayUrl, setXrayUrl] = useState<string | undefined>(initialXrayUrl);
 
   // Visits & Plan Items (Module 2)
   const [visits, setVisits] = useState<StudioVisit[]>(
@@ -692,6 +702,8 @@ export function TreatmentStudio({
           <DiagnosisModule
             conditions={conditions}
             onConditionsChange={handleConditionsChange}
+            xrayUrl={xrayUrl}
+            onXrayChange={setXrayUrl}
             patientName={patient.name}
             isLocked={isPlanLocked}
           />
@@ -754,6 +766,10 @@ export function TreatmentStudio({
             clinic={clinic}
             items={items}
             visits={visits}
+            conditions={conditions}
+            discounts={discounts}
+            generalDiagnoses={generalDiagnoses}
+            xrayUrl={xrayUrl}
             currency={currency}
             planId={planId}
             planTitle={currentTitle}

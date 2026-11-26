@@ -98,13 +98,19 @@ function createPlanSnapshot(
   diags: string[],
   vsts: VisitSnapshot[],
   its: ItemSnapshot[],
-  dscs: DiscountSnapshot[]
+  dscs: DiscountSnapshot[],
+  conds?: Record<string, string>
 ) {
   return JSON.stringify({
     title: t.trim(),
     locale: loc,
     currency: curr,
     diagnoses: [...diags].sort(),
+    conditions: conds
+      ? Object.entries(conds)
+          .filter(([, v]) => v && v !== "intact")
+          .sort(([a], [b]) => a.localeCompare(b))
+      : [],
     visits: vsts.map((v) => ({
       title: v.title.trim(),
       phase_label: v.phase_label.trim(),
@@ -304,15 +310,15 @@ export function ClassicPlanClient({
 
   // Dirty state tracking
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
-    createPlanSnapshot(title, locale, currency, diagnoses, visits, items, discounts)
+    createPlanSnapshot(title, locale, currency, diagnoses, visits, items, discounts, conditions)
   );
 
   const isDirty = useMemo(() => {
     return (
-      createPlanSnapshot(title, locale, currency, diagnoses, visits, items, discounts) !==
+      createPlanSnapshot(title, locale, currency, diagnoses, visits, items, discounts, conditions) !==
       savedSnapshot
     );
-  }, [title, locale, currency, diagnoses, visits, items, discounts, savedSnapshot]);
+  }, [title, locale, currency, diagnoses, visits, items, discounts, conditions, savedSnapshot]);
 
   // Live calculated totals for interactive display
   const liveSubtotal = useMemo(() => {
@@ -497,7 +503,8 @@ export function ClassicPlanClient({
           diagnoses,
           visits,
           items,
-          discounts
+          discounts,
+          conditions
         );
 
         const res = await savePlanDetailsAction(String(plan.id), {
@@ -508,6 +515,11 @@ export function ClassicPlanClient({
           currency,
           diagnoses,
           situation: {
+            xrayKey: plan.situation?.xrayKey,
+            generalDiagnoses: plan.situation?.generalDiagnoses || diagnoses,
+            chartTeeth: Object.entries(conditions)
+              .filter(([, cond]) => cond && cond !== "intact")
+              .map(([tooth]) => tooth),
             toothFindings: Object.entries(conditions).map(([tooth, cond]) => ({
               tooth,
               status: cond as any,
@@ -592,6 +604,11 @@ export function ClassicPlanClient({
           currency,
           diagnoses,
           situation: {
+            xrayKey: plan.situation?.xrayKey,
+            generalDiagnoses: plan.situation?.generalDiagnoses || diagnoses,
+            chartTeeth: Object.entries(conditions)
+              .filter(([, cond]) => cond && cond !== "intact")
+              .map(([tooth]) => tooth),
             toothFindings: Object.entries(conditions).map(([tooth, cond]) => ({
               tooth,
               status: cond as any,
@@ -762,6 +779,11 @@ export function ClassicPlanClient({
       currency,
       diagnoses,
       situation: {
+        xrayKey: plan.situation?.xrayKey,
+        generalDiagnoses: plan.situation?.generalDiagnoses || diagnoses,
+        chartTeeth: Object.entries(studioData.conditions)
+          .filter(([, cond]) => cond && cond !== "intact")
+          .map(([tooth]) => tooth),
         toothFindings: Object.entries(studioData.conditions).map(([tooth, cond]) => ({
           tooth,
           status: cond as any,
@@ -809,6 +831,8 @@ export function ClassicPlanClient({
           }
         });
         setConditions(map);
+      } else {
+        setConditions(studioData.conditions);
       }
       const newVisits = res.data.visits
         ? res.data.visits.map((v, i) => ({
@@ -867,7 +891,8 @@ export function ClassicPlanClient({
           res.data.diagnoses ?? diagnoses,
           newVisits,
           newItems,
-          newDiscountsData
+          newDiscountsData,
+          studioData.conditions
         )
       );
   };
@@ -961,6 +986,11 @@ export function ClassicPlanClient({
           currency,
           diagnoses,
           situation: {
+            xrayKey: plan.situation?.xrayKey,
+            generalDiagnoses: plan.situation?.generalDiagnoses || diagnoses,
+            chartTeeth: Object.entries(conditions)
+              .filter(([, cond]) => cond && cond !== "intact")
+              .map(([tooth]) => tooth),
             toothFindings: Object.entries(conditions).map(([tooth, cond]) => ({
               tooth,
               status: cond as any,
@@ -1045,6 +1075,10 @@ export function ClassicPlanClient({
             },
           }}
           initialConditions={conditions}
+          initialGeneralDiagnoses={plan.situation?.generalDiagnoses || diagnoses}
+          initialXrayUrl={
+            plan.situation?.xrayKey ? `/api/media/${plan.situation.xrayKey}` : undefined
+          }
           initialItems={studioItems}
           initialVisits={studioVisits}
           initialDiscounts={discounts}

@@ -594,6 +594,7 @@ interface SimulationModuleProps {
   treatmentsCatalog?: { id: string; code?: string | null; name: string; isActive?: boolean }[];
   darkMode?: boolean;
   isActive?: boolean;
+  autoPlay?: boolean;
 }
 
 function formatTime(sec: number): string {
@@ -610,6 +611,7 @@ export function SimulationModule({
   treatmentsCatalog,
   darkMode = false,
   isActive = true,
+  autoPlay = false,
 }: SimulationModuleProps) {
   const [selectedShowcaseId, setSelectedShowcaseId] = useState<string>("plan");
 
@@ -687,7 +689,7 @@ export function SimulationModule({
   }, [stages]);
 
   const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(() => Boolean(autoPlay));
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [resetSignal, setResetSignal] = useState(0);
 
@@ -727,10 +729,12 @@ export function SimulationModule({
   // When active changes to true (opening the simulation tab), always start from the beginning
   useEffect(() => {
     if (isActive) {
+      setSelectedShowcaseId("plan");
       setCurrentTime(0);
-      setIsPlaying(false);
+      setIsPlaying(Boolean(autoPlay));
       setResetSignal((s) => s + 1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
 
   const activeStage: AnimationTimelineStage =

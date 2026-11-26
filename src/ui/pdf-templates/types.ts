@@ -33,10 +33,22 @@ export interface PdfPalette {
   coverBg?: string;
 }
 
+export type PdfToothCondition =
+  | "intact"
+  | "missing"
+  | "filled"
+  | "caries"
+  | "root_canal"
+  | "implant"
+  | "crown"
+  | "bridge";
+
 export interface TreatmentItem {
   name: string;
   treatmentName?: string;
+  treatmentType?: string;
   session?: string;
+  visitId?: string;
   amount: number;
   unitPrice?: number;
   description?: string;
@@ -46,13 +58,25 @@ export interface TreatmentItem {
   qty?: number;
   teeth?: string[];
   category?: string;
+  isPackage?: boolean;
 }
 
 export interface ToothFinding {
   toothNumber: string;
   condition: string;
-  treatment: string;
-  status: "missing" | "cavity" | "implant" | "crown" | "healthy";
+  treatment?: string;
+  note?: string;
+  status:
+    | "missing"
+    | "cavity"
+    | "caries"
+    | "filled"
+    | "root_canal"
+    | "implant"
+    | "crown"
+    | "bridge"
+    | "healthy"
+    | "intact";
 }
 
 export interface PlanVisit {
@@ -61,6 +85,7 @@ export interface PlanVisit {
   phaseLabel?: string;
   duration?: string;
   healingPeriod?: string;
+  chartTeeth?: string[];
   items: TreatmentItem[];
   subtotal?: number;
   note?: string;
@@ -72,6 +97,12 @@ export interface StatItem {
   description?: string;
 }
 
+export interface PdfDiscountItem {
+  id?: string;
+  label: string;
+  amount: number;
+}
+
 export interface PdfPlanData {
   clinicName: string;
   slogan?: string;
@@ -80,6 +111,7 @@ export interface PdfPlanData {
   email?: string;
   website?: string;
   address?: string;
+  hours?: string;
   logoUrl?: string;
   doctorName?: string;
   doctorTitle?: string;
@@ -88,6 +120,7 @@ export interface PdfPlanData {
   coordinatorName?: string;
   coordinatorPhotoUrl?: string | null;
   patientPhotoUrl?: string | null;
+  xrayUrl?: string | null;
   planTitle?: string;
   proposalNo?: string;
   doctorStats?: StatItem[];
@@ -107,6 +140,9 @@ export interface PdfPlanData {
   templateId: TemplateId;
   showMotifs: boolean;
   items: TreatmentItem[];
+  discounts?: PdfDiscountItem[];
+  subtotal?: number;
+  discountTotal?: number;
   grandTotal?: number;
   totalAmount?: number;
   clinicPhone?: string;
@@ -117,7 +153,7 @@ export interface PdfPlanData {
 
   // Kapsamlı Sunum Kitapçığı (Booklet) Alanları
   format?: "booklet" | "summary";
-  activePage?: number; // 1-12 arası tek bir sayfayı önizlemek için (tanımsızsa tüm sayfalar)
+  activePage?: number; // 1-24 arası tek bir sayfayı önizlemek için (tanımsızsa tüm sayfalar)
   aboutText?: string;
   highlights?: StatItem[];
   labStats?: StatItem[];
@@ -126,6 +162,14 @@ export interface PdfPlanData {
     text?: string;
     imageKey?: string;
   };
+  /** Diş bazlı doktor teşhisi haritası (ör. { "16": "missing", "24": "caries" }) */
+  toothConditions?: Record<string, PdfToothCondition>;
+  /** Genel teşhis ve klinik değerlendirme notları */
+  generalDiagnoses?: string[];
   diagnoses?: ToothFinding[];
   visits?: PlanVisit[];
+  /** Hasta paylaşım sayfası URL'i (ör. https://.../p/{token}) */
+  shareUrl?: string;
+  /** Hastanın 3D tedavi simülasyonunu doğrudan açan URL (ör. https://.../p/{token}?viz=1) */
+  simulationUrl?: string;
 }

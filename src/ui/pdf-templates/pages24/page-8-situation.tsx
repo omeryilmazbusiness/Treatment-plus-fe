@@ -1,6 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 import React from "react";
+import { DEFAULT_PANORAMIC_XRAY_URL } from "@/ui/treatment-studio/panoramic-xray-asset";
 import type { PdfPalette, PdfPlanData } from "../types";
 import { WisePageWrapper, WiseHeader, WiseFooter, getThemeColor } from "../wise-frame";
+import { PdfCurrentSituationOdontogram } from "./pdf-odontogram";
 
 export function Booklet24Page8Situation({
   data,
@@ -12,10 +15,17 @@ export function Booklet24Page8Situation({
   const isEn = data.locale === "en";
   const themeColor = getThemeColor(palette, "#0b2938");
 
+  // Eğer daha önce yapay SVG kaydedilmişse veya röntgen yüklenmemişse gerçek klinik OPG röntgenini kullan
+  const rawXray = data.xrayUrl?.trim() || "";
+  const isSyntheticSvg =
+    rawXray.startsWith("data:image/svg+xml") ||
+    rawXray.includes("svg+xml");
+  const xraySrc =
+    rawXray && !isSyntheticSvg ? rawXray : DEFAULT_PANORAMIC_XRAY_URL;
+
   return (
     <WisePageWrapper
-      bgImage="/pdf-assets/wise/page_8.jpg"
-      className="flex flex-col justify-between"
+      className="flex flex-col justify-between bg-white"
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
@@ -24,10 +34,22 @@ export function Booklet24Page8Situation({
         themeColor={themeColor}
       />
 
-      {/* 2D FDI Odontogram ve Panoramik Röntgen Görseli temizlenmiş page_8.jpg içinde orijinal yerinde yer alır */}
-      <div className="flex-1" />
+      {/* 2. Doktorun Teşhisine Göre Dinamik Şekillenen 2D FDI Odontogram ve Gerçekçi Panoramik Röntgen */}
+      <div className="flex-1 flex flex-col justify-between px-[36px] pt-2 pb-[22mm] z-10 select-none gap-3">
+        {/* A. Dinamik Mevcut Durum (Teşhis) Odontogramı */}
+        <PdfCurrentSituationOdontogram data={data} />
 
-      {/* 2. Çift Sayfa Sağ Alt Köşe Takozu */}
+        {/* B. Hasta Panoramik Röntgen Görseli (Gerçek Klinik OPG Radyografisi) */}
+        <div className="flex-1 min-h-[96mm] max-h-[112mm] w-full rounded-xl overflow-hidden bg-white relative flex items-center justify-center">
+          <img
+            src={xraySrc}
+            alt={isEn ? "Panoramic X-Ray" : "Panoramik Röntgen"}
+            className="w-full h-full object-contain"
+          />
+        </div>
+      </div>
+
+      {/* 3. Çift Sayfa Sağ Alt Köşe Takozu */}
       <WiseFooter
         clinicName={data.clinicName || "Wise Dental"}
         slogan={data.slogan || data.clinicSlogan || "Every Smile Matters!!"}

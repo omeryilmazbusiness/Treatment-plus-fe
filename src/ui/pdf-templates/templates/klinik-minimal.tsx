@@ -13,10 +13,13 @@ export function KlinikMinimalTemplate({
   const isEn = data.locale === "en";
   const curr = data.currency || "TRY";
 
-  const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.amount || 0), 0);
-  const grandTotal = data.grandTotal !== undefined && data.grandTotal !== null ? data.grandTotal : totalCalculated;
-  const subtotal = Math.round(grandTotal * 1.12);
-  const discount = subtotal - grandTotal;
+  const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.isPackage ? 0 : it.amount || 0), 0);
+  const subtotal = data.subtotal !== undefined && data.subtotal !== null ? data.subtotal : totalCalculated;
+  const discount = data.discountTotal !== undefined && data.discountTotal !== null ? data.discountTotal : 0;
+  const grandTotal =
+    data.grandTotal !== undefined && data.grandTotal !== null
+      ? data.grandTotal
+      : Math.max(0, subtotal - discount);
 
   return (
     <div className="relative flex min-h-[297mm] h-[297mm] max-h-[297mm] w-[210mm] flex-col justify-between bg-white text-slate-800 font-sans shadow-sm overflow-hidden box-border select-none">
