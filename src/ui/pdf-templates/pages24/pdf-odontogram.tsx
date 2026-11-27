@@ -4,7 +4,7 @@ import {
   LOWER_TEETH_FDI,
   TOOTH_METADATA,
   UPPER_TEETH_FDI,
-} from "@/ui/treatment-studio/fdi-odontogram";
+} from "@/ui/treatment-studio/anatomical-tooth-svg";
 import type { ToothCondition } from "@/ui/treatment-studio/types";
 import type {
   PdfPlanData,
