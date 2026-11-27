@@ -125,14 +125,16 @@ export function ThreeMouthCanvas({
   const defaultCamPos = useRef<THREE.Vector3>(new THREE.Vector3());
 
   const isActiveRef = useRef(isActive);
+  const isPlayingRef = useRef(isPlaying);
   const isRecordingRef = useRef(isRecording);
   const onAfterRenderRef = useRef(onAfterRender);
 
   useEffect(() => {
     isActiveRef.current = isActive;
+    isPlayingRef.current = isPlaying;
     isRecordingRef.current = isRecording;
     onAfterRenderRef.current = onAfterRender;
-  }, [isActive, isRecording, onAfterRender]);
+  }, [isActive, isPlaying, isRecording, onAfterRender]);
 
   const [loading, setLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -426,6 +428,9 @@ export function ThreeMouthCanvas({
 
     baseTimeScaleRef.current = tl.timeScale();
     tl.timeScale(baseTimeScaleRef.current * (playbackSpeed || 1));
+    if (!isPlayingRef.current) {
+      tl.pause(0);
+    }
   }, [currentStage, stageIndex, allStages, conditions, modelReadyTick]);
 
   // Keep timeline playback speed synchronized with user speed toggle (1x / 1.5x / 2x)
@@ -437,10 +442,17 @@ export function ThreeMouthCanvas({
 
   // Pause / resume active GSAP timeline when isPlaying toggles
   useEffect(() => {
+    isPlayingRef.current = isPlaying;
     const tl = cinematicsRef.current?.activeTimeline;
     if (!tl) return;
     if (isPlaying) {
-      tl.play();
+      if (tl.progress() >= 0.98) {
+        tl.restart();
+      } else {
+        tl.play();
+      }
+    } else {
+      tl.pause();
     }
   }, [isPlaying]);
 
@@ -451,7 +463,9 @@ export function ThreeMouthCanvas({
     if (!tl) return;
     const dur = Math.max(0.1, currentStage.durationSeconds || 8.0);
     const ratio = Math.max(0, Math.min(1, stageElapsedSeconds / dur));
-    if (ratio > 0.02) {
+    if (ratio <= 0.005) {
+      tl.pause(0);
+    } else {
       tl.progress(ratio, false);
     }
   }, [stageElapsedSeconds, isPlaying, currentStage.durationSeconds]);
@@ -500,6 +514,10 @@ export function ThreeMouthCanvas({
           conditions
         );
         baseTimeScaleRef.current = tl.timeScale();
+        tl.timeScale(baseTimeScaleRef.current * (playbackSpeed || 1));
+        if (!isPlayingRef.current) {
+          tl.pause(0);
+        }
       } else {
         handleResetCamera();
       }

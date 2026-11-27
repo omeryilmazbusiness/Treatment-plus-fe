@@ -408,6 +408,9 @@ export async function GET(
       break-inside: avoid !important;
       page-break-inside: avoid !important;
     }
+    .grid-cols-16 {
+      grid-template-columns: repeat(16, minmax(0, 1fr)) !important;
+    }
     @media screen and (max-width: 860px) {
       body {
         padding-top: 56px !important;

@@ -296,7 +296,13 @@ export function PdfCurrentSituationOdontogram({
   const renderArchRow = (teeth: readonly string[], jaw: "upper" | "lower") => {
     const isUpper = jaw === "upper";
     return (
-      <div className="grid grid-cols-16 gap-0.5 items-center justify-items-center w-full">
+      <div
+        className="grid grid-cols-16 gap-0.5 items-center justify-items-center w-full"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(16, minmax(0, 1fr))",
+        }}
+      >
         {teeth.map((tooth, idx) => {
           const entry = diagMap[tooth];
           const cond = (entry?.condition || "intact") as ToothCondition;
@@ -316,7 +322,7 @@ export function PdfCurrentSituationOdontogram({
 
           const numberBadge = (
             <span
-              className={`inline-flex items-center justify-center size-[20px] rounded-full text-[10px] font-bold leading-none ${
+              className={`inline-flex items-center justify-center w-[20px] h-[20px] size-[20px] rounded-full text-[10px] font-bold leading-none ${
                 cond === "missing"
                   ? "text-slate-400 line-through"
                   : isAbnormal
@@ -377,7 +383,7 @@ export function PdfCurrentSituationOdontogram({
             .filter((item) => item.key === "intact" || item.key === "missing" || (conditionCounts[item.key] || 0) > 0)
             .map((item) => (
               <span key={item.key} className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600">
-                <span className={`size-2 rounded-full ${item.dot}`} />
+                <span className={`w-2 h-2 size-2 rounded-full ${item.dot}`} />
                 <span>{item.label}</span>
                 {conditionCounts[item.key] ? (
                   <span className="text-slate-400 font-mono">({conditionCounts[item.key]})</span>
@@ -597,7 +603,13 @@ export function PdfVisitOdontogram({
   const renderVisitArchRow = (teeth: readonly string[], jaw: "upper" | "lower") => {
     const isUpper = jaw === "upper";
     return (
-      <div className="grid grid-cols-16 gap-0.5 items-center justify-items-center w-full">
+      <div
+        className="grid grid-cols-16 gap-0.5 items-center justify-items-center w-full"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(16, minmax(0, 1fr))",
+        }}
+      >
         {teeth.map((tooth, idx) => {
           const vis = visualMap[tooth]!;
           const cond = vis.condition;
@@ -616,7 +628,7 @@ export function PdfVisitOdontogram({
 
           const numberBadge = (
             <span
-              className={`inline-flex items-center justify-center size-[20px] rounded-full text-[10px] font-bold leading-none transition-all ${
+              className={`inline-flex items-center justify-center w-[20px] h-[20px] size-[20px] rounded-full text-[10px] font-bold leading-none transition-all ${
                 vis.isExtractedInVisit
                   ? "bg-rose-100 text-rose-700 border-[1.5px] border-rose-500"
                   : vis.isTreatedInVisit
@@ -678,15 +690,15 @@ export function PdfVisitOdontogram({
         </span>
         <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-600">
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full bg-[#10b981]" />
+            <span className="w-2 h-2 size-2 rounded-full bg-[#10b981]" />
             <span>{isEn ? "Planned in this visit" : "Bu seansta işlem gören"}</span>
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full bg-rose-500" />
+            <span className="w-2 h-2 size-2 rounded-full bg-rose-500" />
             <span>{isEn ? "Missing / Extraction" : "Eksik / Çekim"}</span>
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full bg-slate-300" />
+            <span className="w-2 h-2 size-2 rounded-full bg-slate-300" />
             <span>{isEn ? "Existing tooth" : "Mevcut diş durumu"}</span>
           </span>
         </div>

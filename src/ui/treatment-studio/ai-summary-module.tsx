@@ -18,12 +18,13 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import type {
-  ClinicBrandInfo,
-  PatientInfo,
-  StudioPlanItem,
-  StudioVisit,
-  ToothCondition,
+import {
+  normalizeTurkishText,
+  type ClinicBrandInfo,
+  type PatientInfo,
+  type StudioPlanItem,
+  type StudioVisit,
+  type ToothCondition,
 } from "./types";
 import { CONDITION_CONFIG } from "./diagnosis-module";
 
@@ -106,8 +107,8 @@ export function AiSummaryModule({
     const otherItems: StudioPlanItem[] = [];
 
     items.forEach((it) => {
-      const type = (it.treatmentType || "").toLowerCase();
-      const name = (it.treatmentName || "").toLowerCase();
+      const type = normalizeTurkishText(it.treatmentType || "");
+      const name = normalizeTurkishText(it.treatmentName || "");
 
       if (type === "implant" || name.includes("implant") || name.includes("all-on")) {
         implantItems.push(it);

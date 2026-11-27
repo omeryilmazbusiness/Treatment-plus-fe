@@ -46,7 +46,7 @@ export function Booklet24Page15SimulationPlayer({
             className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-white shadow-xs"
             style={{ backgroundColor: "#F47B00" }}
           >
-            <span className="size-2 rounded-full bg-white" />
+            <span className="w-2 h-2 size-2 rounded-full bg-white" />
             {isEn
               ? "INTERACTIVE 3D TREATMENT SIMULATION"
               : "İNTERAKTİF 3D TEDAVİ SİMÜLASYONU"}
@@ -77,24 +77,24 @@ export function Booklet24Page15SimulationPlayer({
         >
           {/* QR Çerçevesi */}
           <div
-            className="relative flex size-[260px] items-center justify-center rounded-[24px] border-2 bg-white p-3.5 shadow-inner"
+            className="relative flex w-[260px] h-[260px] size-[260px] items-center justify-center rounded-[24px] border-2 bg-white p-3.5 shadow-inner"
             style={{ borderColor: themeColor }}
           >
             {/* Köşe Tarama Vurguları */}
             <span
-              className="pointer-events-none absolute -top-1.5 -left-1.5 size-6 rounded-tl-xl border-t-4 border-l-4"
+              className="pointer-events-none absolute -top-1.5 -left-1.5 w-6 h-6 size-6 rounded-tl-xl border-t-4 border-l-4"
               style={{ borderColor: "#F47B00" }}
             />
             <span
-              className="pointer-events-none absolute -top-1.5 -right-1.5 size-6 rounded-tr-xl border-t-4 border-r-4"
+              className="pointer-events-none absolute -top-1.5 -right-1.5 w-6 h-6 size-6 rounded-tr-xl border-t-4 border-r-4"
               style={{ borderColor: "#F47B00" }}
             />
             <span
-              className="pointer-events-none absolute -bottom-1.5 -left-1.5 size-6 rounded-bl-xl border-b-4 border-l-4"
+              className="pointer-events-none absolute -bottom-1.5 -left-1.5 w-6 h-6 size-6 rounded-bl-xl border-b-4 border-l-4"
               style={{ borderColor: "#F47B00" }}
             />
             <span
-              className="pointer-events-none absolute -bottom-1.5 -right-1.5 size-6 rounded-br-xl border-b-4 border-r-4"
+              className="pointer-events-none absolute -bottom-1.5 -right-1.5 w-6 h-6 size-6 rounded-br-xl border-b-4 border-r-4"
               style={{ borderColor: "#F47B00" }}
             />
 
@@ -142,7 +142,7 @@ export function Booklet24Page15SimulationPlayer({
               background: "linear-gradient(180deg, #FFA33B 0%, #F47B00 100%)",
             }}
           >
-            <svg className="size-4 fill-current shrink-0" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 size-4 fill-current shrink-0" viewBox="0 0 24 24">
               <polygon points="5 3 20 12 5 21 5 3" />
             </svg>
             <span>
@@ -157,7 +157,7 @@ export function Booklet24Page15SimulationPlayer({
         <div className="grid w-full max-w-[560px] grid-cols-3 gap-4 text-center">
           <div className="rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs">
             <div
-              className="mx-auto flex size-6 items-center justify-center rounded-full text-[11px] font-black text-white"
+              className="mx-auto flex w-6 h-6 size-6 items-center justify-center rounded-full text-[11px] font-black text-white"
               style={{ backgroundColor: themeColor }}
             >
               1
@@ -174,7 +174,7 @@ export function Booklet24Page15SimulationPlayer({
 
           <div className="rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs">
             <div
-              className="mx-auto flex size-6 items-center justify-center rounded-full text-[11px] font-black text-white"
+              className="mx-auto flex w-6 h-6 size-6 items-center justify-center rounded-full text-[11px] font-black text-white"
               style={{ backgroundColor: themeColor }}
             >
               2
@@ -191,7 +191,7 @@ export function Booklet24Page15SimulationPlayer({
 
           <div className="rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs">
             <div
-              className="mx-auto flex size-6 items-center justify-center rounded-full text-[11px] font-black text-white"
+              className="mx-auto flex w-6 h-6 size-6 items-center justify-center rounded-full text-[11px] font-black text-white"
               style={{ backgroundColor: "#F47B00" }}
             >
               3

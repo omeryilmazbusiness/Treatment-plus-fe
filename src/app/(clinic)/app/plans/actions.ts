@@ -532,6 +532,8 @@ const ADDITIONAL_3D_CATALOG_ITEMS: { code: string; name: string; amount: number 
   { code: "TR09", name: "Lamina Veneer (Yaprak Porselen)", amount: 650000 },
   { code: "TR10", name: "Kalıcı Zirkonyum Köprü Protezi", amount: 1440000 },
   { code: "TR11", name: "Diş Taşı Temizliği (Detertraj & Polisaj)", amount: 160000 },
+  { code: "TR12", name: "Ofis Tipi Diş Beyazlatma (Bleaching)", amount: 420000 },
+  { code: "TR13", name: "Sinüs Lifting & Kemik Grefti", amount: 850000 },
 ];
 
 export async function ensureStandard3DTreatments(
@@ -608,8 +610,8 @@ export async function seedDefaultCatalog(accessToken: string): Promise<void> {
     ),
   ]);
 
-  // Create treatments (all 10 3D-supported treatments + Panoramik Röntgen)
-  const [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11] = await Promise.all([
+  // Create treatments (all 13 3D-supported treatments)
+  const [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13] = await Promise.all([
     runtime.catalog.createTreatment(
       { code: "TR01", name: "Kompozit Dolgu (Estetik)" },
       accessToken
@@ -654,6 +656,14 @@ export async function seedDefaultCatalog(accessToken: string): Promise<void> {
       { code: "TR11", name: "Diş Taşı Temizliği (Detertraj & Polisaj)" },
       accessToken
     ),
+    runtime.catalog.createTreatment(
+      { code: "TR12", name: "Ofis Tipi Diş Beyazlatma (Bleaching)" },
+      accessToken
+    ),
+    runtime.catalog.createTreatment(
+      { code: "TR13", name: "Sinüs Lifting & Kemik Grefti" },
+      accessToken
+    ),
   ]);
 
   // Create default price list
@@ -677,6 +687,8 @@ export async function seedDefaultCatalog(accessToken: string): Promise<void> {
       { treatmentId: t9.id, amount: 650000 }, // 6,500.00 TL
       { treatmentId: t10.id, amount: 1440000 }, // 14,400.00 TL
       { treatmentId: t11.id, amount: 160000 }, // 1,600.00 TL
+      { treatmentId: t12.id, amount: 420000 }, // 4,200.00 TL
+      { treatmentId: t13.id, amount: 850000 }, // 8,500.00 TL
     ],
     accessToken
   );

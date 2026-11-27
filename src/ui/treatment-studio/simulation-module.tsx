@@ -15,11 +15,12 @@ import {
 } from "lucide-react";
 import { ThreeMouthCanvas } from "./three-mouth-canvas";
 import { useTreatmentVideoRecorder } from "./use-treatment-video-recorder";
-import type {
-  AnimationTimelineStage,
-  StudioPlanItem,
-  StudioVisit,
-  ToothCondition,
+import {
+  normalizeTurkishText,
+  type AnimationTimelineStage,
+  type StudioPlanItem,
+  type StudioVisit,
+  type ToothCondition,
 } from "./types";
 
 export const DEFAULT_ANIMATION_STAGES: AnimationTimelineStage[] = [
@@ -126,7 +127,7 @@ export const TEN_TREATMENT_SHOWCASE_STAGES: AnimationTimelineStage[] = [
   {
     id: "showcase-2-implant",
     visitTitle: "2. İmplantoloji",
-    stageName: "Dental İmplant Yerleştirimi",
+    stageName: "Dental İmplant Tedavisi",
     teeth: ["14", "24"],
     actionType: "implant",
     durationSeconds: 11.5,
@@ -253,12 +254,13 @@ function classifyPlanItemAction(
   code: string,
   treatmentType = ""
 ): AnimationTimelineStage["actionType"] {
-  const n = `${name} ${treatmentType}`.toLowerCase();
-  const c = code.toLowerCase();
+  const n = normalizeTurkishText(`${name} ${treatmentType}`);
+  const c = normalizeTurkishText(code);
 
   if (
     c.includes("xray") ||
     c.includes("röntgen") ||
+    c.includes("rontgen") ||
     c === "tr05" ||
     n.includes("röntgen") ||
     n.includes("rontgen") ||
@@ -269,11 +271,14 @@ function classifyPlanItemAction(
   }
   if (
     c.includes("sinus") ||
+    c.includes("sinüs") ||
     c.includes("graft") ||
+    c.includes("greft") ||
     c === "tr13" ||
     n.includes("sinüs") ||
     n.includes("sinus") ||
     n.includes("greft") ||
+    n.includes("graft") ||
     n.includes("kemik tozu")
   ) {
     return "sinus_graft";
@@ -283,30 +288,49 @@ function classifyPlanItemAction(
     c.includes("bleach") ||
     c === "tr12" ||
     n.includes("beyazlatma") ||
-    n.includes("bleaching")
+    n.includes("bleaching") ||
+    n.includes("whiten")
   ) {
     return "whitening";
   }
   if (
     c.includes("extract") ||
     c.includes("çekim") ||
+    c.includes("cekim") ||
+    c === "tr06" ||
     n.includes("çekim") ||
     n.includes("cekim") ||
     n.includes("cerrahi çekim") ||
+    n.includes("ekstraksiyon") ||
     n.includes("extraction")
   ) {
     return "extraction";
   }
-  if (c.includes("abutment") || n.includes("abutment") || n.includes("dayanak")) {
+  if (
+    c.includes("abutment") ||
+    c === "tr07" ||
+    n.includes("abutment") ||
+    n.includes("multi-unit") ||
+    n.includes("iyileşme başlığı") ||
+    n.includes("iyilesme basligi") ||
+    n.includes("dayanak")
+  ) {
     return "abutment";
   }
-  if (c.includes("implant") || n.includes("implant") || n.includes("fikstür")) {
+  if (
+    c.includes("implant") ||
+    c === "tr04" ||
+    n.includes("implant") ||
+    n.includes("fikstür") ||
+    n.includes("fikstur")
+  ) {
     return "implant";
   }
   if (
     c.includes("root") ||
     c.includes("endo") ||
     c.includes("canal") ||
+    c === "tr02" ||
     n.includes("kanal") ||
     n.includes("endo") ||
     n.includes("pulpa")
@@ -316,9 +340,11 @@ function classifyPlanItemAction(
   if (
     c.includes("sealant") ||
     c.includes("fissure") ||
+    c === "tr08" ||
     n.includes("fissür") ||
     n.includes("fissur") ||
-    n.includes("örtücü")
+    n.includes("örtücü") ||
+    n.includes("ortucu")
   ) {
     return "sealant";
   }
@@ -326,18 +352,23 @@ function classifyPlanItemAction(
     c.includes("fill") ||
     c.includes("composite") ||
     c.includes("dolgu") ||
+    c === "tr01" ||
     n.includes("dolgu") ||
     n.includes("kompozit") ||
     n.includes("bonding") ||
     n.includes("inlay") ||
-    n.includes("onlay")
+    n.includes("onlay") ||
+    n.includes("inley") ||
+    n.includes("onley")
   ) {
     return "filling";
   }
   if (
     c.includes("veneer") ||
     c.includes("lamina") ||
+    c === "tr09" ||
     n.includes("lamina") ||
+    n.includes("lamine") ||
     n.includes("veneer") ||
     n.includes("yaprak")
   ) {
@@ -345,8 +376,10 @@ function classifyPlanItemAction(
   }
   if (
     c.includes("bridge") ||
+    c === "tr10" ||
     n.includes("köprü") ||
-    n.includes("kopru")
+    n.includes("kopru") ||
+    n.includes("bridge")
   ) {
     return "permanent_bridge";
   }
@@ -355,6 +388,7 @@ function classifyPlanItemAction(
     c.includes("crown") ||
     c.includes("kaplama") ||
     c.includes("kuron") ||
+    c === "tr03" ||
     n.includes("zirkon") ||
     n.includes("kuron") ||
     n.includes("kron") ||
@@ -376,10 +410,14 @@ function classifyPlanItemAction(
   if (
     c.includes("scaling") ||
     c.includes("clean") ||
+    c === "tr11" ||
     n.includes("detertraj") ||
+    n.includes("detartraj") ||
     n.includes("diş taşı") ||
+    n.includes("dis tasi") ||
     n.includes("temiz") ||
-    n.includes("küretaj")
+    n.includes("küretaj") ||
+    n.includes("kuretaj")
   ) {
     return "scaling";
   }
@@ -624,27 +662,20 @@ export function SimulationModule({
     treatmentsCatalog.forEach((cat, idx) => {
       if (cat.isActive === false) return;
       const actionType = classifyPlanItemAction(cat.name, cat.code || "");
-      const alreadyCovered =
-        existingActionTypes.has(actionType) &&
-        base.some(
-          (b) =>
-            b.actionType === actionType &&
-            (b.stageName.toLowerCase().includes(cat.name.toLowerCase().slice(0, 8)) ||
-              cat.name.toLowerCase().includes(b.stageName.toLowerCase().slice(0, 8)))
-        );
-      if (!alreadyCovered && !existingActionTypes.has(actionType)) {
-        const defaultTeeth = getDefaultTeethForAction(actionType);
-        base.push({
-          id: `showcase-cat-${cat.id || idx}`,
-          visitTitle: `${base.length + 1}. Klinik Tedavi`,
-          stageName: cat.name,
-          teeth: defaultTeeth.length > 0 ? defaultTeeth : ["11", "21"],
-          actionType,
-          durationSeconds: computeStageDuration(actionType, defaultTeeth.length || 2),
-          description: `${cat.name} işleminin 3D klinik simülasyonu.`,
-        });
-        existingActionTypes.add(actionType);
+      if (actionType === "custom" || existingActionTypes.has(actionType)) {
+        return;
       }
+      const defaultTeeth = getDefaultTeethForAction(actionType);
+      base.push({
+        id: `showcase-cat-${cat.id || idx}`,
+        visitTitle: `${base.length + 1}. Klinik Tedavi`,
+        stageName: cat.name,
+        teeth: defaultTeeth.length > 0 ? defaultTeeth : ["11", "21"],
+        actionType,
+        durationSeconds: computeStageDuration(actionType, defaultTeeth.length || 2),
+        description: `${cat.name} işleminin 3D klinik simülasyonu.`,
+      });
+      existingActionTypes.add(actionType);
     });
     return base;
   }, [treatmentsCatalog]);
@@ -891,8 +922,8 @@ export function SimulationModule({
       badge: `${showcaseStages.length} Video`,
     },
     { id: "showcase-1-extraction", label: "1. Diş Çekimi" },
-    { id: "showcase-2-implant", label: "2. İmplant" },
-    { id: "showcase-3-abutment", label: "3. Abutment" },
+    { id: "showcase-2-implant", label: "2. Dental İmplant Tedavisi" },
+    { id: "showcase-3-abutment", label: "3. Multi-Unit Abutment" },
     { id: "showcase-4-root-canal", label: "4. Kanal Tedavisi" },
     { id: "showcase-5-filling", label: "5. Kompozit Dolgu" },
     { id: "showcase-6-sealant", label: "6. Fissür Örtücü" },

@@ -20,6 +20,7 @@ import { createTreatmentWithPriceAction } from "@/app/(clinic)/app/actions";
 import { FdiOdontogram, TOOTH_METADATA } from "./fdi-odontogram";
 import {
   inferTreatmentType,
+  normalizeTurkishText,
   type PlanDiscount,
   type StudioPlanItem,
   type StudioVisit,
@@ -137,33 +138,33 @@ export function TreatmentsModule({
       price: number;
       type: TreatmentType;
     }[] = [
-      { id: "demo-tr05", code: "TR05", name: "Panoramik Röntgen (Paket İçi)", price: 0, type: "scaling" },
+      { id: "demo-tr05", code: "TR05", name: "Panoramik Röntgen (Paket İçi)", price: 0, type: "xray" },
       { id: "demo-tr06", code: "TR06", name: "Diş Çekimi (Cerrahi Ekstraksiyon)", price: 1800, type: "extraction" },
       { id: "demo-tr07", code: "TR07", name: "Multi-Unit Abutment & İyileşme Başlığı", price: 3200, type: "abutment" },
       { id: "demo-tr08", code: "TR08", name: "Fissür Örtücü (Koruyucu Sealant)", price: 900, type: "fissure" },
       { id: "demo-tr09", code: "TR09", name: "Lamina Veneer (Yaprak Porselen)", price: 6500, type: "veneer" },
       { id: "demo-tr10", code: "TR10", name: "Kalıcı Zirkonyum Köprü Protezi", price: 14400, type: "bridge" },
       { id: "demo-tr11", code: "TR11", name: "Diş Taşı Temizliği (Detertraj & Polisaj)", price: 1600, type: "scaling" },
-      { id: "demo-tr12", code: "TR12", name: "Ofis Tipi Diş Beyazlatma (Bleaching)", price: 4200, type: "scaling" },
-      { id: "demo-tr13", code: "TR13", name: "Sinüs Lifting & Kemik Grefti", price: 8500, type: "implant" },
+      { id: "demo-tr12", code: "TR12", name: "Ofis Tipi Diş Beyazlatma (Bleaching)", price: 4200, type: "whitening" },
+      { id: "demo-tr13", code: "TR13", name: "Sinüs Lifting & Kemik Grefti", price: 8500, type: "sinus_graft" },
     ];
 
     const merged = [...baseList];
-    const seenNames = new Set(merged.map((m) => m.name.toLowerCase()));
+    const seenNames = new Set(merged.map((m) => normalizeTurkishText(m.name)));
     const seenCodes = new Set(merged.map((m) => (m.code || "").toUpperCase()));
 
     for (const std of standard3DFallbacks) {
-      if (!seenCodes.has(std.code) && !seenNames.has(std.name.toLowerCase())) {
+      if (!seenCodes.has(std.code) && !seenNames.has(normalizeTurkishText(std.name))) {
         merged.push(std);
         seenCodes.add(std.code);
-        seenNames.add(std.name.toLowerCase());
+        seenNames.add(normalizeTurkishText(std.name));
       }
     }
 
     for (const ext of extraTreatments) {
-      if (!seenNames.has(ext.name.toLowerCase())) {
+      if (!seenNames.has(normalizeTurkishText(ext.name))) {
         merged.push(ext);
-        seenNames.add(ext.name.toLowerCase());
+        seenNames.add(normalizeTurkishText(ext.name));
       }
     }
 
@@ -173,11 +174,11 @@ export function TreatmentsModule({
   // Filtered clinic treatments
   const filteredClinicTreatments = useMemo(() => {
     if (!searchQuery.trim()) return clinicCatalog;
-    const q = searchQuery.toLowerCase().trim();
+    const q = normalizeTurkishText(searchQuery).trim();
     return clinicCatalog.filter(
       (t) =>
-        t.name.toLowerCase().includes(q) ||
-        (t.code && t.code.toLowerCase().includes(q))
+        normalizeTurkishText(t.name).includes(q) ||
+        (t.code && normalizeTurkishText(t.code).includes(q))
     );
   }, [clinicCatalog, searchQuery]);
 

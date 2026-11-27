@@ -2038,6 +2038,8 @@ export function makeGelSyringe(scale: number): THREE.Group {
   );
 
   g.add(barrel, gelInside, plunger, tip);
+  g.userData.plunger = plunger;
+  g.userData.gelInside = gelInside;
   g.renderOrder = 5;
   return g;
 }
@@ -2148,14 +2150,27 @@ export function normalizeActionType(
   actionType: AnimationActionType | string,
   stageName = ""
 ): AnimationActionType {
-  const raw = `${actionType} ${stageName}`.toLowerCase();
-  if (raw.includes("extract") || raw.includes("çekim") || raw.includes("cekim")) {
+  const raw = `${actionType} ${stageName}`
+    .replace(/İ/g, "i")
+    .replace(/I/g, "ı")
+    .toLowerCase()
+    .replace(/\u0307/g, "");
+  if (
+    raw.includes("sinus") ||
+    raw.includes("sinüs") ||
+    raw.includes("greft") ||
+    raw.includes("graft") ||
+    raw.includes("kemik tozu")
+  ) {
+    return "sinus_graft";
+  }
+  if (raw.includes("extract") || raw.includes("çekim") || raw.includes("cekim") || raw.includes("ekstraksiyon")) {
     return "extraction";
   }
-  if (raw.includes("abutment") || raw.includes("dayanak")) {
+  if (raw.includes("abutment") || raw.includes("dayanak") || raw.includes("iyileşme başlığı") || raw.includes("iyilesme basligi")) {
     return "abutment";
   }
-  if (raw.includes("implant") || raw.includes("fikstür")) {
+  if (raw.includes("implant") || raw.includes("fikstür") || raw.includes("fikstur")) {
     return "implant";
   }
   if (raw.includes("root_canal") || raw.includes("kanal") || raw.includes("endo")) {
@@ -2164,13 +2179,13 @@ export function normalizeActionType(
   if (raw.includes("sealant") || raw.includes("fissür") || raw.includes("fissur")) {
     return "sealant";
   }
-  if (raw.includes("filling") || raw.includes("dolgu") || raw.includes("kompozit") || raw.includes("bonding")) {
+  if (raw.includes("filling") || raw.includes("dolgu") || raw.includes("kompozit") || raw.includes("bonding") || raw.includes("inley") || raw.includes("onley")) {
     return "filling";
   }
   if (raw.includes("temporary") || raw.includes("geçici") || raw.includes("gecici")) {
     return "temporary_denture";
   }
-  if (raw.includes("veneer") || raw.includes("lamina") || raw.includes("yaprak")) {
+  if (raw.includes("veneer") || raw.includes("lamina") || raw.includes("lamine") || raw.includes("yaprak")) {
     return "veneer";
   }
   if (
@@ -2178,10 +2193,12 @@ export function normalizeActionType(
     raw.includes("crown") ||
     raw.includes("zirkon") ||
     raw.includes("köprü") ||
+    raw.includes("kopru") ||
     raw.includes("kuron") ||
+    raw.includes("kron") ||
     raw.includes("kaplama")
   ) {
-    return actionType === "permanent_bridge" || raw.includes("köprü") || raw.includes("bridge")
+    return actionType === "permanent_bridge" || raw.includes("köprü") || raw.includes("kopru") || raw.includes("bridge")
       ? "permanent_bridge"
       : "crown";
   }
@@ -2202,25 +2219,20 @@ export function normalizeActionType(
     return "xray";
   }
   if (
-    raw.includes("sinus") ||
-    raw.includes("sinüs") ||
-    raw.includes("greft") ||
-    raw.includes("graft") ||
-    raw.includes("kemik tozu")
-  ) {
-    return "sinus_graft";
-  }
-  if (
     raw.includes("scaling") ||
     raw.includes("cleaning") ||
     raw.includes("detertraj") ||
+    raw.includes("detartraj") ||
     raw.includes("diş taşı") ||
+    raw.includes("dis tasi") ||
     raw.includes("temiz") ||
-    raw.includes("polisaj")
+    raw.includes("polisaj") ||
+    raw.includes("küretaj") ||
+    raw.includes("kuretaj")
   ) {
     return "scaling";
   }
-  if (raw.includes("healing") || raw.includes("iyileşme") || raw.includes("osteointegrasyon")) {
+  if (raw.includes("healing") || raw.includes("iyileşme") || raw.includes("iyilesme") || raw.includes("osteointegrasyon")) {
     return "healing";
   }
   return "custom";
@@ -2296,6 +2308,7 @@ export function syncCompletedStateBeforeStage(
   const cariesAmount = new Map<string, number>();
   const implanted = new Set<string>();
   const abutted = new Set<string>();
+  const sinusGrafted = new Set<string>();
   const prostheticMode = new Map<string, "temp" | "crown" | "veneer">();
   const cappedMode = new Map<string, boolean>(); // true = sealant, false = filling/endo cap
 
@@ -2386,6 +2399,9 @@ export function syncCompletedStateBeforeStage(
         cariesAmount.delete(fdi);
       } else if (act === "scaling" || act === "cleaning" || act === "whitening") {
         cariesAmount.delete(fdi);
+      } else if (act === "sinus_graft") {
+        extracted.add(fdi);
+        sinusGrafted.add(fdi);
       }
     }
   }
@@ -2403,6 +2419,14 @@ export function syncCompletedStateBeforeStage(
         cariesVal,
         0.0
       );
+
+      if (sinusGrafted.has(fdi)) {
+        const graftPack = makeSinusGraftPack(isl, true);
+        graftPack.position.copy(
+          isl.localCervical.clone().addScaledVector(isl.localRootAxis, isl.localRadius * 0.08)
+        );
+        arch.anchorGroup.add(graftPack);
+      }
 
       const pMode = prostheticMode.get(fdi);
       if (implanted.has(fdi)) {
@@ -2467,19 +2491,18 @@ function computeStageCameraFrame(
     };
   }
 
-  // Maxillary sinus lift & bone graft: always frame from lateral buccal cheek profile
+  // Maxillary sinus lift & bone graft: frame from 3/4 buccal-occlusal angle looking directly into the crestal socket opening
   if (mode === "sinus" && frames.length) {
     const allSameSide = frames.every((f) => f.right === frames[0]!.right);
     const primary = frames[0]!;
     const buccalX = primary.right ? -1 : 1;
-    // Predominantly lateral (94%), slightly inferior looking upward into the sinus floor (-0.08), slightly anterior looking posteromedially (0.34)
-    const sideDir = new THREE.Vector3(buccalX * 0.94, -0.08, 0.34).normalize();
+    const sideDir = new THREE.Vector3(buccalX * 0.82, -0.38, 0.42).normalize();
 
     if (frames.length === 1 || !allSameSide) {
       return {
-        pos: primary.worldCervical.clone().addScaledVector(sideDir, 0.068),
+        pos: primary.worldCervical.clone().addScaledVector(sideDir, 0.074),
         target: primary.worldCervical.clone(),
-        jawAngle: 0.32,
+        jawAngle: 0.34,
       };
     }
 
@@ -2489,12 +2512,12 @@ function computeStageCameraFrame(
     }
     const center = box.getCenter(new THREE.Vector3());
     const span = box.getSize(new THREE.Vector3()).length();
-    const dist = THREE.MathUtils.clamp(span * 1.35 + 0.058, 0.068, 0.098);
+    const dist = THREE.MathUtils.clamp(span * 1.35 + 0.062, 0.074, 0.105);
 
     return {
       pos: center.clone().addScaledVector(sideDir, dist),
       target: center,
-      jawAngle: 0.32,
+      jawAngle: 0.34,
     };
   }
 
@@ -3151,46 +3174,22 @@ function buildImplantChoreography(
 ) {
   if (!frames.length) return;
 
-  const gums = new Set<THREE.Mesh>();
   for (const f of frames) {
     f.arch.uniforms.uScanColor.value.setHex(0x38bdf8);
     const st = f.arch.uniforms.uToothState.value[f.island.slot];
     if (st) {
       st.x = 1.0;
     }
-    if (f.arch.gumsMesh) {
-      gums.add(f.arch.gumsMesh);
-    }
   }
 
   const primary = frames[0]!;
-  const drill = makeSurgicalDrill(primary.island.localRadius * 1.35);
+  const drill = makeSurgicalDrill(primary.island.localRadius * 1.0);
   drill.visible = false;
   primary.arch.anchorGroup.add(drill);
   const drillSpinner = drill.userData.spinner as THREE.Object3D | undefined;
 
   const toothStep =
     frames.length === 1 ? 3.2 : Math.max(1.45, Math.min(2.4, 10.5 / frames.length));
-  const totalSeqDur = 0.55 + frames.length * toothStep;
-
-  gums.forEach((gumMesh) => {
-    const mat = gumMesh.material as THREE.MeshPhysicalMaterial | undefined;
-    if (mat && "opacity" in mat) {
-      mat.transparent = true;
-      tl.to(mat, { opacity: 0.48, duration: 0.45 }, 0.25);
-      tl.to(
-        mat,
-        {
-          opacity: 1.0,
-          duration: 0.45,
-          onComplete: () => {
-            mat.transparent = false;
-          },
-        },
-        totalSeqDur
-      );
-    }
-  });
 
   frames.forEach((f, idx) => {
     const seqStart = 0.55 + idx * toothStep;
@@ -3226,12 +3225,15 @@ function buildImplantChoreography(
     }
 
     // Sub-step A (0% -> 34%): Surgical osteotomy drill prepares socket on tooth `f`
+    // Note: makeSurgicalDrill tip sits at +1.25*scale along localRootAxis from drill.position.
+    // Keeping drill.position along localCrownAxis ensures the handpiece head stays outside the gum in the oral cavity
+    // while only the twist drill bur penetrates the alveolar socket.
     const entryPos = f.island.localCervical
       .clone()
-      .addScaledVector(f.island.localCrownAxis, f.island.localRadius * 1.45);
+      .addScaledVector(f.island.localCrownAxis, f.island.localRadius * 2.05);
     const depthPos = f.island.localCervical
       .clone()
-      .addScaledVector(f.island.localRootAxis, f.island.localRadius * 0.28);
+      .addScaledVector(f.island.localCrownAxis, f.island.localRadius * 0.82);
 
     tl.add(() => {
       if (drill.parent !== f.arch.anchorGroup) {
@@ -3414,13 +3416,11 @@ function buildAbutmentChoreography(
 ) {
   if (!frames.length) return;
 
-  const gums = new Set<THREE.Mesh>();
   frames.forEach((f) => {
     const st = f.arch.uniforms.uToothState.value[f.island.slot];
     if (st) {
       st.x = 1.0;
     }
-    if (f.arch.gumsMesh) gums.add(f.arch.gumsMesh);
 
     const prevCrown = f.arch.anchorGroup.getObjectByName(`prop_perm_prosthetic_${f.fdi}`);
     if (prevCrown) {
@@ -3445,26 +3445,6 @@ function buildAbutmentChoreography(
 
   const toothStep =
     frames.length === 1 ? 2.7 : Math.max(1.25, Math.min(2.1, 9.5 / frames.length));
-  const totalSeqDur = 0.55 + frames.length * toothStep;
-
-  gums.forEach((gumMesh) => {
-    const mat = gumMesh.material as THREE.MeshPhysicalMaterial | undefined;
-    if (mat && "opacity" in mat) {
-      mat.transparent = true;
-      tl.to(mat, { opacity: 0.58, duration: 0.4 }, 0.25);
-      tl.to(
-        mat,
-        {
-          opacity: 1.0,
-          duration: 0.45,
-          onComplete: () => {
-            mat.transparent = false;
-          },
-        },
-        totalSeqDur
-      );
-    }
-  });
 
   frames.forEach((f, idx) => {
     const seqStart = 0.55 + idx * toothStep;
@@ -3658,7 +3638,17 @@ function buildRootCanalChoreography(
     if (mat && "opacity" in mat) {
       mat.transparent = true;
       tl.to(mat, { opacity: 0.36, duration: 0.45 }, 0.3);
-      tl.to(mat, { opacity: 1.0, duration: 0.45 }, totalSeqDur);
+      tl.to(
+        mat,
+        {
+          opacity: 1.0,
+          duration: 0.45,
+          onComplete: () => {
+            mat.transparent = false;
+          },
+        },
+        totalSeqDur
+      );
     }
   });
 
@@ -5136,9 +5126,112 @@ function buildXRayChoreography(
 }
 
 /**
+ * Builds a structured 3D maxillary sinus bone graft pack (bio-active graft block + individually animated granules + collagen barrier cap)
+ * anchored at `isl.localCervical` and oriented along `isl.localRootAxis` into the sub-antral sinus floor.
+ */
+function makeSinusGraftPack(
+  island: ToothIslandMeta,
+  isPermanent = true
+): THREE.Group {
+  const g = new THREE.Group();
+  g.name = isPermanent
+    ? `prop_perm_sinus_graft_${island.fdi}`
+    : `prop_tool_sinus_graft_${island.fdi}`;
+
+  const r = Math.min(island.localRadius * 0.44, 0.25);
+  const h = Math.min(island.localRadius * 0.88, island.localRootLength * 0.68);
+
+  g.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    island.localRootAxis
+  );
+
+  const matrixMat = new THREE.MeshPhysicalMaterial({
+    color: 0xf5ebd6,
+    emissive: new THREE.Color(0xd97706),
+    emissiveIntensity: 0.14,
+    roughness: 0.4,
+    metalness: 0.02,
+    clearcoat: 0.25,
+    transparent: true,
+    opacity: isPermanent ? 0.92 : 0.0,
+  });
+
+  // Sub-antral grafted bone matrix core (sits inside the lifted sinus pocket from y = 0.14*h to 0.86*h)
+  const core = new THREE.Mesh(
+    new THREE.CylinderGeometry(r * 0.96, r * 0.76, h * 0.72, 22),
+    matrixMat
+  );
+  core.position.set(0, h * 0.5, 0);
+  g.add(core);
+
+  const granuleMat = new THREE.MeshStandardMaterial({
+    color: 0xfef3c7,
+    emissive: new THREE.Color(0xb45309),
+    emissiveIntensity: 0.2,
+    roughness: 0.32,
+    metalness: 0.05,
+  });
+
+  const offsets: [number, number, number, number][] = [
+    [0.0, 0.26, 0.0, 0.24],
+    [0.32, 0.32, 0.18, 0.23],
+    [-0.3, 0.36, 0.2, 0.22],
+    [0.26, 0.48, -0.22, 0.24],
+    [-0.28, 0.52, -0.18, 0.22],
+    [0.34, 0.58, 0.08, 0.21],
+    [-0.32, 0.62, 0.06, 0.21],
+    [0.14, 0.72, 0.16, 0.25],
+    [-0.16, 0.74, -0.14, 0.24],
+    [0.0, 0.8, 0.0, 0.26],
+  ];
+
+  const granules: THREE.Mesh[] = [];
+  for (const [ox, oy, oz, radScale] of offsets) {
+    const gran = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(r * radScale, 0),
+      granuleMat
+    );
+    const targetPos = new THREE.Vector3(r * ox, h * oy, r * oz);
+    gran.position.copy(targetPos);
+    gran.userData.targetPos = targetPos.clone();
+    g.add(gran);
+    granules.push(gran);
+  }
+
+  // White resorbable collagen barrier membrane disc sealing the crestal osteotomy window at y = 0.08*h
+  const barrierMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    emissive: new THREE.Color(0x38bdf8),
+    emissiveIntensity: 0.12,
+    roughness: 0.25,
+    clearcoat: 0.4,
+    transparent: true,
+    opacity: isPermanent ? 0.92 : 0.0,
+  });
+  const barrier = new THREE.Mesh(
+    new THREE.CylinderGeometry(r * 0.88, r * 0.88, h * 0.07, 22),
+    barrierMat
+  );
+  barrier.position.set(0, h * 0.1, 0);
+  g.add(barrier);
+
+  g.userData.matrixMat = matrixMat;
+  g.userData.granules = granules;
+  g.userData.barrier = barrier;
+  g.userData.barrierMat = barrierMat;
+  g.renderOrder = 4;
+  return g;
+}
+
+/**
  * 13. SİNÜS LİFTİNG & KEMİK GREFTİ (`sinus_graft` / Kemik Tozu Uygulaması):
- * Posterior upper molar site is prepared with osteotomy drill, then bio-active bone graft
- * granules (`makeDroplet` warm ivory matrix) are packed into the maxillary sinus floor / alveolar socket.
+ * Upper gum becomes semi-transparent so the sub-antral maxillary sinus floor is clearly visible.
+ * Step 1: Osteotomy surgical handpiece approaches from below the gum in the oral cavity (handpiece head stays outside the gum!)
+ *         and gently elevates the Schneiderian sinus membrane dome upward into the maxillary sinus.
+ * Step 2: Bone graft carrier syringe approaches the socket opening and injects individual bio-active bone graft granules
+ *         stream-by-stream into the lifted sinus pocket, compacting into a dense bone matrix.
+ * Step 3: Resorbable collagen barrier membrane seals the osteotomy window.
  */
 function buildSinusGraftChoreography(
   tl: gsap.core.Timeline,
@@ -5150,53 +5243,99 @@ function buildSinusGraftChoreography(
   if (!frames.length) return;
   const primary = frames[0]!;
 
-  // Mark target posterior sites as edentulous sockets needing sinus floor augmentation
   for (const f of frames) {
     f.arch.uniforms.uScanColor.value.setHex(0x2dd4bf);
     const st = f.arch.uniforms.uToothState.value[f.island.slot];
     if (st) {
       st.x = 1.0;
-      st.w = 0.7;
+      st.w = 0.85;
     }
   }
 
-  const drill = makeSurgicalDrill(primary.island.localRadius * 1.0);
+  // Scale = 0.95*r so the drill tip is at +1.19*r along localRootAxis from drill.position.
+  const drillScale = primary.island.localRadius * 0.95;
+  const drill = makeSurgicalDrill(drillScale);
   drill.visible = false;
   primary.arch.anchorGroup.add(drill);
 
-  const toothStep = frames.length === 1 ? 3.4 : Math.max(2.0, Math.min(3.2, 9.5 / frames.length));
+  const syringeScale = primary.island.localRadius * 1.1;
+  const syringe = makeGelSyringe(syringeScale);
+  const gelInside = syringe.userData.gelInside as THREE.Mesh | undefined;
+  if (gelInside) {
+    (gelInside.material as THREE.MeshStandardMaterial).color.setHex(0xfef3c7);
+  }
+  syringe.visible = false;
+  primary.arch.anchorGroup.add(syringe);
+
+  const toothStep =
+    frames.length === 1 ? 4.6 : Math.max(2.4, Math.min(3.6, 10.0 / frames.length));
 
   frames.forEach((f, idx) => {
-    const seqStart = 0.5 + idx * toothStep;
+    const seqStart = 0.55 + idx * toothStep;
     const isl = f.island;
     const r = isl.localRadius;
 
-    // Always orient camera smoothly to active tooth's lateral sinus floor site
-    focusCameraOnTooth(
-      tl,
-      f,
-      camera,
-      controls,
-      camMode,
-      seqStart,
-      Math.min(0.42, toothStep * 0.22)
-    );
+    // Clean up any prior graft on this tooth
+    const prevGraft = f.arch.anchorGroup.getObjectByName(`prop_perm_sinus_graft_${f.fdi}`);
+    if (prevGraft) {
+      f.arch.anchorGroup.remove(prevGraft);
+      disposeObject3D(prevGraft);
+    }
 
-    // Step 1: Sinus floor window / osteotomy preparation
-    // `drillStart`: tip hovers ~0.40*r cleanly outside the gum in oral cavity
-    // `drillDepth`: tip penetrates a gentle, safe 0.40*r into the sinus floor
-    const drillStart = isl.localCervical
+    if (frames.length > 1) {
+      focusCameraOnTooth(
+        tl,
+        f,
+        camera,
+        controls,
+        camMode,
+        seqStart,
+        Math.min(0.42, toothStep * 0.2)
+      );
+    }
+
+    // Schneiderian sinus membrane dome visible at the crestal socket base
+    const membraneMat = new THREE.MeshPhysicalMaterial({
+      color: 0xfb7185,
+      emissive: new THREE.Color(0xe11d48),
+      emissiveIntensity: 0.28,
+      roughness: 0.22,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.82,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const membrane = new THREE.Mesh(
+      new THREE.SphereGeometry(r * 0.46, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      membraneMat
+    );
+    membrane.name = `prop_tool_sinus_membrane_${f.fdi}`;
+    membrane.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), isl.localRootAxis);
+    const membraneLowPos = isl.localCervical
       .clone()
-      .addScaledVector(isl.localCrownAxis, r * 1.75);
+      .addScaledVector(isl.localCrownAxis, r * 0.18);
+    const membraneLiftedPos = isl.localCervical
+      .clone()
+      .addScaledVector(isl.localRootAxis, r * 0.18);
+    membrane.position.copy(membraneLowPos);
+    membrane.visible = false;
+    f.arch.anchorGroup.add(membrane);
+
+    // Step 1 (0% -> 38%): Osteotomy drill starts clearly BELOW the gum in the oral cavity
+    const drillEntry = isl.localCervical
+      .clone()
+      .addScaledVector(isl.localCrownAxis, r * 2.15);
     const drillDepth = isl.localCervical
       .clone()
-      .addScaledVector(isl.localCrownAxis, r * 0.95);
+      .addScaledVector(isl.localCrownAxis, r * 1.05);
 
-    tl.set(drill, { visible: true }, seqStart);
     tl.add(() => {
       if (drill.parent !== f.arch.anchorGroup) {
         f.arch.anchorGroup.add(drill);
       }
+      membrane.visible = true;
+      drill.visible = true;
       drill.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), isl.localRootAxis);
       if (!f.right) {
         const qY = new THREE.Quaternion().setFromAxisAngle(
@@ -5205,78 +5344,208 @@ function buildSinusGraftChoreography(
         );
         drill.quaternion.multiply(qY);
       }
-      drill.position.copy(drillStart);
+      drill.position.copy(drillEntry);
     }, seqStart);
 
-    if (drill.userData.spinner) {
+    const drillSpinner = drill.userData.spinner as THREE.Object3D | undefined;
+    if (drillSpinner) {
       tl.to(
-        drill.userData.spinner.rotation,
-        { y: `+=${Math.PI * 16}`, duration: toothStep * 0.34, ease: "none" },
+        drillSpinner.rotation,
+        { y: `+=${Math.PI * 16}`, duration: toothStep * 0.36, ease: "none" },
         seqStart
       );
     }
 
+    // Advance drill smoothly from oral cavity up to socket entrance
     tl.to(
       drill.position,
       {
         x: drillDepth.x,
         y: drillDepth.y,
         z: drillDepth.z,
-        duration: toothStep * 0.17,
-        yoyo: true,
-        repeat: 1,
-        ease: "power2.inOut",
+        duration: toothStep * 0.16,
+        ease: "power2.out",
       },
       seqStart + toothStep * 0.02
     );
 
-    // Step 2: Bio-active bone graft granules (`graft`) packed into the sinus / alveolar socket
+    // Elevate (lift) the sinus membrane dome as the osteotome/drill reaches the socket base
+    tl.to(
+      membrane.position,
+      {
+        x: membraneLiftedPos.x,
+        y: membraneLiftedPos.y,
+        z: membraneLiftedPos.z,
+        duration: toothStep * 0.18,
+        ease: "power2.inOut",
+      },
+      seqStart + toothStep * 0.11
+    );
+    tl.to(
+      membraneMat.color,
+      { r: 0.22, g: 0.74, b: 0.97, duration: toothStep * 0.18 },
+      seqStart + toothStep * 0.11
+    );
+
+    // Withdraw drill back down into oral cavity
+    tl.to(
+      drill.position,
+      {
+        x: drillEntry.x,
+        y: drillEntry.y,
+        z: drillEntry.z,
+        duration: toothStep * 0.12,
+        ease: "power2.in",
+      },
+      seqStart + toothStep * 0.25
+    );
+
+    // Step 2 (38% -> 84%): Bone graft carrier syringe approaches from below the gum and injects granules one-by-one into the visible socket window
     const graftAt = seqStart + toothStep * 0.38;
-    const graft = makeDroplet(r * 0.38);
-    const graftMat = graft.material as THREE.MeshPhysicalMaterial;
-    graftMat.color.setHex(0xe8dec8);
-    graftMat.roughness = 0.48;
-
-    const gStart = isl.localCervical
+    const graftPack = makeSinusGraftPack(isl, false);
+    graftPack.name = `prop_perm_sinus_graft_${f.fdi}`;
+    const graftTarget = isl.localCervical
       .clone()
-      .addScaledVector(isl.localCrownAxis, r * 1.8);
-    graft.position.copy(gStart);
-    graft.scale.setScalar(0.01);
-    graft.visible = false;
-    f.arch.anchorGroup.add(graft);
+      .addScaledVector(isl.localCrownAxis, r * 0.32);
+    graftPack.position.copy(graftTarget);
+    graftPack.visible = false;
+    f.arch.anchorGroup.add(graftPack);
 
-    tl.set(drill, { visible: false }, graftAt);
-    tl.set(graft, { visible: true }, graftAt);
+    const granules = (graftPack.userData.granules as THREE.Mesh[]) || [];
+    const matrixMat = graftPack.userData.matrixMat as THREE.MeshPhysicalMaterial | undefined;
+    const barrier = graftPack.userData.barrier as THREE.Mesh | undefined;
+    const barrierMat = graftPack.userData.barrierMat as THREE.MeshPhysicalMaterial | undefined;
+
+    // Prepare granules at the crestal nozzle entrance (scale 0) so they shoot up into the lifted sinus cavity sequentially
+    granules.forEach((gran) => {
+      gran.position.set(0, 0, 0);
+      gran.scale.setScalar(0.01);
+    });
+    if (barrier) {
+      barrier.scale.setScalar(0.01);
+    }
+
+    // Syringe tip is at local y=0, barrel extends along +Y (which maps to localCrownAxis = down into oral cavity)
+    const syringeApproach = isl.localCervical
+      .clone()
+      .addScaledVector(isl.localCrownAxis, r * 1.75);
+    const syringeWork = isl.localCervical
+      .clone()
+      .addScaledVector(isl.localCrownAxis, r * 0.36);
+
     tl.add(() => {
       drill.visible = false;
-      graft.visible = true;
+      if (syringe.parent !== f.arch.anchorGroup) {
+        f.arch.anchorGroup.add(syringe);
+      }
+      syringe.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, -1, 0),
+        isl.localRootAxis
+      );
+      const plunger = syringe.userData.plunger as THREE.Object3D | undefined;
+      if (plunger) {
+        plunger.position.y = syringeScale * 2.2;
+      }
+      syringe.position.copy(syringeApproach);
+      syringe.visible = true;
+      graftPack.visible = true;
     }, graftAt);
 
     tl.to(
-      graft.scale,
-      { x: 1.45, y: 0.55, z: 1.35, duration: toothStep * 0.22, ease: "power2.out" },
-      graftAt
-    );
-    tl.to(
-      graft.position,
+      syringe.position,
       {
-        x: isl.localCervical.x,
-        y: isl.localCervical.y,
-        z: isl.localCervical.z,
-        duration: toothStep * 0.24,
+        x: syringeWork.x,
+        y: syringeWork.y,
+        z: syringeWork.z,
+        duration: toothStep * 0.12,
         ease: "power2.out",
       },
-      graftAt + toothStep * 0.02
+      graftAt
     );
+
+    const plunger = syringe.userData.plunger as THREE.Object3D | undefined;
+    if (plunger) {
+      tl.to(
+        plunger.position,
+        {
+          y: syringeScale * 1.45,
+          duration: toothStep * 0.32,
+          ease: "power1.inOut",
+        },
+        graftAt + toothStep * 0.1
+      );
+    }
+
+    // Stream individual bone graft granules upward from the syringe nozzle into the elevated sub-antral sinus pocket
+    granules.forEach((gran, gIdx) => {
+      const targetPos = (gran.userData.targetPos as THREE.Vector3) || new THREE.Vector3();
+      const granAt =
+        graftAt +
+        toothStep * (0.1 + (gIdx / Math.max(1, granules.length)) * 0.24);
+      tl.to(
+        gran.scale,
+        { x: 1, y: 1, z: 1, duration: toothStep * 0.12, ease: "back.out(1.4)" },
+        granAt
+      );
+      tl.to(
+        gran.position,
+        {
+          x: targetPos.x,
+          y: targetPos.y,
+          z: targetPos.z,
+          duration: toothStep * 0.14,
+          ease: "power2.out",
+        },
+        granAt
+      );
+    });
+
+    // Solidify the bone graft matrix around the packed granules
+    if (matrixMat) {
+      tl.to(
+        matrixMat,
+        { opacity: 0.92, duration: toothStep * 0.2 },
+        graftAt + toothStep * 0.24
+      );
+    }
+
+    // Withdraw syringe back down into oral cavity
     tl.to(
-      graftMat,
-      { opacity: 0.0, duration: toothStep * 0.2, ease: "power1.out" },
-      seqStart + toothStep * 0.76
+      syringe.position,
+      {
+        x: syringeApproach.x,
+        y: syringeApproach.y,
+        z: syringeApproach.z,
+        duration: toothStep * 0.13,
+        ease: "power2.in",
+      },
+      seqStart + toothStep * 0.74
     );
+
+    // Step 3 (82% -> 96%): Place white collagen barrier membrane cap to seal the crestal window
+    if (barrier && barrierMat) {
+      tl.to(
+        barrier.scale,
+        { x: 1, y: 1, z: 1, duration: toothStep * 0.12, ease: "back.out(1.3)" },
+        seqStart + toothStep * 0.82
+      );
+      tl.to(
+        barrierMat,
+        { opacity: 0.94, duration: toothStep * 0.12 },
+        seqStart + toothStep * 0.82
+      );
+    }
+
+    tl.to(
+      membraneMat,
+      { opacity: 0.36, duration: toothStep * 0.14 },
+      seqStart + toothStep * 0.84
+    );
+
     tl.add(() => {
-      graft.visible = false;
+      syringe.visible = false;
       const st = f.arch.uniforms.uToothState.value[isl.slot];
       if (st) st.w = 0.0;
-    }, seqStart + toothStep * 0.96);
+    }, seqStart + toothStep * 0.95);
   });
 }
