@@ -1,15 +1,17 @@
 import React from "react";
 import type { PdfPalette, PdfPlanData } from "../types";
-import { WisePageWrapper } from "../wise-frame";
+import { WisePageWrapper, WiseTopWedge, WiseFooter, getThemeColor } from "../wise-frame";
 import { resolvePatientDiagnosisMap } from "./pdf-odontogram";
 
 export function Booklet24Page9Diagnosis({
   data,
+  palette,
 }: {
   data: PdfPlanData;
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const themeColor = getThemeColor(palette, "#0b2938");
 
   // 8. sayfadaki mevcut ağız durumu (teşhis) ile birebir aynı teşhis haritasını kullan
   const diagMap = resolvePatientDiagnosisMap(data);
@@ -109,6 +111,29 @@ export function Booklet24Page9Diagnosis({
       bgImage="/pdf-assets/wise/page_9.jpg"
       className="flex flex-col justify-start"
     >
+      {/* Arka Plan Üst ve Alt Tema Kenarlıkları (Beyaz Kartın Arkasında) */}
+      <WiseTopWedge
+        themeColor={themeColor}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 0 }}
+      />
+      <WiseFooter
+        clinicName={data.clinicName || "Wise Dental"}
+        themeColor={themeColor}
+        variant="odd"
+        hideLogo
+        style={{ zIndex: 0 }}
+      />
+      <div
+        className="absolute bg-white shadow-[0_4px_24px_rgba(0,0,0,0.08)] pointer-events-none"
+        style={{
+          top: "1.6%",
+          right: "4.7%",
+          bottom: "1.6%",
+          left: "4.6%",
+          zIndex: 5,
+        }}
+      />
+
       {/* Teşhis Tabloları (page_9.jpg içindeki temizlenmiş beyaz kart çerçevesi üzerinde) */}
       <div className="flex-1 px-[64px] py-[56px] space-y-7 select-none z-10">
         {/* 1. Üst Çene Teşhis Bloğu */}

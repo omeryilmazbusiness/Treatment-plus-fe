@@ -17,7 +17,6 @@ import {
   Loader2,
   Mail,
   MapPin,
-  Palette as PaletteIcon,
   Pencil,
   Phone,
   Plus,
@@ -1198,43 +1197,6 @@ export function ClinicSettingsView({
                       </div>
                     </div>
                   </div>
-
-                  <div className="mt-4">
-                    <span className={`${labelCls} inline-flex items-center gap-1.5`}>
-                      <PaletteIcon className="size-3.5" /> Renk paleti
-                    </span>
-                    <div className="mt-1.5 grid grid-cols-2 gap-2">
-                      {(Object.keys(PALETTE_CONFIGS) as Palette[]).map((palKey) => {
-                        const pal = PALETTE_CONFIGS[palKey];
-                        const active = settings.palette === palKey;
-                        return (
-                          <button
-                            key={palKey}
-                            type="button"
-                            onClick={() => handleFieldChange("palette", palKey)}
-                            className={`tp-tab flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left ${
-                              active
-                                ? "bg-white ring-2 ring-[#0b1f4d]/30"
-                                : "bg-white/60 ring-1 ring-slate-900/[0.04] hover:bg-white"
-                            }`}
-                          >
-                            <span
-                              className="size-7 shrink-0 rounded-xl shadow-inner"
-                              style={{ backgroundColor: pal.primaryHex }}
-                            />
-                            <span className="min-w-0">
-                              <span className="block truncate text-xs font-semibold text-[#0b1f4d]">
-                                {pal.name}
-                              </span>
-                            </span>
-                            {active ? (
-                              <Check className="ml-auto size-3.5 shrink-0 text-[#0b1f4d]" />
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
 
                 {/* 6 Şablon Seçici & Dekoratif Yan Motifler */}
@@ -1274,82 +1236,80 @@ export function ClinicSettingsView({
                             >
                               {/* Şablona Özel Mini Tel Çerçeve Çizimi */}
                               <div className="relative size-full flex flex-col overflow-hidden">
+                                {/* MODERN (Altıgen & Altın Çizgi) */}
                                 {tmpl.id === "modern-geometric" && (
-                                  <div className="size-full flex flex-col bg-white relative">
-                                    <div className="h-4 w-full bg-[#0B2570] flex items-center px-1">
-                                      <div className="size-1.5 rounded-xs bg-[#00A3FF]" />
+                                  <div className="size-full flex flex-col bg-[#F8FAFC] relative overflow-hidden">
+                                    <div className="h-3 w-full bg-[#1E293B] border-b border-[#E5A93C]" />
+                                    <div className="absolute right-1 top-3.5 size-4 rotate-45 rounded-2xs bg-[#1E293B] border border-[#E5A93C]" />
+                                    <div className="flex-1 p-1.5 space-y-1">
+                                      <div className="h-1 w-2/3 bg-[#1E293B] rounded-2xs" />
+                                      <div className="h-1 w-1/2 bg-[#E5A93C]/70 rounded-2xs" />
                                     </div>
-                                    <div className="absolute top-0 right-0 w-3 h-3 bg-[#00A3FF]/30 [clip-path:polygon(100%_0,0_0,100%_100%)]" />
-                                    <div className="flex-1 p-1 space-y-0.5">
-                                      <div className="h-1 w-3/4 bg-blue-100 rounded-2xs" />
-                                      <div className="h-1 w-1/2 bg-slate-200 rounded-2xs" />
-                                    </div>
+                                    <div className="h-1.5 w-full bg-[#1E293B]" />
                                   </div>
                                 )}
+                                {/* NATURE (Botanik Yaprak, Pembe Çiçek & Çift Çerçeve) */}
                                 {tmpl.id === "botanical-serenity" && (
-                                  <div className="size-full bg-[#F7F6F2] p-1 flex flex-col justify-between border border-[#5F7161]/30">
+                                  <div className="size-full bg-[#FAFBF7] p-1 flex flex-col justify-between border border-[#588157]/60 relative">
                                     <div className="flex justify-between items-center">
-                                      <div className="size-2 rounded-full border border-[#5F7161] flex items-center justify-center">
-                                        <div className="size-1 rounded-full bg-[#5F7161]" />
-                                      </div>
-                                      <div className="h-0.5 w-6 bg-[#5F7161]/40" />
+                                      <div className="size-2 rounded-full bg-[#588157]" />
+                                      <div className="size-2 rounded-full bg-[#F4ACB7]" />
                                     </div>
-                                    <div className="space-y-0.5">
-                                      <div className="h-1 w-2/3 bg-[#5F7161]/30 rounded-2xs" />
-                                      <div className="h-1 w-1/2 bg-[#5F7161]/20 rounded-2xs" />
+                                    <div className="space-y-0.5 px-0.5">
+                                      <div className="h-1 w-2/3 bg-[#3A5A40]/70 rounded-2xs mx-auto" />
+                                      <div className="h-1 w-1/2 bg-[#B5945B]/50 rounded-2xs mx-auto" />
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                      <div className="size-1.5 rounded-full bg-[#F4ACB7]" />
+                                      <div className="size-2 rounded-full bg-[#3A5A40]" />
                                     </div>
                                   </div>
                                 )}
+                                {/* SOFT (Pastel Dalgalar & Bulut) */}
                                 {tmpl.id === "liquid-art" && (
-                                  <div className="size-full bg-[#120E24] p-1 flex flex-col justify-between relative overflow-hidden">
-                                    <div className="h-3.5 w-full bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400" />
+                                  <div className="size-full bg-[#FFFDF9] flex flex-col justify-between relative overflow-hidden">
+                                    <div className="h-3 w-full bg-gradient-to-r from-[#FBCFE8] via-[#DDD6FE] to-[#BAE6FD]" />
                                     <div className="flex-1 p-1 flex flex-col justify-center space-y-0.5">
-                                      <div className="h-1 w-3/4 bg-white/20 rounded-2xs" />
-                                      <div className="h-1 w-1/2 bg-cyan-400/40 rounded-2xs" />
+                                      <div className="h-1 w-3/4 bg-[#F9A8D4]/70 rounded-2xs" />
+                                      <div className="h-1 w-1/2 bg-[#7DD3FC]/80 rounded-2xs" />
                                     </div>
-                                    <div className="h-2 w-full bg-gradient-to-r from-cyan-400 to-purple-600" />
+                                    <div className="h-2.5 w-full bg-gradient-to-r from-[#BAE6FD] via-[#FEF08A] to-[#FBCFE8]" />
                                   </div>
                                 )}
+                                {/* PREMİUM (Siyah & Altın V-Kalkan + Krem İç) */}
                                 {tmpl.id === "noir-gold" && (
-                                  <div className="size-full bg-[#0A0A0A] p-1 border border-[#F5C842]/40 flex flex-col justify-between relative overflow-hidden">
-                                    <div className="absolute -top-2 -left-2 w-6 h-6 border-b-2 border-r-2 border-[#F5C842] rotate-45 opacity-60" />
-                                    <div className="h-2.5 w-full bg-[#F5C842] flex items-center px-1">
-                                      <div className="size-1 rounded-full bg-black" />
+                                  <div className="size-full bg-[#F5EFE0] border border-[#D4AF37] flex flex-col justify-between relative overflow-hidden">
+                                    <div className="h-4 w-full bg-[#141414] border-b-2 border-[#D4AF37] flex items-center justify-center [clip-path:polygon(0_0,100%_0,100%_70%,50%_100%,0_70%)]">
+                                      <div className="h-0.5 w-5 bg-[#D4AF37]" />
                                     </div>
-                                    <div className="flex-1 py-1 space-y-0.5">
-                                      <div className="h-1 w-2/3 bg-[#F5C842]/40 rounded-2xs" />
+                                    <div className="flex-1 px-1.5 py-0.5 space-y-0.5 flex flex-col justify-center">
+                                      <div className="h-1 w-3/4 bg-[#18181B]/80 rounded-2xs" />
+                                      <div className="h-1 w-1/2 bg-[#D4AF37] rounded-2xs" />
                                     </div>
+                                    <div className="h-1.5 w-full bg-[#141414] border-t border-[#D4AF37]" />
                                   </div>
                                 )}
+                                {/* TEKNO (Siber Lacivert & Neon Cyan Mikroçip) */}
                                 {tmpl.id === "royal-gold" && (
-                                  <div className="size-full bg-[#070709] p-1 border border-[#D4AF37]/50 flex flex-col justify-between relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-3.5 h-3.5 bg-gradient-to-bl from-[#001845] to-transparent border-b border-l border-[#D4AF37]" />
-                                    <div className="h-2.5 w-full bg-gradient-to-r from-[#D4AF37] via-[#FFF2B2] to-[#AA771C] flex items-center px-1">
-                                      <div className="size-1 rounded-full bg-[#001845]" />
+                                  <div className="size-full bg-[#051020] p-1 border border-[#00E5FF]/50 flex flex-col items-center justify-center relative overflow-hidden">
+                                    <div className="w-full h-0.5 bg-[#00E5FF]/40 absolute top-1.5" />
+                                    <div className="size-5 rounded-xs border border-[#00E5FF] bg-[#081E3A] flex items-center justify-center shadow-[0_0_6px_#00E5FF]">
+                                      <div className="size-2 bg-[#00E5FF]/60 rounded-2xs" />
                                     </div>
-                                    <div className="flex-1 py-1 space-y-0.5">
-                                      <div className="h-1 w-2/3 bg-[#D4AF37]/50 rounded-2xs" />
-                                      <div className="h-1 w-1/2 bg-[#001845]/60 rounded-2xs" />
-                                    </div>
+                                    <div className="w-full h-0.5 bg-[#00E5FF]/40 absolute bottom-1.5" />
                                   </div>
                                 )}
+                                {/* KLASİK (Orijinal Wise Dental) */}
                                 {tmpl.id === "klinik-minimal" && (
                                   <div className="relative size-full flex flex-col bg-white">
-                                    <div className="h-4 w-full flex flex-col items-center justify-center bg-slate-900">
-                                      <div className="h-0.5 w-6 bg-white/80 rounded-2xs mb-0.5" />
-                                      <div className="size-2 rounded-full bg-sky-500 flex items-center justify-center">
-                                        <div className="size-1 rounded-full bg-white" />
-                                      </div>
+                                    <div className="h-4 w-full flex flex-col items-center justify-center bg-[#0b2938] [clip-path:polygon(0_0,100%_0,100%_65%,0_100%)]">
+                                      <div className="h-0.5 w-6 bg-[#E5B94E] rounded-2xs" />
                                     </div>
                                     <div className="flex-1 p-1 space-y-0.5 flex flex-col justify-around">
                                       <div className="h-1 w-3/4 bg-slate-300 rounded-2xs" />
-                                      <div className="flex gap-0.5">
-                                        <div className="h-1 flex-1 bg-sky-100 rounded-2xs" />
-                                        <div className="h-1 flex-1 bg-sky-100 rounded-2xs" />
-                                        <div className="h-1 flex-1 bg-sky-100 rounded-2xs" />
-                                      </div>
                                       <div className="h-1 w-1/2 bg-slate-200 rounded-2xs" />
                                     </div>
+                                    <div className="h-2 w-full bg-[#0b2938] [clip-path:polygon(0_70%,100%_0,100%_100%,0_100%)]" />
                                   </div>
                                 )}
                               </div>
@@ -1605,17 +1565,7 @@ export function ClinicSettingsView({
                     >
                       <div
                         ref={previewRef}
-                        className={
-                          (settings.templateId || "klinik-minimal") === "noir-gold"
-                            ? "bg-[#0A0A0A]"
-                            : (settings.templateId || "klinik-minimal") === "royal-gold"
-                            ? pdfPreviewPage === 1
-                              ? "bg-[#070709]"
-                              : "bg-white"
-                            : (settings.templateId || "klinik-minimal") === "botanical-serenity"
-                            ? "bg-[#F7F6F2]"
-                            : "bg-white"
-                        }
+                        className="bg-white"
                       >
                         <A4Document data={livePdfData} />
                       </div>

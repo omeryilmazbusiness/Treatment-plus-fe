@@ -2,6 +2,7 @@ import React from "react";
 import type { PdfPlanData } from "./types";
 import { PALETTES } from "./palettes";
 import { normalizeTemplateId } from "./page-frame";
+import { getTemplateVisuals } from "./wise-frame";
 import {
   KlinikMinimalTemplate,
   ModernGeometricTemplate,
@@ -47,11 +48,20 @@ export function A4Document({
   id?: string;
 }) {
   const palKey = data.palette || data.paletteKey || "navy";
-  const palette = PALETTES[palKey] || PALETTES.navy;
+  const basePalette = PALETTES[palKey] || PALETTES.navy;
 
   const isSummary = data.format === "summary";
   const activePage = data.activePage;
   const templateId = normalizeTemplateId(data.templateId);
+  const templateVisuals = getTemplateVisuals(templateId, basePalette);
+  const palette =
+    templateId === "klinik-minimal"
+      ? basePalette
+      : {
+          ...basePalette,
+          primary: templateVisuals.primaryColor,
+          accent: templateVisuals.accentColor,
+        };
   const normalizedData: PdfPlanData = { ...data, templateId };
 
   // 1 Sayfalık Hızlı Fiyat ve Tedavi Özeti Şablonu

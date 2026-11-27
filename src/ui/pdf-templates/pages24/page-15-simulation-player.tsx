@@ -1,6 +1,6 @@
 import React from "react";
 import type { PdfPalette, PdfPlanData } from "../types";
-import { WisePageWrapper, getThemeColor } from "../wise-frame";
+import { WisePageWrapper, WiseTopWedge, WiseFooter, getThemeColor } from "../wise-frame";
 
 export function Booklet24Page15SimulationPlayer({
   data,
@@ -19,7 +19,8 @@ export function Booklet24Page15SimulationPlayer({
       ? `${data.shareUrl}${data.shareUrl.includes("?") ? "&" : "?"}viz=1`
       : "/p/demo-preview?viz=1");
 
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=8&color=0b2938&bgcolor=ffffff&ecc=M&data=${encodeURIComponent(
+  const qrColorHex = (themeColor || "#0b2938").replace("#", "");
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=8&color=${qrColorHex}&bgcolor=ffffff&ecc=M&data=${encodeURIComponent(
     simulationUrl
   )}`;
 
@@ -31,6 +32,19 @@ export function Booklet24Page15SimulationPlayer({
       bgImage="/pdf-assets/wise/page_15.jpg"
       className="relative flex flex-col justify-between"
     >
+      {/* Arka Plan Üst ve Alt Tema Kenarlıkları (Simülasyon Çerçevesinin Arkasında) */}
+      <WiseTopWedge
+        themeColor={themeColor}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 0 }}
+      />
+      <WiseFooter
+        clinicName={data.clinicName || "Wise Dental"}
+        themeColor={themeColor}
+        variant="odd"
+        hideLogo
+        style={{ zIndex: 0 }}
+      />
+
       {/* page_15.jpg iç çerçevesindeki statik arka plan diş modelini tamamen kaldıran temiz klinik yüzey */}
       <div
         className="absolute top-[3.1%] right-[4.8%] bottom-[3.2%] left-[4.65%] z-10 flex flex-col items-center justify-between overflow-hidden rounded-[2px] bg-[#f4f8fb] px-12 py-14"

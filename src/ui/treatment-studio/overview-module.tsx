@@ -573,15 +573,18 @@ export function OverviewModule({
           activeToken && activeToken.length >= 16
             ? `&token=${encodeURIComponent(activeToken)}`
             : "";
+        const templateQuery = activeTemplateId
+          ? `&template=${encodeURIComponent(activeTemplateId)}`
+          : "";
         if (format === "summary") {
           window.open(
-            `/api/plans/${effectivePlanId}/pdf?format=summary&download=1${tokenQuery}`,
+            `/api/plans/${effectivePlanId}/pdf?format=summary&download=1${tokenQuery}${templateQuery}`,
             "_blank"
           );
         } else {
           // Kapsamlı sunum kitapçığını yeni sekmede aç ve yazdır/indir
           window.open(
-            `/api/plans/${effectivePlanId}/pdf?download=1${tokenQuery}`,
+            `/api/plans/${effectivePlanId}/pdf?download=1${tokenQuery}${templateQuery}`,
             "_blank"
           );
         }
@@ -1861,7 +1864,14 @@ export function OverviewModule({
               {effectivePlanId && (
                 <button
                   type="button"
-                  onClick={() => window.open(`/api/plans/${effectivePlanId}/pdf`, "_blank")}
+                  onClick={() =>
+                    window.open(
+                      `/api/plans/${effectivePlanId}/pdf?template=${encodeURIComponent(
+                        activeTemplateId
+                      )}`,
+                      "_blank"
+                    )
+                  }
                   className="hidden sm:inline-flex cursor-pointer items-center gap-1 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-xs font-semibold text-white transition active:scale-95"
                   title="Yeni Sekmede Aç"
                 >

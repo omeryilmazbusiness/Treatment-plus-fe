@@ -474,62 +474,6 @@ export function ClinicSettingsClient({
               </div>
             </div>
 
-            {/* 2. Palet Seçimi (Kapalı Set) */}
-            <div className="rounded-2xl border border-line bg-paper-2 p-5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold tracking-wide text-ink uppercase">
-                    2. Renk Paleti (Kapalı Set)
-                  </h3>
-                  <p className="mt-1 text-xs text-ink-soft">
-                    Kurumsal kimlik kuralları gereği serbest hex yasaktır;
-                    özenle hazırlanmış 4 paletten birini seçin.
-                  </p>
-                </div>
-                <span className="text-xs font-medium text-teal capitalize">
-                  {settings.palette}
-                </span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {(["navy", "forest", "rose", "slate"] as const).map((key) => {
-                  const p = PALETTE_CONFIGS[key];
-                  const isSelected = settings.palette === key;
-                  return (
-                    <div
-                      key={key}
-                      onClick={() => handleFieldChange("palette", key)}
-                      className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
-                        isSelected
-                          ? "border-teal bg-teal/5 shadow-xs ring-2 ring-teal/20"
-                          : "border-line bg-paper hover:border-ink-soft/40"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="size-5 rounded-full shadow-inner ring-1 ring-black/10"
-                            style={{ backgroundColor: p.primaryHex }}
-                          />
-                          <span className="text-xs font-semibold text-ink">
-                            {p.name.split(" ")[0]}
-                          </span>
-                        </div>
-                        {isSelected && (
-                          <span className="text-xs font-bold text-teal">
-                            ✓
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1.5 text-[11px] leading-4 text-ink-soft">
-                        {p.description}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* 3. Klinik / Marka Bilgileri */}
             <div className="rounded-2xl border border-line bg-paper-2 p-5 shadow-xs">
               <h3 className="text-sm font-semibold tracking-wide text-ink uppercase">

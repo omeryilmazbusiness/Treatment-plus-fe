@@ -249,8 +249,15 @@ export async function GET(
         ? SAMPLE_LAB_STATS_EN
         : SAMPLE_LAB_STATS;
 
+    const requestedTemplate =
+      searchParams.get("template") ||
+      searchParams.get("templateId") ||
+      clinic.template_id ||
+      clinic.templateId ||
+      "klinik-minimal";
+
     const pdfPlanData: PdfPlanData = {
-      templateId: (clinic.template_id || clinic.templateId || "klinik-minimal") as TemplateId,
+      templateId: requestedTemplate as TemplateId,
       paletteKey: (clinic.palette || plan.palette || "navy") as PaletteKey,
       palette: (clinic.palette || plan.palette || "navy") as PaletteKey,
       clinicName: clinic.name || "Wise Dental Clinic",

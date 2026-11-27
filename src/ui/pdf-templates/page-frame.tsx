@@ -22,20 +22,24 @@ export function normalizeTemplateId(id?: string): TemplateId {
   if (!id) return "klinik-minimal";
   const s = String(id).toLowerCase().trim();
   switch (s) {
+    case "modern":
     case "modern-geometric":
+    case "prestige-minimal":
       return "modern-geometric";
+    case "nature":
     case "botanical-serenity":
     case "botanical-aesthetic":
       return "botanical-serenity";
+    case "soft":
     case "liquid-art":
     case "pediatric-joy":
       return "liquid-art";
+    case "premium":
     case "noir-gold":
       return "noir-gold";
+    case "tekno":
     case "royal-gold":
       return "royal-gold";
-    case "prestige-minimal":
-      return "modern-geometric";
     case "klinik-minimal":
     case "classic-ribbon":
     case "executive-split":
