@@ -10,6 +10,8 @@ export function Booklet24Page13PermanentBridge({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
@@ -27,10 +29,20 @@ export function Booklet24Page13PermanentBridge({
             className="text-[24px] font-extrabold italic text-right mb-5"
             style={{ color: themeColor }}
           >
-            {isEn ? "Fitting the Permanent Bridge" : "Kalıcı Köprü Protezin Uygulanması"}
+            {isAr
+              ? "تركيب الجسر الدائم"
+              : isRu
+              ? "Установка постоянного моста"
+              : isEn
+              ? "Fitting the Permanent Bridge"
+              : "Kalıcı Köprü Protezin Uygulanması"}
           </h2>
           <p className="text-[15px] leading-[1.6] text-[#222222] text-justify">
-            {isEn
+            {isAr
+              ? "بعد انتهاء فترة التئام العظام (4-6 أشهر) — دون الحاجة إلى أي جراحة إضافية — تتم إزالة التركيبات المؤقتة الثابتة ويتم تصنيع وتركيب جسر الزركونيا الدائم خلال 5 أيام."
+              : isRu
+              ? "После завершения периода остеоинтеграции (4–6 месяцев) — без дополнительного хирургического вмешательства — временный протез снимается, и в течение 5 дней изготавливается постоянный циркониевый мост."
+              : isEn
               ? "Following the healing period (4-6 months) - without any need for further surgery - the temporary fixed dentures is removed and a 12 unit bridge is created within 5 days."
               : "İyileşme sürecinin (4-6 ay) tamamlanmasının ardından — herhangi bir ek cerrahi işleme gerek duyulmaksızın — sabit geçici protezler çıkarılır ve 5 gün içerisinde 12 üyeli kalıcı porselen/zirkonyum köprünüz hazırlanarak uygulanır."}
           </p>
@@ -41,10 +53,20 @@ export function Booklet24Page13PermanentBridge({
             className="text-[24px] font-extrabold italic text-right mb-5"
             style={{ color: themeColor }}
           >
-            {isEn ? "Check-up Protocol" : "Kontrol ve Takip Protokolü"}
+            {isAr
+              ? "بروتوكول المتابعة والفحص"
+              : isRu
+              ? "Протокол наблюдения и осмотра"
+              : isEn
+              ? "Check-up Protocol"
+              : "Kontrol ve Takip Protokolü"}
           </h2>
           <p className="text-[15px] leading-[1.6] text-[#222222] text-justify mb-6">
-            {isEn
+            {isAr
+              ? "الفحوصات الدورية ضرورية لضمان النجاح طويل الأمد لزراعة الأسنان والجسور. تم تصميم بروتوكولنا للحفاظ على تركيباتكم في أفضل حالة:"
+              : isRu
+              ? "Регулярные осмотры необходимы для долговечности дентальных имплантатов и мостовидных протезов. Что мы проверяем на контрольных визитах:"
+              : isEn
               ? "Regular check-ups are essential to ensure the long-term success of your dental implants and bridges. Our protocol is designed to keep your restorations in top condition and detect any issues early. What We Check:"
               : "Düzenli kontroller, dental implantlarınızın ve köprü protezlerinizin uzun yıllar sağlıklı kalması için büyük önem taşır. Protokolümüz restorasyonlarınızı en üst kondisyonda tutmak üzere tasarlanmıştır. Kontrollerde İncelenenler:"}
           </p>
@@ -52,40 +74,80 @@ export function Booklet24Page13PermanentBridge({
           <div className="space-y-5 text-[15px] leading-[1.58] text-[#222222] text-justify">
             <p>
               <span className="font-bold text-black">
-                {isEn ? "Implant Stability" : "İmplant Stabilitesi"}
+                {isAr
+                  ? "ثبات الغرسات"
+                  : isRu
+                  ? "Стабильность имплантатов"
+                  : isEn
+                  ? "Implant Stability"
+                  : "İmplant Stabilitesi"}
               </span>{" "}
               –{" "}
-              {isEn
+              {isAr
+                ? "التأكد من اندماج الغرسة بالكامل وثباتها في عظم الفك."
+                : isRu
+                ? "Проверка полной остеоинтеграции и надежной фиксации имплантата."
+                : isEn
                 ? "Ensuring the implant is fully integrated and secure."
                 : "İmplantın çene kemiğiyle tam kaynaştığının ve stabilitesinin doğrulanması."}
             </p>
 
             <p>
               <span className="font-bold text-black">
-                {isEn ? "Gum & Bone Health" : "Diş Eti ve Kemik Sağlığı"}
+                {isAr
+                  ? "صحة اللثة والعظام"
+                  : isRu
+                  ? "Здоровье десен и костной ткани"
+                  : isEn
+                  ? "Gum & Bone Health"
+                  : "Diş Eti ve Kemik Sağlığı"}
               </span>{" "}
               –{" "}
-              {isEn
+              {isAr
+                ? "فحص الأنسجة للتأكد من عدم وجود التهاب أو فقدان للعظام."
+                : isRu
+                ? "Контроль тканей на отсутствие воспаления или резорбции кости."
+                : isEn
                 ? "Checking for inflammation, infection, or bone loss."
                 : "Enflamasyon, enfeksiyon veya kemik kaybı belirtilerine karşı doku kontrolü."}
             </p>
 
             <p>
               <span className="font-bold text-black">
-                {isEn ? "Bridge Integrity" : "Köprü Bütünlüğü"}
+                {isAr
+                  ? "سلامة الجسر والإطباق"
+                  : isRu
+                  ? "Целостность моста и прикус"
+                  : isEn
+                  ? "Bridge Integrity"
+                  : "Köprü Bütünlüğü"}
               </span>{" "}
               –{" "}
-              {isEn
+              {isAr
+                ? "تقييم تطابق الإطباق والتآكل وإجراء أي تعديلات لازمة."
+                : isRu
+                ? "Оценка прилегания, износа и окклюзионного баланса."
+                : isEn
                 ? "Assessing fit, wear, and any necessary adjustments."
                 : "Kapanış uyumunun, aşınma durumunun ve gerekli oklüzal ayarların incelenmesi."}
             </p>
 
             <p>
               <span className="font-bold text-black">
-                {isEn ? "Oral Hygiene Maintenance" : "Ağız Hijyeni Bakımı"}
+                {isAr
+                  ? "العناية بنظافة الفم"
+                  : isRu
+                  ? "Профессиональная гигиена"
+                  : isEn
+                  ? "Oral Hygiene Maintenance"
+                  : "Ağız Hijyeni Bakımı"}
               </span>{" "}
               –{" "}
-              {isEn
+              {isAr
+                ? "تنظيف احترافي لمنع تراكم البلاك حول الغرسات."
+                : isRu
+                ? "Профессиональная чистка для предотвращения налета вокруг имплантатов."
+                : isEn
                 ? "Professional cleaning to prevent plaque buildup around the implant."
                 : "İmplant çevresinde plak birikimini önlemek için profesyonel klinik temizlik."}
             </p>

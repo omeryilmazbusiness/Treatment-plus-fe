@@ -10,6 +10,8 @@ export function Booklet24Page22Hotel({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
@@ -19,8 +21,24 @@ export function Booklet24Page22Hotel({
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "YOUR STAY WITH US" : "KONAKLAMA & KONFOR"}
-        title={isEn ? "THE HOTEL" : "OTELİNİZ"}
+        eyebrow={
+          isAr
+            ? "إقامتكم معنا"
+            : isRu
+            ? "ВАШЕ ПРОЖИВАНИЕ"
+            : isEn
+            ? "YOUR STAY WITH US"
+            : "KONAKLAMA & KONFOR"
+        }
+        title={
+          isAr
+            ? "الفندق"
+            : isRu
+            ? "ОТЕЛЬ"
+            : isEn
+            ? "THE HOTEL"
+            : "OTELİNİZ"
+        }
         themeColor={themeColor}
       />
 

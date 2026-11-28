@@ -14,6 +14,8 @@ export function Booklet24Page24BackCover({
   const visuals = getTemplateVisuals(data.templateId, palette);
   const isCustomTheme = visuals.templateId !== "klinik-minimal";
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const clinicName = (data.clinicName || "Wise Dental").trim();
   const slogan = data.slogan || data.clinicSlogan || "Every Smile Matters!!";
 
@@ -63,12 +65,12 @@ export function Booklet24Page24BackCover({
       sloganColor: "#785C12",
     },
     "liquid-art": {
-      headingColor: "#4A356B",
-      bodyColor: "#5B4B73",
-      logoColor: "#EC4899",
-      brandPrimary: "#4A356B",
-      brandSecondary: "#DB2777",
-      sloganColor: "#6B538C",
+      headingColor: "#4A3441",
+      bodyColor: "#6A5260",
+      logoColor: "#B5838D",
+      brandPrimary: "#4A3441",
+      brandSecondary: "#9C6F7E",
+      sloganColor: "#7A6070",
     },
     "botanical-serenity": {
       headingColor: "#2D4A36",
@@ -108,7 +110,13 @@ export function Booklet24Page24BackCover({
             className="text-[19px] font-bold tracking-tight mb-1"
             style={{ color: headingCol }}
           >
-            {isEn ? "Clinic Address" : "Klinik Adresi"}
+            {isAr
+              ? "عنوان العيادة"
+              : isRu
+              ? "Адрес клиники"
+              : isEn
+              ? "Clinic Address"
+              : "Klinik Adresi"}
           </h3>
           <p
             className="text-[18px] font-extralight max-w-[460px] leading-snug"
@@ -123,7 +131,7 @@ export function Booklet24Page24BackCover({
             className="text-[19px] font-bold tracking-tight mb-1"
             style={{ color: headingCol }}
           >
-            {isEn ? "Phone" : "Telefon"}
+            {isAr ? "الهاتف" : isRu ? "Телефон" : isEn ? "Phone" : "Telefon"}
           </h3>
           <p className="text-[18px] font-extralight" style={{ color: bodyCol }}>
             {phone}
@@ -135,7 +143,13 @@ export function Booklet24Page24BackCover({
             className="text-[19px] font-bold tracking-tight mb-1"
             style={{ color: headingCol }}
           >
-            {isEn ? "Email" : "E-posta"}
+            {isAr
+              ? "البريد الإلكتروني"
+              : isRu
+              ? "Эл. почта"
+              : isEn
+              ? "Email"
+              : "E-posta"}
           </h3>
           <p className="text-[18px] font-extralight" style={{ color: bodyCol }}>
             {email}
@@ -147,7 +161,13 @@ export function Booklet24Page24BackCover({
             className="text-[19px] font-bold tracking-tight mb-1"
             style={{ color: headingCol }}
           >
-            {isEn ? "Website" : "Web Sitesi"}
+            {isAr
+              ? "الموقع الإلكتروني"
+              : isRu
+              ? "Веб-сайт"
+              : isEn
+              ? "Website"
+              : "Web Sitesi"}
           </h3>
           <p className="text-[18px] font-extralight" style={{ color: bodyCol }}>
             {website}
@@ -159,17 +179,33 @@ export function Booklet24Page24BackCover({
             className="text-[19px] font-bold tracking-tight mb-1"
             style={{ color: headingCol }}
           >
-            {isEn ? "Opening Hours" : "Çalışma Saatleri"}
+            {isAr
+              ? "ساعات العمل"
+              : isRu
+              ? "Часы работы"
+              : isEn
+              ? "Opening Hours"
+              : "Çalışma Saatleri"}
           </h3>
           <p
             className="text-[18px] font-extralight leading-snug"
             style={{ color: bodyCol }}
           >
-            {isEn
+            {isAr
+              ? "الإثنين – الجمعة: 10:00–19:00"
+              : isRu
+              ? "Понедельник – Пятница: 10:00–19:00"
+              : isEn
               ? "Monday – Friday: 10:00–19:00"
               : "Pazartesi – Cuma: 10:00–19:00"}
             <br />
-            {isEn ? "Saturday – Sunday: Closed" : "Cumartesi – Pazar: Kapalı"}
+            {isAr
+              ? "السبت – الأحد: مغلق"
+              : isRu
+              ? "Суббота – Воскресенье: Закрыто"
+              : isEn
+              ? "Saturday – Sunday: Closed"
+              : "Cumartesi – Pazar: Kapalı"}
           </p>
         </div>
       </div>

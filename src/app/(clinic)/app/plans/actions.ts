@@ -150,7 +150,7 @@ export type SavePlanPayload = {
   workspaceId?: string;
   title: string;
   palette?: "navy" | "forest" | "rose" | "slate";
-  locale?: "tr" | "en";
+  locale?: "tr" | "en" | "ar" | "ru";
   currency?: "TRY" | "EUR" | "USD";
   diagnoses: string[];
   situation?: Situation;

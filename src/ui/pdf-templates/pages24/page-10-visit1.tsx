@@ -12,6 +12,8 @@ export function Booklet24Page10Visit1({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const curr = data.currency || "EUR";
   const themeColor = getThemeColor(palette, "#0b2938");
 
@@ -35,8 +37,24 @@ export function Booklet24Page10Visit1({
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "YOUR PLAN" : "TEDAVİ PLANINIZ"}
-        title={isEn ? "1ST VISIT" : "1. SEANS"}
+        eyebrow={
+          isAr
+            ? "خطة العلاج"
+            : isRu
+            ? "ВАШ ПЛАН"
+            : isEn
+            ? "YOUR PLAN"
+            : "TEDAVİ PLANINIZ"
+        }
+        title={
+          isAr
+            ? "الزيارة الأولى"
+            : isRu
+            ? "1-Й ВИЗИТ"
+            : isEn
+            ? "1ST VISIT"
+            : "1. SEANS"
+        }
         themeColor={themeColor}
       />
 
@@ -56,7 +74,13 @@ export function Booklet24Page10Visit1({
         <div className="bg-[#F2F2F2] px-3.5 py-2.5 flex items-center justify-between mb-1">
           <h2 className="text-[15.5px] font-bold text-black">
             {visit1?.title ||
-              (isEn ? "1st Visit: Planned Treatments" : "1. Seans: Planlanan Tedaviler")}
+              (isAr
+                ? "الزيارة الأولى: العلاجات المخططة"
+                : isRu
+                ? "1-й Визит: Запланированное лечение"
+                : isEn
+                ? "1st Visit: Planned Treatments"
+                : "1. Seans: Planlanan Tedaviler")}
           </h2>
           <span className="text-[16px] font-bold text-black">
             {formatCurrency(phaseTotal, curr, data.locale)}
@@ -65,18 +89,32 @@ export function Booklet24Page10Visit1({
 
         {/* Tablo Başlıkları */}
         <div className="grid grid-cols-12 text-[11.5px] text-slate-500 font-semibold px-3.5 py-2 border-b border-slate-200">
-          <span className="col-span-5">{isEn ? "Treatment" : "Tedavi"}</span>
-          <span className="col-span-2 text-center">{isEn ? "Teeth" : "Diş No"}</span>
-          <span className="col-span-1 text-center">{isEn ? "Qty" : "Adet"}</span>
-          <span className="col-span-2 text-right">{isEn ? "Unit price" : "Birim fiyat"}</span>
-          <span className="col-span-2 text-right">{isEn ? "Price" : "Tutar"}</span>
+          <span className="col-span-5">
+            {isAr ? "العلاج" : isRu ? "Процедура" : isEn ? "Treatment" : "Tedavi"}
+          </span>
+          <span className="col-span-2 text-center">
+            {isAr ? "الأسنان" : isRu ? "Зубы" : isEn ? "Teeth" : "Diş No"}
+          </span>
+          <span className="col-span-1 text-center">
+            {isAr ? "العدد" : isRu ? "Кол-во" : isEn ? "Qty" : "Adet"}
+          </span>
+          <span className="col-span-2 text-right">
+            {isAr ? "سعر الوحدة" : isRu ? "Цена за ед." : isEn ? "Unit price" : "Birim fiyat"}
+          </span>
+          <span className="col-span-2 text-right">
+            {isAr ? "الإجمالي" : isRu ? "Сумма" : isEn ? "Price" : "Tutar"}
+          </span>
         </div>
 
         {/* Kalemler */}
         <div className="divide-y divide-slate-200/80 text-[12px] text-black">
           {visit1Items.length === 0 ? (
             <div className="py-6 text-center text-slate-400 text-xs">
-              {isEn
+              {isAr
+                ? "لم تتم إضافة عناصر علاج لهذه الزيارة."
+                : isRu
+                ? "Для этого визита процедуры не добавлены."
+                : isEn
                 ? "No treatment items added to this visit."
                 : "Bu seans için henüz tedavi kalemi eklenmedi."}
             </div>
@@ -101,7 +139,7 @@ export function Booklet24Page10Visit1({
                       {item.treatmentName || item.name}
                       {item.isPackage && (
                         <span className="ml-1.5 text-[10px] font-bold text-slate-500">
-                          ({isEn ? "Package" : "Paket"})
+                          ({isAr ? "باقة" : isRu ? "Пакет" : isEn ? "Package" : "Paket"})
                         </span>
                       )}
                     </p>
@@ -122,7 +160,11 @@ export function Booklet24Page10Visit1({
                   </span>
                   <span className="col-span-2 text-right font-semibold text-black">
                     {item.isPackage
-                      ? isEn
+                      ? isAr
+                        ? "مشمول"
+                        : isRu
+                        ? "Включено"
+                        : isEn
                         ? "Included"
                         : "Paket İçi"
                       : formatCurrency(lineAmount, curr, data.locale)}

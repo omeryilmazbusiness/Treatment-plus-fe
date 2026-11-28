@@ -418,7 +418,7 @@ export function ClinicSettingsClient({
               </p>
 
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {/* Dil Seçimi (tr | en) */}
+                {/* Dil Seçimi (tr | en | ar | ru) */}
                 <div>
                   <label className="block text-xs font-semibold text-ink-soft">
                     Belge Dili
@@ -445,6 +445,28 @@ export function ClinicSettingsClient({
                       }`}
                     >
                       🇬🇧 English (en)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFieldChange("locale", "ar")}
+                      className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+                        settings.locale === "ar"
+                          ? "border-teal bg-teal/10 text-teal font-semibold shadow-xs"
+                          : "border-line bg-paper text-ink hover:border-teal/50"
+                      }`}
+                    >
+                      🇸🇦 Arabic (ar)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFieldChange("locale", "ru")}
+                      className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
+                        settings.locale === "ru"
+                          ? "border-teal bg-teal/10 text-teal font-semibold shadow-xs"
+                          : "border-line bg-paper text-ink hover:border-teal/50"
+                      }`}
+                    >
+                      🇷🇺 Russia (ru)
                     </button>
                   </div>
                 </div>

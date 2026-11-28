@@ -61,36 +61,38 @@ export function normalizeToothCondition(raw?: string | null): PdfToothCondition 
 
 export function getConditionLabel(
   cond: PdfToothCondition,
-  locale: "tr" | "en" = "tr",
+  locale: "tr" | "en" | "ar" | "ru" = "tr",
   customNote?: string
 ): string {
   const isEn = locale === "en";
+  const isAr = locale === "ar";
+  const isRu = locale === "ru";
   let base = "";
   switch (cond) {
     case "missing":
-      base = isEn ? "Missing" : "Eksik Diş";
+      base = isAr ? "مفقود" : isRu ? "Отсутствует" : isEn ? "Missing" : "Eksik Diş";
       break;
     case "filled":
-      base = isEn ? "Filled" : "Dolgulu";
+      base = isAr ? "حشوة" : isRu ? "Пломба" : isEn ? "Filled" : "Dolgulu";
       break;
     case "caries":
-      base = isEn ? "Caries / Decay" : "Çürük";
+      base = isAr ? "تسوس" : isRu ? "Кариес" : isEn ? "Caries / Decay" : "Çürük";
       break;
     case "root_canal":
-      base = isEn ? "Root Canal Treated" : "Kanal Tedavili";
+      base = isAr ? "علاج الجذور" : isRu ? "Канал" : isEn ? "Root Canal Treated" : "Kanal Tedavili";
       break;
     case "implant":
-      base = isEn ? "Implant" : "İmplant";
+      base = isAr ? "زراعة" : isRu ? "Имплантат" : isEn ? "Implant" : "İmplant";
       break;
     case "crown":
-      base = isEn ? "Crown" : "Kuron Kaplama";
+      base = isAr ? "تاج" : isRu ? "Коронка" : isEn ? "Crown" : "Kuron Kaplama";
       break;
     case "bridge":
-      base = isEn ? "Bridge" : "Köprü";
+      base = isAr ? "جسر" : isRu ? "Мост" : isEn ? "Bridge" : "Köprü";
       break;
     case "intact":
     default:
-      base = isEn ? "Intact" : "Sağlam";
+      base = isAr ? "سليم" : isRu ? "Здоров" : isEn ? "Intact" : "Sağlam";
       break;
   }
   if (customNote && customNote.trim() && customNote.trim().toLowerCase() !== base.toLowerCase()) {
@@ -124,7 +126,7 @@ export function resolvePatientDiagnosisMap(data: PdfPlanData): Record<
   for (const tooth of ALL_FDI_TEETH) {
     result[tooth] = {
       condition: "intact",
-      label: isEn ? "Intact" : "Sağlam",
+      label: getConditionLabel("intact", data.locale),
     };
   }
 
@@ -271,6 +273,8 @@ export function PdfCurrentSituationOdontogram({
   data: PdfPlanData;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const diagMap = resolvePatientDiagnosisMap(data);
 
   const conditionCounts = ALL_FDI_TEETH.reduce(
@@ -283,14 +287,14 @@ export function PdfCurrentSituationOdontogram({
   );
 
   const legendItems: { key: PdfToothCondition; label: string; dot: string }[] = [
-    { key: "intact", label: isEn ? "Intact" : "Sağlam", dot: "bg-emerald-500" },
-    { key: "missing", label: isEn ? "Missing" : "Eksik", dot: "bg-rose-500" },
-    { key: "caries", label: isEn ? "Caries" : "Çürük", dot: "bg-amber-600" },
-    { key: "filled", label: isEn ? "Filled" : "Dolgulu", dot: "bg-sky-500" },
-    { key: "root_canal", label: isEn ? "Root Canal" : "Kanal", dot: "bg-purple-500" },
-    { key: "crown", label: isEn ? "Crown" : "Kuron", dot: "bg-amber-400" },
-    { key: "bridge", label: isEn ? "Bridge" : "Köprü", dot: "bg-indigo-500" },
-    { key: "implant", label: isEn ? "Implant" : "İmplant", dot: "bg-teal-500" },
+    { key: "intact", label: getConditionLabel("intact", data.locale), dot: "bg-emerald-500" },
+    { key: "missing", label: getConditionLabel("missing", data.locale), dot: "bg-rose-500" },
+    { key: "caries", label: getConditionLabel("caries", data.locale), dot: "bg-amber-600" },
+    { key: "filled", label: getConditionLabel("filled", data.locale), dot: "bg-sky-500" },
+    { key: "root_canal", label: getConditionLabel("root_canal", data.locale), dot: "bg-purple-500" },
+    { key: "crown", label: getConditionLabel("crown", data.locale), dot: "bg-amber-400" },
+    { key: "bridge", label: getConditionLabel("bridge", data.locale), dot: "bg-indigo-500" },
+    { key: "implant", label: getConditionLabel("implant", data.locale), dot: "bg-teal-500" },
   ];
 
   const renderArchRow = (teeth: readonly string[], jaw: "upper" | "lower") => {
@@ -376,7 +380,13 @@ export function PdfCurrentSituationOdontogram({
       {/* Üst Başlık ve Durum Lejantı */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
-          {isEn ? "Clinical FDI Dental Chart (Diagnosis)" : "Klinik FDI Diş Şeması (Hekim Teşhisi)"}
+          {isAr
+            ? "مخطط الأسنان السريري FDI (التشخيص)"
+            : isRu
+            ? "Клиническая зубная карта FDI (Диагноз)"
+            : isEn
+            ? "Clinical FDI Dental Chart (Diagnosis)"
+            : "Klinik FDI Diş Şeması (Hekim Teşhisi)"}
         </span>
         <div className="flex flex-wrap items-center gap-2.5">
           {legendItems
@@ -400,10 +410,10 @@ export function PdfCurrentSituationOdontogram({
         {/* Oklüzal Yatay & Orta Hat Çizgisi */}
         <div className="my-1.5 border-t border-slate-300/80 relative flex items-center justify-between px-1">
           <span className="text-[8.5px] font-bold uppercase tracking-widest text-slate-400 bg-white pr-2">
-            {isEn ? "RIGHT (R)" : "SAĞ (R)"}
+            {isAr ? "اليمين (R)" : isRu ? "ПРАВО (R)" : isEn ? "RIGHT (R)" : "SAĞ (R)"}
           </span>
           <span className="text-[8.5px] font-bold uppercase tracking-widest text-slate-400 bg-white pl-2">
-            {isEn ? "LEFT (L)" : "SOL (L)"}
+            {isAr ? "اليسار (L)" : isRu ? "ЛЕВО (L)" : isEn ? "LEFT (L)" : "SOL (L)"}
           </span>
         </div>
 
@@ -431,6 +441,8 @@ export function PdfVisitOdontogram({
   visit?: PlanVisit;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const diagMap = resolvePatientDiagnosisMap(data);
 
   // Bu seansta hangi dişlere hangi işlem uygulanıyor?
@@ -684,22 +696,50 @@ export function PdfVisitOdontogram({
     <div className="w-full bg-white rounded-2xl px-4 py-2.5 border border-slate-200/80 shadow-2xs">
       <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5">
         <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-700">
-          {isEn
+          {isAr
+            ? `خريطة الأسنان للزيارة ${visitIndex + 1} (التشخيص والخطة)`
+            : isRu
+            ? `Зубная карта визита ${visitIndex + 1} (Диагноз и план)`
+            : isEn
             ? `Visit ${visitIndex + 1} Dental Map (Based on Diagnosis & Plan)`
             : `${visitIndex + 1}. Seans Diş Haritası (Teşhis & Tedavi Planı)`}
         </span>
         <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-600">
           <span className="inline-flex items-center gap-1">
             <span className="w-2 h-2 size-2 rounded-full bg-[#10b981]" />
-            <span>{isEn ? "Planned in this visit" : "Bu seansta işlem gören"}</span>
+            <span>
+              {isAr
+                ? "مخطط في هذه الزيارة"
+                : isRu
+                ? "Лечение в этот визит"
+                : isEn
+                ? "Planned in this visit"
+                : "Bu seansta işlem gören"}
+            </span>
           </span>
           <span className="inline-flex items-center gap-1">
             <span className="w-2 h-2 size-2 rounded-full bg-rose-500" />
-            <span>{isEn ? "Missing / Extraction" : "Eksik / Çekim"}</span>
+            <span>
+              {isAr
+                ? "مفقود / خلع"
+                : isRu
+                ? "Отсутствует / Удаление"
+                : isEn
+                ? "Missing / Extraction"
+                : "Eksik / Çekim"}
+            </span>
           </span>
           <span className="inline-flex items-center gap-1">
             <span className="w-2 h-2 size-2 rounded-full bg-slate-300" />
-            <span>{isEn ? "Existing tooth" : "Mevcut diş durumu"}</span>
+            <span>
+              {isAr
+                ? "حالة السن الحالية"
+                : isRu
+                ? "Текущее состояние"
+                : isEn
+                ? "Existing tooth"
+                : "Mevcut diş durumu"}
+            </span>
           </span>
         </div>
       </div>
@@ -710,10 +750,10 @@ export function PdfVisitOdontogram({
       {/* Orta Hat */}
       <div className="my-1 border-t border-slate-300/80 relative flex items-center justify-between px-1">
         <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400 bg-white pr-2">
-          {isEn ? "RIGHT (R)" : "SAĞ (R)"}
+          {isAr ? "اليمين (R)" : isRu ? "ПРАВО (R)" : isEn ? "RIGHT (R)" : "SAĞ (R)"}
         </span>
         <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400 bg-white pl-2">
-          {isEn ? "LEFT (L)" : "SOL (L)"}
+          {isAr ? "اليسار (L)" : isRu ? "ЛЕВО (L)" : isEn ? "LEFT (L)" : "SOL (L)"}
         </span>
       </div>
 

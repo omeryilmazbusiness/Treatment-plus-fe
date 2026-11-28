@@ -10,25 +10,49 @@ export function Booklet24Page6Doctor({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
   const doctorName = data.doctorName || "Dr. Peter";
   const doctorTitle =
     data.doctorTitle ||
-    (isEn
+    (isAr
+      ? "خبير في نظام زراعة الأسنان السويسري للتحميل الفوري"
+      : isRu
+      ? "Эксперт швейцарской системы имплантации с немедленной нагрузкой"
+      : isEn
       ? "Master of the Swiss immediate loading implant system"
       : "İsviçre Hemen Yüklemeli İmplant Sistemleri Uzmanı");
 
   const stat1 = data.doctorStats?.[0] || {
     value: "25",
-    label: isEn ? "years of\nexperience" : "yıl klinik\ndeneyim",
+    label: isAr
+      ? "عاماً من\nالخبرة"
+      : isRu
+      ? "лет клинического\nопыта"
+      : isEn
+      ? "years of\nexperience"
+      : "yıl klinik\ndeneyim",
   };
   const stat2 = data.doctorStats?.[1] || {
     value: "1,500",
-    label: isEn ? "smiles\nrestored" : "yenilenen\ngülüş",
+    label: isAr
+      ? "ابتسامة\nمجددة"
+      : isRu
+      ? "восстановленных\nулыбок"
+      : isEn
+      ? "smiles\nrestored"
+      : "yenilenen\ngülüş",
   };
   const stat3 = data.doctorStats?.[2] || {
     value: "16k",
-    label: isEn ? "implants\nplaced" : "başarılı\nimplant",
+    label: isAr
+      ? "زراعة أسنان\nناجحة"
+      : isRu
+      ? "установленных\nимплантатов"
+      : isEn
+      ? "implants\nplaced"
+      : "başarılı\nimplant",
   };
 
   return (
@@ -38,7 +62,15 @@ export function Booklet24Page6Doctor({
     >
       {/* 1. Eğimli Başlık Bandı */}
       <WiseHeader
-        eyebrow={isEn ? "YOUR IMPLANTOLOGIST" : "İMPLANTOLOJİ UZMANINIZ"}
+        eyebrow={
+          isAr
+            ? "أخصائي زراعة الأسنان"
+            : isRu
+            ? "ВАШ ХИРУРГ-ИМПЛАНТОЛОГ"
+            : isEn
+            ? "YOUR IMPLANTOLOGIST"
+            : "İMPLANTOLOJİ UZMANINIZ"
+        }
         title={doctorName.toUpperCase()}
         themeColor={themeColor}
       />
@@ -59,7 +91,23 @@ export function Booklet24Page6Doctor({
             ) : (
               <>
                 <p>
-                  {isEn ? (
+                  {isAr ? (
+                    <>
+                      تخرج من كلية الطب وعلوم الصحة في عام 2000،{" "}
+                      <span className="font-bold text-black">
+                        وتخصص في زراعة الأسنان القاعدية والفورية
+                      </span>{" "}
+                      بأحدث الأنظمة الجراحية العالمية.
+                    </>
+                  ) : isRu ? (
+                    <>
+                      Окончил стоматологический факультет Медицинского университета в 2000 году (D.D.S, D.M.D).{" "}
+                      <span className="font-bold text-black">
+                        Специализируется на базальной и дентальной имплантологии
+                      </span>{" "}
+                      — системах с немедленной нагрузкой.
+                    </>
+                  ) : isEn ? (
                     <>
                       Graduated from the University of Debrecen Medical and Health Science Centre in 2000 (D.D.S, D.M.D){" "}
                       <span className="font-bold text-black">
@@ -78,7 +126,23 @@ export function Booklet24Page6Doctor({
                   )}
                 </p>
                 <p>
-                  {isEn ? (
+                  {isAr ? (
+                    <>
+                      لديه اهتمام خاص{" "}
+                      <span className="font-bold text-black">وتدريب متقدم</span> في جراحة الزراعة الموجهة Nobel Guide وAnkylos وStraumann، وقد بنى{" "}
+                      <span className="font-bold text-black">
+                        سمعة دولية مرموقة لأعلى معايير رعاية الأسنان.
+                      </span>
+                    </>
+                  ) : isRu ? (
+                    <>
+                      Прошел{" "}
+                      <span className="font-bold text-black">повышение квалификации</span> по навигационной хирургии Nobel Guide, системам Ankylos и Straumann. Завоевал{" "}
+                      <span className="font-bold text-black">
+                        высокую международную репутацию благодаря безупречным стандартам лечения.
+                      </span>
+                    </>
+                  ) : isEn ? (
                     <>
                       He has special interest and{" "}
                       <span className="font-bold text-black">advanced training</span> in Nobel Guide Implant Surgery, Ankylos and Straumann. He has built a considerable{" "}

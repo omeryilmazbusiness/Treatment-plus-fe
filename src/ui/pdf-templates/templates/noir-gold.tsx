@@ -12,6 +12,8 @@ export function NoirGoldTemplate({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const curr = data.currency || "TRY";
 
   const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.isPackage ? 0 : it.amount || 0), 0);
@@ -55,22 +57,40 @@ export function NoirGoldTemplate({
               {data.clinicName || "Noir Gold Dental Excellence"}
             </h1>
             <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-[#F5C842]">
-              {isEn ? "EXCLUSIVE PRIVATE DENTAL CARE" : "KİŞİYE ÖZEL LÜKS DİŞ CERRAHİSİ"}
+              {isAr
+                ? "رعاية وجراحة الأسنان الفاخرة"
+                : isRu
+                ? "ЭКСКЛЮЗИВНАЯ СТОМАТОЛОГИЧЕСКАЯ ХИРУРГИЯ"
+                : isEn
+                ? "EXCLUSIVE PRIVATE DENTAL CARE"
+                : "KİŞİYE ÖZEL LÜKS DİŞ CERRAHİSİ"}
             </p>
           </div>
         </div>
 
         <div className="text-right">
           <span className="text-[9px] font-mono tracking-wider uppercase text-[#F5C842] block font-bold">
-            {isEn ? "1-PAGE SUMMARY" : "1 SAYFALIK ÖZET PLAN"}
+            {isAr
+              ? "ملخص صفحة واحدة"
+              : isRu
+              ? "СВОДКА НА 1 СТРАНИЦЕ"
+              : isEn
+              ? "1-PAGE SUMMARY"
+              : "1 SAYFALIK ÖZET PLAN"}
           </span>
           <h2
             className="text-lg font-black uppercase text-white"
             style={{ fontFamily: palette.headingFont }}
           >
-            {isEn ? "TREATMENT PLAN" : "TEDAVİ PLANI"}
+            {isAr
+              ? "خطة العلاج"
+              : isRu
+              ? "ПЛАН ЛЕЧЕНИЯ"
+              : isEn
+              ? "TREATMENT PLAN"
+              : "TEDAVİ PLANI"}
           </h2>
-          <span className="text-[10px] font-mono text-slate-400 block">{data.date}</span>
+          <span className="text-[10px] font-mono text-slate-400 block">{data.dateStr || data.date}</span>
         </div>
       </div>
 

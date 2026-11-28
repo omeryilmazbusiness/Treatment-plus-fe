@@ -146,8 +146,11 @@ export function ClassicPlanClient({
   // Plan presentation & header states
   const [title, setTitle] = useState(plan.title || "Tedavi Planı");
   const palette = plan.palette || clinicSettings?.palette || "navy";
-  const [locale] = useState<"tr" | "en">(
-    plan.locale || clinicSettings?.locale || "tr"
+  const [locale] = useState<"tr" | "en" | "ar" | "ru">(
+    (clinicSettings?.locale && clinicSettings.locale !== "tr" ? clinicSettings.locale : "") ||
+    plan.locale ||
+    clinicSettings?.locale ||
+    "tr"
   );
   const [currency, setCurrency] = useState<Currency>(
     plan.currency || clinicSettings?.currency || "TRY"
@@ -682,7 +685,8 @@ export function ClassicPlanClient({
   const handleDownloadPdf = async () => {
     try {
       setIsGeneratingPdf(true);
-      window.open(`/api/plans/${plan.id}/pdf`, "_blank");
+      const effectiveLocale = locale || clinicSettings?.locale || "tr";
+      window.open(`/api/plans/${plan.id}/pdf?locale=${encodeURIComponent(effectiveLocale)}`, "_blank");
     } finally {
       setIsGeneratingPdf(false);
     }

@@ -62,7 +62,7 @@ export interface TreatmentStudioProps {
   initialItems?: StudioPlanItem[];
   initialVisits?: StudioVisit[];
   initialCurrency?: "EUR" | "USD" | "TRY";
-  initialLocale?: "en" | "tr";
+  initialLocale?: "en" | "tr" | "ar" | "ru";
   planId?: string;
   planTitle?: string;
   onPlanTitleChange?: (title: string) => void;
@@ -208,7 +208,7 @@ export function TreatmentStudio({
   );
 
   // Locale & Currency
-  const [locale, setLocale] = useState<"en" | "tr">(initialLocale);
+  const [locale, setLocale] = useState<"en" | "tr" | "ar" | "ru">(initialLocale);
   const [currency, setCurrency] = useState<"EUR" | "USD" | "TRY">(initialCurrency);
 
   // Patient Info

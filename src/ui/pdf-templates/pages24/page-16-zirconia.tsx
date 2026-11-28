@@ -10,6 +10,8 @@ export function Booklet24Page16Zirconia({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
@@ -19,8 +21,24 @@ export function Booklet24Page16Zirconia({
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "WHY CHOOSE" : "NEDEN TERCİH EDİLMELİ"}
-        title={isEn ? "ZIRCONIA" : "ZİRKONYUM"}
+        eyebrow={
+          isAr
+            ? "لماذا نختار"
+            : isRu
+            ? "ПОЧЕМУ ВЫБИРАЮТ"
+            : isEn
+            ? "WHY CHOOSE"
+            : "NEDEN TERCİH EDİLMELİ"
+        }
+        title={
+          isAr
+            ? "الزركونيا"
+            : isRu
+            ? "ЦИРКОНИЙ"
+            : isEn
+            ? "ZIRCONIA"
+            : "ZİRKONYUM"
+        }
         themeColor={themeColor}
       />
 
@@ -28,7 +46,29 @@ export function Booklet24Page16Zirconia({
       <div className="flex-1 px-[76px] pt-[18px] select-none z-10">
         <div className="space-y-6 text-[15px] leading-[1.58] text-white/90 text-justify">
           <p>
-            {isEn ? (
+            {isAr ? (
+              <>
+                عندما يتعلق الأمر بتعويض الأسنان المفقودة أو المتضررة، فإننا نعطي الأولوية للحلول التي{" "}
+                <span className="font-bold text-white">
+                  تجمع بين القوة والجمال وطول العمر.
+                </span>{" "}
+                لذلك نوصي بجسور الزركونيا — الخيار الأمثل للمرضى الذين يرغبون في{" "}
+                <span className="font-bold text-white">
+                  ابتسامة طبيعية المظهر ومتينة دون أي تنازلات.
+                </span>
+              </>
+            ) : isRu ? (
+              <>
+                При восстановлении отсутствующих или поврежденных зубов мы отдаем приоритет решениям, которые{" "}
+                <span className="font-bold text-white">
+                  сочетают прочность, эстетику и долговечность.
+                </span>{" "}
+                Именно поэтому мы рекомендуем циркониевые мосты — премиальный выбор для пациентов, желающих получить{" "}
+                <span className="font-bold text-white">
+                  естественную и надежную улыбку без компромиссов.
+                </span>
+              </>
+            ) : isEn ? (
               <>
                 When it comes to restoring missing or damaged teeth, we prioritize solutions that{" "}
                 <span className="font-bold text-white">
@@ -55,7 +95,23 @@ export function Booklet24Page16Zirconia({
           </p>
 
           <p>
-            {isEn ? (
+            {isAr ? (
+              <>
+                يتميز الزركونيا بمقاومة عالية للكسر والتآكل، وبخلاف البدائل المعدنية فإنه يحاكي{" "}
+                <span className="font-bold text-white">
+                  شفافية الأسنان الطبيعية،
+                </span>{" "}
+                ولا يترك أي خطوط رمادية عند خط اللثة مع مرور الوقت.
+              </>
+            ) : isRu ? (
+              <>
+                Диоксид циркония обладает высокой устойчивостью к сколам и износу. В отличие от металлокерамики, циркониевые мосты воспроизводят{" "}
+                <span className="font-bold text-white">
+                  светопроницаемость натуральной эмали
+                </span>{" "}
+                и не образуют темного контура у десны со временем.
+              </>
+            ) : isEn ? (
               <>
                 Zirconium is highly resistant to fractures and wear, making it a long-lasting solution. Unlike metal-based alternatives, zirconium bridges mimic the{" "}
                 <span className="font-bold text-white">

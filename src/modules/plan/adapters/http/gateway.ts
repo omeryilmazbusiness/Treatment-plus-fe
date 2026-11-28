@@ -38,7 +38,7 @@ type RawPlan = {
   status: "draft" | "ready" | "sent" | "viewed" | "accepted" | "expired" | string;
   currency: string;
   palette?: "navy" | "forest" | "rose" | "slate";
-  locale?: "tr" | "en";
+  locale?: "tr" | "en" | "ar" | "ru";
   diagnoses: string[];
   situation?: RawSituation;
   totals_subtotal: number;

@@ -62,7 +62,28 @@ export function A4Document({
           primary: templateVisuals.primaryColor,
           accent: templateVisuals.accentColor,
         };
-  const normalizedData: PdfPlanData = { ...data, templateId };
+  // Kayıtta otomatik üretilen "<Klinik> · Dijital Tedavi Planlama" sloganında klinik adı zaten
+  // başlıkta büyükçe yazdığı için tekrar edilmez; yalnızca seçilen dildeki açıklama kalır.
+  const DEFAULT_SLOGAN_SUFFIX = " · Dijital Tedavi Planlama";
+  const localizeSlogan = (raw?: string): string | undefined => {
+    if (!raw || !raw.endsWith(DEFAULT_SLOGAN_SUFFIX)) return raw;
+    switch (data.locale) {
+      case "ar":
+        return "تخطيط العلاج الرقمي";
+      case "ru":
+        return "Цифровое планирование лечения";
+      case "en":
+        return "Digital Treatment Planning";
+      default:
+        return "Dijital Tedavi Planlama";
+    }
+  };
+  const normalizedData: PdfPlanData = {
+    ...data,
+    templateId,
+    slogan: localizeSlogan(data.slogan),
+    clinicSlogan: localizeSlogan(data.clinicSlogan),
+  };
 
   // 1 Sayfalık Hızlı Fiyat ve Tedavi Özeti Şablonu
   const renderSummaryTemplate = () => {
@@ -126,6 +147,8 @@ export function A4Document({
   return (
     <div
       id={id}
+      dir={data.locale === "ar" ? "rtl" : "ltr"}
+      lang={data.locale}
       className={`a4-document-root relative select-none ${className}`}
       style={{
         boxSizing: "border-box",
@@ -135,7 +158,19 @@ export function A4Document({
       <style
         dangerouslySetInnerHTML={{
           __html: `
-            @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&family=Dancing+Script:wght@500;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+            .a4-document-root[lang="ar"],
+            .a4-document-root[lang="ar"] * {
+              font-family: 'Cairo', 'Plus Jakarta Sans', system-ui, sans-serif !important;
+              letter-spacing: 0 !important;
+            }
+            .a4-document-root[lang="ar"] .uppercase {
+              text-transform: none !important;
+            }
+            .a4-document-root[lang="ar"] .italic {
+              font-style: normal !important;
+            }
             
             @media print {
               @page {

@@ -128,11 +128,25 @@ export const TEMPLATE_META = [
 
 export function formatCurrency(amount: number, currency: string = "TRY", locale?: string): string {
   const sym = currency === "EUR" ? "€" : currency === "USD" ? "$" : "₺";
-  const numLocale = locale === "en" ? "en-US" : "tr-TR";
+  const numLocale =
+    locale === "en"
+      ? "en-US"
+      : locale === "ar"
+      ? "ar-SA"
+      : locale === "ru"
+      ? "ru-RU"
+      : "tr-TR";
   return `${sym} ${Math.round(amount).toLocaleString(numLocale)}`;
 }
 
 export function formatNumber(amount: number, locale?: string): string {
-  const numLocale = locale === "en" ? "en-US" : "tr-TR";
+  const numLocale =
+    locale === "en"
+      ? "en-US"
+      : locale === "ar"
+      ? "ar-SA"
+      : locale === "ru"
+      ? "ru-RU"
+      : "tr-TR";
   return Math.round(amount).toLocaleString(numLocale);
 }

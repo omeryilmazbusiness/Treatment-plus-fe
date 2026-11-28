@@ -12,6 +12,8 @@ export function Booklet24Page12Visit2({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const curr = data.currency || "EUR";
   const themeColor = getThemeColor(palette, "#0b2938");
 
@@ -42,14 +44,22 @@ export function Booklet24Page12Visit2({
 
   const visit2Title =
     subsequentVisits.length > 1
-      ? `${visit2?.title || (isEn ? "2nd Visit" : "2. Seans")} & ${
-          isEn ? "Subsequent Phases" : "Diğer Aşamalar"
+      ? `${visit2?.title || (isAr ? "الزيارة الثانية" : isRu ? "2-й Визит" : isEn ? "2nd Visit" : "2. Seans")} & ${
+          isAr ? "المراحل التالية" : isRu ? "Последующие этапы" : isEn ? "Subsequent Phases" : "Diğer Aşamalar"
         }`
       : visit2?.title ||
         (hasSecondVisit
-          ? isEn
+          ? isAr
+            ? "الزيارة الثانية: التركيبات النهائية"
+            : isRu
+            ? "2-й Визит: Протезирование и завершение"
+            : isEn
             ? "2nd Visit: Prosthetic & Final Phase"
             : "2. Seans: Tamamlama Aşaması"
+          : isAr
+          ? "ملخص العلاج والتكلفة المالية"
+          : isRu
+          ? "Сводка лечения и финансовый расчет"
           : isEn
           ? "Treatment Summary & Financial Breakdown"
           : "Tedavi ve Finansal Bütçe Özeti");
@@ -60,12 +70,28 @@ export function Booklet24Page12Visit2({
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "YOUR PLAN" : "TEDAVİ PLANINIZ"}
+        eyebrow={
+          isAr
+            ? "خطة العلاج"
+            : isRu
+            ? "ВАШ ПЛАН"
+            : isEn
+            ? "YOUR PLAN"
+            : "TEDAVİ PLANINIZ"
+        }
         title={
           hasSecondVisit
-            ? isEn
+            ? isAr
+              ? "الزيارة الثانية"
+              : isRu
+              ? "2-Й ВИЗИТ"
+              : isEn
               ? "2ND VISIT"
               : "2. SEANS"
+            : isAr
+            ? "ملخص الخطة"
+            : isRu
+            ? "ИТОГИ ПЛАНА"
             : isEn
             ? "PLAN SUMMARY"
             : "PLAN ÖZETİ"
@@ -95,18 +121,32 @@ export function Booklet24Page12Visit2({
 
         {/* Tablo Başlıkları */}
         <div className="grid grid-cols-12 text-[11.5px] text-slate-500 font-semibold px-3.5 py-2 border-b border-slate-200">
-          <span className="col-span-5">{isEn ? "Treatment" : "Tedavi"}</span>
-          <span className="col-span-2 text-center">{isEn ? "Teeth" : "Diş No"}</span>
-          <span className="col-span-1 text-center">{isEn ? "Qty" : "Adet"}</span>
-          <span className="col-span-2 text-right">{isEn ? "Unit price" : "Birim fiyat"}</span>
-          <span className="col-span-2 text-right">{isEn ? "Price" : "Tutar"}</span>
+          <span className="col-span-5">
+            {isAr ? "العلاج" : isRu ? "Процедура" : isEn ? "Treatment" : "Tedavi"}
+          </span>
+          <span className="col-span-2 text-center">
+            {isAr ? "الأسنان" : isRu ? "Зубы" : isEn ? "Teeth" : "Diş No"}
+          </span>
+          <span className="col-span-1 text-center">
+            {isAr ? "العدد" : isRu ? "Кол-во" : isEn ? "Qty" : "Adet"}
+          </span>
+          <span className="col-span-2 text-right">
+            {isAr ? "سعر الوحدة" : isRu ? "Цена за ед." : isEn ? "Unit price" : "Birim fiyat"}
+          </span>
+          <span className="col-span-2 text-right">
+            {isAr ? "الإجمالي" : isRu ? "Сумма" : isEn ? "Price" : "Tutar"}
+          </span>
         </div>
 
         {/* Kalemler */}
         <div className="divide-y divide-slate-200/80 text-[12px] text-black mb-4">
           {(hasSecondVisit ? visit2Items : data.items || []).length === 0 ? (
             <div className="py-5 text-center text-slate-400 text-xs">
-              {isEn
+              {isAr
+                ? "يتم إكمال جميع الإجراءات المخططة في الزيارة الأولى."
+                : isRu
+                ? "Все запланированные процедуры выполняются в 1-й визит."
+                : isEn
                 ? "All planned procedures are completed in the 1st visit."
                 : "Planlanan tüm işlemler 1. seansta tamamlanmaktadır."}
             </div>
@@ -133,7 +173,7 @@ export function Booklet24Page12Visit2({
                         {item.treatmentName || item.name}
                         {item.isPackage && (
                           <span className="ml-1.5 text-[10px] font-bold text-slate-500">
-                            ({isEn ? "Package" : "Paket"})
+                            ({isAr ? "باقة" : isRu ? "Пакет" : isEn ? "Package" : "Paket"})
                           </span>
                         )}
                       </span>
@@ -154,7 +194,11 @@ export function Booklet24Page12Visit2({
                     </span>
                     <span className="col-span-2 text-right font-semibold text-black">
                       {item.isPackage
-                        ? isEn
+                        ? isAr
+                          ? "مشمول"
+                          : isRu
+                          ? "Включено"
+                          : isEn
                           ? "Included"
                           : "Paket İçi"
                         : formatCurrency(lineAmount, curr, data.locale)}
@@ -169,7 +213,7 @@ export function Booklet24Page12Visit2({
         {discountTotal > 0 && (
           <div className="space-y-1 mb-2 px-3.5 text-[12px]">
             <div className="flex items-center justify-between text-slate-600">
-              <span>{isEn ? "Subtotal" : "Ara Toplam"}</span>
+              <span>{isAr ? "المجموع الفرعي" : isRu ? "Подытог" : isEn ? "Subtotal" : "Ara Toplam"}</span>
               <span className="font-semibold">
                 {formatCurrency(subtotal, curr, data.locale)}
               </span>
@@ -180,13 +224,13 @@ export function Booklet24Page12Visit2({
                   key={d.id || dIdx}
                   className="flex items-center justify-between text-emerald-700 font-medium"
                 >
-                  <span>{d.label || (isEn ? "Discount" : "İndirim")}</span>
+                  <span>{d.label || (isAr ? "خصم" : isRu ? "Скидка" : isEn ? "Discount" : "İndirim")}</span>
                   <span>- {formatCurrency(d.amount, curr, data.locale)}</span>
                 </div>
               ))
             ) : (
               <div className="flex items-center justify-between text-emerald-700 font-medium">
-                <span>{isEn ? "Total Discount" : "Toplam İndirim"}</span>
+                <span>{isAr ? "إجمالي الخصم" : isRu ? "Общая скидка" : isEn ? "Total Discount" : "Toplam İndirim"}</span>
                 <span>- {formatCurrency(discountTotal, curr, data.locale)}</span>
               </div>
             )}
@@ -196,7 +240,7 @@ export function Booklet24Page12Visit2({
         {/* Genel Toplam Şeridi */}
         <div className="bg-[#F2F2F2] px-3.5 py-3 flex items-center justify-between">
           <span className="text-[16px] font-bold text-black">
-            {isEn ? "Total" : "Genel Toplam"}
+            {isAr ? "الإجمالي العام" : isRu ? "Итого" : isEn ? "Total" : "Genel Toplam"}
           </span>
           <span className="text-[16.5px] font-bold text-black">
             {formatCurrency(grandTotal, curr, data.locale)}

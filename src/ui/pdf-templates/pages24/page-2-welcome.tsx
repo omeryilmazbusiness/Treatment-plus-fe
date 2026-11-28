@@ -10,6 +10,8 @@ export function Booklet24Page2Welcome({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
   const patientName = data.patientName || "Mr. John Smith";
   const coordinatorName = data.coordinatorName || "Angelina";
@@ -21,8 +23,8 @@ export function Booklet24Page2Welcome({
     >
       {/* 1. wise_2.pdf Orijinal Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "A WARM" : "SICAK BİR"}
-        title={isEn ? "WELCOME" : "HOŞ GELDİNİZ"}
+        eyebrow={isAr ? "ترحيب" : isRu ? "ТЕПЛЫЙ" : isEn ? "A WARM" : "SICAK BİR"}
+        title={isAr ? "حار بكم" : isRu ? "ПРИЕМ" : isEn ? "WELCOME" : "HOŞ GELDİNİZ"}
         themeColor={themeColor}
       />
 
@@ -32,7 +34,13 @@ export function Booklet24Page2Welcome({
           className="text-[24px] font-extrabold italic mb-7 tracking-tight"
           style={{ color: themeColor }}
         >
-          {isEn ? `Dear ${patientName},` : `Sayın ${patientName},`}
+          {isAr
+            ? `عزيزي ${patientName}،`
+            : isRu
+            ? `Уважаемый(ая) ${patientName},`
+            : isEn
+            ? `Dear ${patientName},`
+            : `Sayın ${patientName},`}
         </h2>
 
         <div className="space-y-6 text-[15.5px] leading-[1.6] text-[#222222] max-w-[630px]">
@@ -41,7 +49,23 @@ export function Booklet24Page2Welcome({
           ) : (
             <>
               <p className="text-justify">
-                {isEn ? (
+                {isAr ? (
+                  <>
+                    شكراً لثقتكم بنا في العناية بصحة أسنانكم. خطة العلاج هذه هي{" "}
+                    <span className="font-bold text-black">
+                      خارطة طريقكم نحو ابتسامة جديدة جميلة وواثقة.
+                    </span>{" "}
+                    لقد تم إعدادها خصيصاً لكم لتلبية احتياجاتكم وحالة أسنانكم الفريدة.
+                  </>
+                ) : isRu ? (
+                  <>
+                    Благодарим вас за то, что доверили нам здоровье ваших зубов. Этот план лечения —{" "}
+                    <span className="font-bold text-black">
+                       ваш путь к уверенной и красивой новой улыбке.
+                    </span>{" "}
+                    Он был разработан специально для вас с учетом вашей уникальной клинической ситуации.
+                  </>
+                ) : isEn ? (
                   <>
                     Thank you for trusting us with your dental health. This treatment plan is{" "}
                     <span className="font-bold text-black">
@@ -61,7 +85,17 @@ export function Booklet24Page2Welcome({
               </p>
 
               <p>
-                {isEn ? (
+                {isAr ? (
+                  <>
+                    يرجى أخذ الوقت الكافي لمراجعتها، ولا تترددوا في طرح أي استفسار.{" "}
+                    <span className="font-bold text-black">نحن هنا من أجلكم.</span>
+                  </>
+                ) : isRu ? (
+                  <>
+                    Пожалуйста, внимательно ознакомьтесь с планом и не стесняйтесь задавать вопросы.{" "}
+                    <span className="font-bold text-black">Мы всегда рядом с вами.</span>
+                  </>
+                ) : isEn ? (
                   <>
                     {"Please take time reviewing it, and don't hesitate to ask questions."}{" "}
                     <span className="font-bold text-black">{"We're here for you."}</span>
@@ -77,10 +111,24 @@ export function Booklet24Page2Welcome({
           )}
 
           <div className="pt-4 text-[15.5px] leading-[1.45] text-[#222222]">
-            <p>{isEn ? "Yours truly," : "Saygılarımızla,"}</p>
+            <p>
+              {isAr
+                ? "مع خالص التحيات،"
+                : isRu
+                ? "С уважением,"
+                : isEn
+                ? "Yours truly,"
+                : "Saygılarımızla,"}
+            </p>
             <p className="font-semibold text-black mt-0.5">{coordinatorName}</p>
             <p className="text-[#333333]">
-              {isEn ? "Your Patient Coordinator" : "Hasta Koordinatörünüz"}
+              {isAr
+                ? "منسق المرضى الخاص بكم"
+                : isRu
+                ? "Ваш координатор пациентов"
+                : isEn
+                ? "Your Patient Coordinator"
+                : "Hasta Koordinatörünüz"}
             </p>
           </div>
         </div>

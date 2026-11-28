@@ -10,6 +10,8 @@ export function Booklet24Page4AboutClinic({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
   const clinicUpper = (data.clinicName || "WISE DENTAL").toUpperCase();
 
@@ -20,8 +22,16 @@ export function Booklet24Page4AboutClinic({
     >
       {/* 1. Eğimli Başlık Bandı */}
       <WiseHeader
-        eyebrow={isEn ? `ABOUT ${clinicUpper}` : `${clinicUpper} HAKKINDA`}
-        title={isEn ? "THE CLINIC" : "KLİNİĞİMİZ"}
+        eyebrow={
+          isAr
+            ? `حول ${clinicUpper}`
+            : isRu
+            ? `О КЛИНИКЕ ${clinicUpper}`
+            : isEn
+            ? `ABOUT ${clinicUpper}`
+            : `${clinicUpper} HAKKINDA`
+        }
+        title={isAr ? "عيادتنا" : isRu ? "КЛИНИКА" : isEn ? "THE CLINIC" : "KLİNİĞİMİZ"}
         themeColor={themeColor}
       />
 

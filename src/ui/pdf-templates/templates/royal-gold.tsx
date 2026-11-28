@@ -12,6 +12,8 @@ export function RoyalGoldTemplate({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const curr = data.currency || "TRY";
 
   const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.isPackage ? 0 : it.amount || 0), 0);
@@ -55,20 +57,38 @@ export function RoyalGoldTemplate({
               {data.clinicName || "Royal Gold Dental Excellence"}
             </h1>
             <p className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase text-[#B8860B]">
-              {isEn ? "ROYAL DENTAL HEALTHCARE • EXCLUSIVE SUITE" : "KİŞİYE ÖZEL LÜKS DENTAL TEDAVİ PLANI"}
+              {isAr
+                ? "رعاية الأسنان الملكية • الجناح الحصري"
+                : isRu
+                ? "ЭКСКЛЮЗИВНЫЙ ПЛАН СТОМАТОЛОГИЧЕСКОГО ЛЕЧЕНИЯ"
+                : isEn
+                ? "ROYAL DENTAL HEALTHCARE • EXCLUSIVE SUITE"
+                : "KİŞİYE ÖZEL LÜKS DENTAL TEDAVİ PLANI"}
             </p>
           </div>
         </div>
 
         <div className="text-right pr-6">
           <span className="text-[9px] font-mono tracking-wider uppercase text-[#B8860B] block font-bold">
-            {isEn ? "1-PAGE SUMMARY" : "1 SAYFALIK ÖZET PLAN"}
+            {isAr
+              ? "ملخص صفحة واحدة"
+              : isRu
+              ? "СВОДКА НА 1 СТРАНИЦЕ"
+              : isEn
+              ? "1-PAGE SUMMARY"
+              : "1 SAYFALIK ÖZET PLAN"}
           </span>
           <h2
             className="text-lg font-black uppercase text-[#001845]"
             style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
           >
-            {isEn ? "TREATMENT PLAN" : "TEDAVİ PLANI"}
+            {isAr
+              ? "خطة العلاج"
+              : isRu
+              ? "ПЛАН ЛЕЧЕНИЯ"
+              : isEn
+              ? "TREATMENT PLAN"
+              : "TEDAVİ PLANI"}
           </h2>
           <span className="text-[10px] font-mono text-slate-500 block">{data.dateStr || data.date}</span>
         </div>

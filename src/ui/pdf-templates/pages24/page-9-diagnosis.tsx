@@ -11,6 +11,8 @@ export function Booklet24Page9Diagnosis({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   // 8. sayfadaki mevcut ağız durumu (teşhis) ile birebir aynı teşhis haritasını kullan
@@ -27,7 +29,9 @@ export function Booklet24Page9Diagnosis({
       return {
         num,
         condition: entry?.condition || "intact",
-        status: entry?.label || (isEn ? "Intact" : "Sağlam"),
+        status:
+          entry?.label ||
+          (isAr ? "سليم" : isRu ? "Здоров" : isEn ? "Intact" : "Sağlam"),
       };
     });
 
@@ -53,48 +57,76 @@ export function Booklet24Page9Diagnosis({
     const parts: string[] = [];
     if (missing.length > 0) {
       parts.push(
-        isEn
+        isAr
+          ? `أسنان مفقودة (${missing.length}): ${missing.join(", ")}`
+          : isRu
+          ? `Отсутствующие зубы (${missing.length}): ${missing.join(", ")}`
+          : isEn
           ? `Missing teeth (${missing.length}): ${missing.join(", ")}`
           : `Eksik dişler (${missing.length}): ${missing.join(", ")}`
       );
     }
     if (caries.length > 0) {
       parts.push(
-        isEn
+        isAr
+          ? `تسوس (${caries.length}): ${caries.join(", ")}`
+          : isRu
+          ? `Кариес (${caries.length}): ${caries.join(", ")}`
+          : isEn
           ? `Caries / Decay (${caries.length}): ${caries.join(", ")}`
           : `Çürük bulgusu (${caries.length}): ${caries.join(", ")}`
       );
     }
     if (filled.length > 0) {
       parts.push(
-        isEn
+        isAr
+          ? `حشوات حالية (${filled.length}): ${filled.join(", ")}`
+          : isRu
+          ? `Пломбы (${filled.length}): ${filled.join(", ")}`
+          : isEn
           ? `Existing fillings (${filled.length}): ${filled.join(", ")}`
           : `Mevcut dolgulu dişler (${filled.length}): ${filled.join(", ")}`
       );
     }
     if (rootCanal.length > 0) {
       parts.push(
-        isEn
+        isAr
+          ? `علاج جذور (${rootCanal.length}): ${rootCanal.join(", ")}`
+          : isRu
+          ? `Лечение каналов (${rootCanal.length}): ${rootCanal.join(", ")}`
+          : isEn
           ? `Root canal treated (${rootCanal.length}): ${rootCanal.join(", ")}`
           : `Kanal tedavili dişler (${rootCanal.length}): ${rootCanal.join(", ")}`
       );
     }
     if (crown.length > 0) {
       parts.push(
-        isEn
+        isAr
+          ? `تيجان/جسور (${crown.length}): ${crown.join(", ")}`
+          : isRu
+          ? `Коронки/мосты (${crown.length}): ${crown.join(", ")}`
+          : isEn
           ? `Prosthetic crown/bridge (${crown.length}): ${crown.join(", ")}`
           : `Mevcut kuron/köprü (${crown.length}): ${crown.join(", ")}`
       );
     }
     if (implant.length > 0) {
       parts.push(
-        isEn
+        isAr
+          ? `زراعات حالية (${implant.length}): ${implant.join(", ")}`
+          : isRu
+          ? `Имплантаты (${implant.length}): ${implant.join(", ")}`
+          : isEn
           ? `Existing implants (${implant.length}): ${implant.join(", ")}`
           : `Mevcut implant (${implant.length}): ${implant.join(", ")}`
       );
     }
     if (parts.length === 0) {
-      return isEn
+      return isAr
+        ? "تم تقييم جميع الأسنان الـ 32 في الفكين العلوي والسفلي على أنها سليمة سريرياً."
+        : isRu
+        ? "Все 32 зуба верхней и нижней челюсти клинически оценены как здоровые."
+        : isEn
         ? "All 32 teeth in upper and lower jaws were evaluated as intact."
         : "Üst ve alt çenedeki tüm dişler klinik olarak sağlam değerlendirilmiştir.";
     }
@@ -140,7 +172,13 @@ export function Booklet24Page9Diagnosis({
         <div>
           <div className="bg-[#EFEFEF] py-2.5 px-3.5 mb-1">
             <h3 className="text-[15px] font-bold text-black leading-none">
-              {isEn ? "Diagnosis - Upper jaw" : "Teşhis - Üst Çene"}
+              {isAr
+                ? "التشخيص - الفك العلوي"
+                : isRu
+                ? "Диагноз - Верхняя челюсть"
+                : isEn
+                ? "Diagnosis - Upper jaw"
+                : "Teşhis - Üst Çene"}
             </h3>
           </div>
           <div className="grid grid-cols-2 gap-x-10 text-[12.5px]">
@@ -177,7 +215,13 @@ export function Booklet24Page9Diagnosis({
         <div>
           <div className="bg-[#EFEFEF] py-2.5 px-3.5 mb-1">
             <h3 className="text-[15px] font-bold text-black leading-none">
-              {isEn ? "Diagnosis - Lower jaw" : "Teşhis - Alt Çene"}
+              {isAr
+                ? "التشخيص - الفك السفلي"
+                : isRu
+                ? "Диагноз - Нижняя челюсть"
+                : isEn
+                ? "Diagnosis - Lower jaw"
+                : "Teşhis - Alt Çene"}
             </h3>
           </div>
           <div className="grid grid-cols-2 gap-x-10 text-[12.5px]">
@@ -214,7 +258,7 @@ export function Booklet24Page9Diagnosis({
         <div className="pt-2">
           <div className="bg-[#EFEFEF] py-2.5 px-3.5 mb-2">
             <h3 className="text-[15px] font-bold text-black leading-none">
-              {isEn ? "General" : "Genel"}
+              {isAr ? "عام" : isRu ? "Общее заключение" : isEn ? "General" : "Genel"}
             </h3>
           </div>
           <div className="px-3.5 py-1 text-[12.5px] font-medium text-black leading-snug line-clamp-3">

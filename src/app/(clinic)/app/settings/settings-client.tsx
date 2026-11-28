@@ -275,7 +275,16 @@ export function SettingsClient({
   const detail = pane !== "root";
   const clinicName = settings.name || "Klinik";
   const currency = `${settings.currency} (${CURRENCY_SYMBOL[settings.currency] ?? settings.currency})`;
-  const reportLanguage = settings.locale === "tr" ? "Türkçe" : "English";
+  const reportLanguage =
+    settings.locale === "tr"
+      ? "Türkçe"
+      : settings.locale === "en"
+      ? "English"
+      : settings.locale === "ar"
+      ? "Arabic (العربية)"
+      : settings.locale === "ru"
+      ? "Russian (Русский)"
+      : "Türkçe";
 
   return (
     <div

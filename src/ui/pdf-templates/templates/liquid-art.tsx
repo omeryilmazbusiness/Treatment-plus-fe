@@ -12,6 +12,8 @@ export function LiquidArtTemplate({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const curr = data.currency || "TRY";
 
   const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.isPackage ? 0 : it.amount || 0), 0);
@@ -28,8 +30,8 @@ export function LiquidArtTemplate({
       style={{ fontFamily: palette.bodyFont }}
     >
       {/* İridisant Sıvı Dalga Header & Footer (Techno.pdf kimliği) */}
-      <LiquidWaveHeader />
-      <LiquidWaveFooter />
+      <LiquidWaveHeader primary="#8E6A78" cyan="#C9D6D8" />
+      <LiquidWaveFooter primary="#8E6A78" cyan="#C9D6D8" />
 
       {/* 1. ÜST HEADER ALANI */}
       <div className="h-20 w-full px-8 pt-2 flex items-center justify-between text-white shrink-0 z-20">
@@ -48,7 +50,13 @@ export function LiquidArtTemplate({
               {data.clinicName || "Liquid Art Dental Clinic"}
             </h1>
             <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-cyan-200">
-              {isEn ? "FUTURISTIC CLINICAL DENTISTRY" : "İLERİ TEKNOLOJİ DİŞ HEKİMLİĞİ"}
+              {isAr
+                ? "طب الأسنان السريري المتطور"
+                : isRu
+                ? "ПЕРЕДОВАЯ КЛИНИЧЕСКАЯ СТОМАТОЛОГИЯ"
+                : isEn
+                ? "FUTURISTIC CLINICAL DENTISTRY"
+                : "İLERİ TEKNOLOJİ DİŞ HEKİMLİĞİ"}
             </p>
           </div>
         </div>
@@ -56,7 +64,7 @@ export function LiquidArtTemplate({
         <div className="text-right text-[10px] font-mono text-white/90 drop-shadow space-y-0.5">
           <span className="font-bold text-white block text-xs">{data.patientName}</span>
           <span className="text-cyan-200 block">{data.planNo || "#LA-2026-001"}</span>
-          <span className="text-white/80 block">{data.date}</span>
+          <span className="text-white/80 block">{data.dateStr || data.date}</span>
         </div>
       </div>
 

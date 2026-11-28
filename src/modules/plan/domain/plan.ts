@@ -90,7 +90,7 @@ export type Plan = {
   status: PlanStatus;
   currency: Currency;
   palette?: "navy" | "forest" | "rose" | "slate";
-  locale?: "tr" | "en";
+  locale?: "tr" | "en" | "ar" | "ru";
   diagnoses: string[];
   situation?: Situation;
   totalsSubtotal: number;

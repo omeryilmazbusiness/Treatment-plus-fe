@@ -10,15 +10,65 @@ export function Booklet24Page5ClinicStats({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   const defaultStats = [
-    { value: "15+", label: isEn ? "YEAR EXPERIENCE" : "YILLIK DENEYİM" },
-    { value: "5", label: isEn ? "BRANCHES" : "ŞUBE" },
-    { value: "60+", label: isEn ? "SPECIALIST DOCTORS" : "UZMAN DOKTOR" },
-    { value: "84+", label: isEn ? "DENTAL UNITS" : "DENTAL ÜNİTE" },
-    { value: "150K", label: isEn ? "PATIENTS" : "MUTLU HASTA" },
-    { value: "98%", label: isEn ? "SATISFACTION" : "MEMNUNİYET ORANI" },
+    {
+      value: "15+",
+      label: isAr
+        ? "سنوات الخبرة"
+        : isRu
+        ? "ЛЕТ ОПЫТА"
+        : isEn
+        ? "YEAR EXPERIENCE"
+        : "YILLIK DENEYİM",
+    },
+    {
+      value: "5",
+      label: isAr ? "فروع" : isRu ? "ФИЛИАЛОВ" : isEn ? "BRANCHES" : "ŞUBE",
+    },
+    {
+      value: "60+",
+      label: isAr
+        ? "طبيب متخصص"
+        : isRu
+        ? "ВРАЧЕЙ-СПЕЦИАЛИСТОВ"
+        : isEn
+        ? "SPECIALIST DOCTORS"
+        : "UZMAN DOKTOR",
+    },
+    {
+      value: "84+",
+      label: isAr
+        ? "وحدة أسنان"
+        : isRu
+        ? "СТОМАТ. УСТАНОВОК"
+        : isEn
+        ? "DENTAL UNITS"
+        : "DENTAL ÜNİTE",
+    },
+    {
+      value: "150K",
+      label: isAr
+        ? "مريض سعيد"
+        : isRu
+        ? "ПАЦИЕНТОВ"
+        : isEn
+        ? "PATIENTS"
+        : "MUTLU HASTA",
+    },
+    {
+      value: "98%",
+      label: isAr
+        ? "نسبة الرضا"
+        : isRu
+        ? "УДОВЛЕТВОРЕННОСТЬ"
+        : isEn
+        ? "SATISFACTION"
+        : "MEMNUNİYET ORANI",
+    },
   ];
 
   const stats =

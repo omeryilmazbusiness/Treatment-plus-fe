@@ -35,6 +35,8 @@ import {
   exportPlanElementToPdf,
   SAMPLE_TREATMENT_ITEMS,
   SAMPLE_TREATMENT_ITEMS_EN,
+  SAMPLE_TREATMENT_ITEMS_AR,
+  SAMPLE_TREATMENT_ITEMS_RU,
   TEMPLATE_META,
   normalizeTemplateId,
   type TemplateId,
@@ -251,26 +253,74 @@ export function ClinicSettingsView({
   ];
 
   const livePdfData = useMemo<PdfPlanData>(() => {
-    const isEn = settings.locale === "en";
-    const items = isEn ? SAMPLE_TREATMENT_ITEMS_EN : SAMPLE_TREATMENT_ITEMS;
+    const loc = settings.locale || "tr";
+    const isEn = loc === "en";
+    const isAr = loc === "ar";
+    const isRu = loc === "ru";
+    const items =
+      loc === "ar"
+        ? SAMPLE_TREATMENT_ITEMS_AR
+        : loc === "ru"
+        ? SAMPLE_TREATMENT_ITEMS_RU
+        : loc === "en"
+        ? SAMPLE_TREATMENT_ITEMS_EN
+        : SAMPLE_TREATMENT_ITEMS;
     const grandTotal = items.reduce((sum, item) => sum + item.amount, 0);
+    const dateLocale =
+      loc === "en"
+        ? "en-US"
+        : loc === "ar"
+        ? "ar-SA"
+        : loc === "ru"
+        ? "ru-RU"
+        : "tr-TR";
 
     return {
       templateId: (settings.templateId as TemplateId) || "klinik-minimal",
       palette: settings.palette,
       paletteKey: settings.palette,
-      clinicName: settings.name || (isEn ? "Modern Dental Clinic" : "Modern Diş Kliniği"),
-      slogan: settings.slogan || (isEn ? "Excellence in Dental Care" : "Gülüşünüz Bizim Tutkumuz"),
+      clinicName:
+        settings.name ||
+        (isAr
+          ? "عيادة الأسنان الحديثة"
+          : isRu
+          ? "Современная Стоматологическая Клиника"
+          : isEn
+          ? "Modern Dental Clinic"
+          : "Modern Diş Kliniği"),
+      slogan:
+        settings.slogan ||
+        (isAr
+          ? "التميز في رعاية الأسنان"
+          : isRu
+          ? "Совершенство в стоматологии"
+          : isEn
+          ? "Excellence in Dental Care"
+          : "Gülüşünüz Bizim Tutkumuz"),
       phone: settings.phone || "+90 212 555 0100",
       email: settings.email || userEmail || "info@klinik.com",
       website: settings.website || "www.treatment-plus.com",
-      address: settings.address || (isEn ? "Nisantasi, Istanbul" : "Nişantaşı, İstanbul"),
+      address:
+        settings.address ||
+        (isAr
+          ? "نيشانتاشي، إسطنبول"
+          : isRu
+          ? "Нишанташи, Стамбул"
+          : isEn
+          ? "Nisantasi, Istanbul"
+          : "Nişantaşı, İstanbul"),
       logoUrl: getMediaUrl(settings.logoKey) || undefined,
       doctorName: settings.doctor?.name || "Dr. Dt. Selin Arslan",
       doctorTitle:
         settings.signerTitle ||
         settings.doctor?.title ||
-        (isEn ? "Chief Oral Surgeon" : "Klinik Direktörü"),
+        (isAr
+          ? "كبير جراحي الفم والأسنان"
+          : isRu
+          ? "Главный хирург-стоматолог"
+          : isEn
+          ? "Chief Oral Surgeon"
+          : "Klinik Direktörü"),
       doctorBio: settings.doctor?.bio,
       doctorPhotoUrl: getMediaUrl(settings.doctor?.photoKey),
       doctorStats: settings.doctor?.stats,
@@ -284,10 +334,16 @@ export function ClinicSettingsView({
             imageKey: settings.hotel.imageKey,
           }
         : undefined,
-      patientName: isEn ? "John Doe" : "Ali Yılmaz",
+      patientName: isAr
+        ? "أحمد محمد"
+        : isRu
+        ? "Иван Петров"
+        : isEn
+        ? "John Doe"
+        : "Ali Yılmaz",
       patientId: "#P-2026-089",
       planNo: "TP-2026-0842",
-      dateStr: new Date().toLocaleDateString(isEn ? "en-US" : "tr-TR", {
+      dateStr: new Date().toLocaleDateString(dateLocale, {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -312,7 +368,8 @@ export function ClinicSettingsView({
       setIsExportingPdf(true);
       await exportPlanElementToPdf(
         printAllRef.current,
-        `${settings.name || "Klinik"}-Tedavi-Plani-Ornek.pdf`
+        `${settings.name || "Klinik"}-Tedavi-Plani-Ornek.pdf`,
+        settings.locale
       );
     } catch (err) {
       console.error("PDF indirme hatası:", err);
@@ -1153,24 +1210,31 @@ export function ClinicSettingsView({
               <div className="space-y-4 md:col-span-5">
                 {/* Dil, Para Birimi, Palet */}
                 <div className={softCard}>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     <div>
                       <span className={`${labelCls} inline-flex items-center gap-1.5`}>
                         <Globe className="size-3.5" /> Dil
                       </span>
-                      <div className="mt-1.5 flex rounded-2xl bg-white p-1 ring-1 ring-slate-900/[0.05]">
-                        {(["tr", "en"] as Locale[]).map((loc) => (
+                      <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 ring-1 ring-slate-900/[0.05] sm:grid-cols-4">
+                        {(
+                          [
+                            { code: "tr", label: "Türkçe", short: "TR" },
+                            { code: "en", label: "English", short: "EN" },
+                            { code: "ar", label: "Arabic", short: "AR" },
+                            { code: "ru", label: "Russia", short: "RU" },
+                          ] as { code: Locale; label: string; short: string }[]
+                        ).map((loc) => (
                           <button
-                            key={loc}
+                            key={loc.code}
                             type="button"
-                            onClick={() => handleFieldChange("locale", loc)}
-                            className={`tp-tab flex-1 rounded-xl py-2 text-xs font-semibold ${
-                              settings.locale === loc
+                            onClick={() => handleFieldChange("locale", loc.code)}
+                            className={`tp-tab rounded-xl px-2 py-2 text-xs font-semibold transition ${
+                              settings.locale === loc.code
                                 ? "bg-[#0b1f4d] text-white"
                                 : "text-slate-500 hover:text-[#0b1f4d]"
                             }`}
                           >
-                            {loc === "tr" ? "TR" : "EN"}
+                            {loc.label}
                           </button>
                         ))}
                       </div>
@@ -1267,13 +1331,13 @@ export function ClinicSettingsView({
                                 )}
                                 {/* SOFT (Pastel Dalgalar & Bulut) */}
                                 {tmpl.id === "liquid-art" && (
-                                  <div className="size-full bg-[#FFFDF9] flex flex-col justify-between relative overflow-hidden">
-                                    <div className="h-3 w-full bg-gradient-to-r from-[#FBCFE8] via-[#DDD6FE] to-[#BAE6FD]" />
+                                  <div className="size-full bg-[#FBF7F4] flex flex-col justify-between relative overflow-hidden">
+                                    <div className="h-3 w-full bg-gradient-to-r from-[#EBD5D3] via-[#DDBFC0] to-[#D3DFE0]" />
                                     <div className="flex-1 p-1 flex flex-col justify-center space-y-0.5">
-                                      <div className="h-1 w-3/4 bg-[#F9A8D4]/70 rounded-2xs" />
-                                      <div className="h-1 w-1/2 bg-[#7DD3FC]/80 rounded-2xs" />
+                                      <div className="h-1 w-3/4 bg-[#B5838D]/60 rounded-2xs" />
+                                      <div className="h-1 w-1/2 bg-[#9DB4B8]/80 rounded-2xs" />
                                     </div>
-                                    <div className="h-2.5 w-full bg-gradient-to-r from-[#BAE6FD] via-[#FEF08A] to-[#FBCFE8]" />
+                                    <div className="h-2.5 w-full bg-gradient-to-r from-[#D3DFE0] via-[#EBD5D3] to-[#DDBFC0]" />
                                   </div>
                                 )}
                                 {/* PREMİUM (Siyah & Altın V-Kalkan + Krem İç) */}

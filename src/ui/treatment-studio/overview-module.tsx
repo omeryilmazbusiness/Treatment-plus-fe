@@ -202,9 +202,14 @@ export function OverviewModule({
   const simulationUrl = `${shareUrl}?viz=1`;
 
   const pdfPlanData: PdfPlanData = useMemo(() => {
-    const isEn = clinicSettings?.locale === "en";
+    const resolvedLocale = (clinicSettings?.locale || "tr") as "tr" | "en" | "ar" | "ru";
+    const isEn = resolvedLocale === "en";
+    const isAr = resolvedLocale === "ar";
+    const isRu = resolvedLocale === "ru";
     const defaultVisitId = visits[0]?.id;
-    const defaultVisitTitle = visits[0]?.title || (isEn ? "1st Visit" : "1. Seans");
+    const defaultVisitTitle =
+      visits[0]?.title ||
+      (isAr ? "الزيارة الأولى" : isRu ? "1-й Визит" : isEn ? "1st Visit" : "1. Seans");
 
     const mappedItems: TreatmentItem[] = items.map((it) => {
       const visitMatch = visits.find((v) => v.id === it.visitId) || visits[0];
@@ -313,14 +318,25 @@ export function OverviewModule({
       labStats: clinicSettings?.lab?.stats,
       hotelDetails: clinicSettings?.hotel,
       patientName: patient?.name || "Sayın Hastamız",
-      planTitle: planTitle || "Kişiye Özel Tedavi Planı",
+      planTitle:
+        planTitle ||
+        (isAr
+          ? "خطة علاج مخصصة"
+          : isRu
+          ? "Индивидуальный план лечения"
+          : isEn
+          ? "Personalized Treatment Plan"
+          : "Kişiye Özel Tedavi Planı"),
       planNo: planId ? `#TP-${planId.slice(0, 8).toUpperCase()}` : "#TP-2026-001",
-      dateStr: new Date().toLocaleDateString(isEn ? "en-US" : "tr-TR", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-      locale: (clinicSettings?.locale || "tr") as "tr" | "en",
+      dateStr: new Date().toLocaleDateString(
+        isAr ? "ar-SA" : isRu ? "ru-RU" : isEn ? "en-US" : "tr-TR",
+        {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }
+      ),
+      locale: resolvedLocale,
       currency: (currency || clinicSettings?.currency || "TRY") as "TRY" | "EUR" | "USD",
       welcomeText: clinicSettings?.welcomeBody || "",
       welcomeBody: clinicSettings?.welcomeBody || "",
@@ -576,15 +592,18 @@ export function OverviewModule({
         const templateQuery = activeTemplateId
           ? `&template=${encodeURIComponent(activeTemplateId)}`
           : "";
+        const localeQuery = pdfPlanData.locale
+          ? `&locale=${encodeURIComponent(pdfPlanData.locale)}`
+          : "";
         if (format === "summary") {
           window.open(
-            `/api/plans/${effectivePlanId}/pdf?format=summary&download=1${tokenQuery}${templateQuery}`,
+            `/api/plans/${effectivePlanId}/pdf?format=summary&download=1${tokenQuery}${templateQuery}${localeQuery}`,
             "_blank"
           );
         } else {
           // Kapsamlı sunum kitapçığını yeni sekmede aç ve yazdır/indir
           window.open(
-            `/api/plans/${effectivePlanId}/pdf?download=1${tokenQuery}${templateQuery}`,
+            `/api/plans/${effectivePlanId}/pdf?download=1${tokenQuery}${templateQuery}${localeQuery}`,
             "_blank"
           );
         }
@@ -595,7 +614,8 @@ export function OverviewModule({
         if (targetEl) {
           await exportPlanElementToPdf(
             targetEl,
-            `${pdfPlanData.clinicName}-${pdfPlanData.patientName}-Tedavi-Plani.pdf`
+            `${pdfPlanData.clinicName}-${pdfPlanData.patientName}-Tedavi-Plani.pdf`,
+            pdfPlanData.locale
           );
           setPdfSuccessMsg("PDF başarıyla oluşturuldu.");
           setTimeout(() => setPdfSuccessMsg(null), 3000);
@@ -1868,7 +1888,7 @@ export function OverviewModule({
                     window.open(
                       `/api/plans/${effectivePlanId}/pdf?template=${encodeURIComponent(
                         activeTemplateId
-                      )}`,
+                      )}${pdfPlanData.locale ? `&locale=${encodeURIComponent(pdfPlanData.locale)}` : ""}`,
                       "_blank"
                     )
                   }

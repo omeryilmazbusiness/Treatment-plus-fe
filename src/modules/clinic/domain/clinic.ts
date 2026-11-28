@@ -4,6 +4,8 @@ import type { Currency } from "@/shared/money";
 export const Locale = {
   TR: "tr",
   EN: "en",
+  AR: "ar",
+  RU: "ru",
 } as const;
 
 export type Locale = (typeof Locale)[keyof typeof Locale];

@@ -10,6 +10,8 @@ export function Booklet24Page14SimulationIntro({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
@@ -19,8 +21,24 @@ export function Booklet24Page14SimulationIntro({
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "SEE YOUR PLAN IN" : "TEDAVİNİZİ CANLI GÖRÜN"}
-        title={isEn ? "ACTION" : "3D SİMÜLASYON"}
+        eyebrow={
+          isAr
+            ? "شاهد خطة علاجك"
+            : isRu
+            ? "ВАШ ПЛАН В ДЕЙСТВИИ"
+            : isEn
+            ? "SEE YOUR PLAN IN"
+            : "TEDAVİNİZİ CANLI GÖRÜN"
+        }
+        title={
+          isAr
+            ? "محاكاة 3D"
+            : isRu
+            ? "3D СИМУЛЯЦИЯ"
+            : isEn
+            ? "ACTION"
+            : "3D SİMÜLASYON"
+        }
         themeColor={themeColor}
       />
 
@@ -28,7 +46,21 @@ export function Booklet24Page14SimulationIntro({
       <div className="flex-1 px-[64px] pt-[42px] select-none z-10">
         <div className="space-y-6 text-[15.5px] leading-[1.6] text-[#222222] text-justify mb-11">
           <p>
-            {isEn ? (
+            {isAr ? (
+              <>
+                من خلال الرسوم المتحركة ثلاثية الأبعاد المخصصة لدينا،{" "}
+                <span className="font-bold text-black">
+                  تحصلون على معاينة فورية لإجراءات العلاج خطوة بخطوة.
+                </span>
+              </>
+            ) : isRu ? (
+              <>
+                Благодаря нашим персонализированным 3D-анимациям вы{" "}
+                <span className="font-bold text-black">
+                  получаете наглядный предварительный просмотр каждой процедуры шаг за шагом.
+                </span>
+              </>
+            ) : isEn ? (
               <>
                 With our personalized 3D animations, you{" "}
                 <span className="font-bold text-black">
@@ -46,7 +78,11 @@ export function Booklet24Page14SimulationIntro({
           </p>
 
           <p>
-            {isEn
+            {isAr
+              ? "من الخطوة الأولى وحتى النتيجة النهائية، تجسد تقنيتنا المتقدمة خطة علاجكم بوضوح، مما يساعدكم على فهم جميع الخيارات والشعور بالثقة في كل قرار."
+              : isRu
+              ? "От первого этапа до финального результата наши цифровые технологии оживляют ваш план лечения, помогая понять все этапы и чувствовать уверенность в каждом решении."
+              : isEn
               ? "From the initial step to the final result, our advanced technology brings your treatment plan to life, helping you understand your options and feel confident in every decision."
               : "İlk aşamadan nihai sonuca kadar ileri dijital teknolojimiz tedavi planınızı canlandırır; tüm seçeneklerinizi net biçimde anlamanızı ve her adımda güven duymanızı sağlar."}
           </p>
@@ -68,7 +104,13 @@ export function Booklet24Page14SimulationIntro({
             <polygon points="5 3 20 12 5 21 5 3" />
           </svg>
           <span className="tracking-wide uppercase">
-            {isEn ? "WATCH NOW" : "ŞİMDİ İZLE"}
+            {isAr
+              ? "شاهد الآن"
+              : isRu
+              ? "СМОТРЕТЬ СЕЙЧАС"
+              : isEn
+              ? "WATCH NOW"
+              : "ŞİMDİ İZLE"}
           </span>
         </a>
       </div>

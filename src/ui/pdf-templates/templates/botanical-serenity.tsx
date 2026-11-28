@@ -12,6 +12,8 @@ export function BotanicalSerenityTemplate({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const curr = data.currency || "TRY";
 
   const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.isPackage ? 0 : it.amount || 0), 0);
@@ -55,22 +57,40 @@ export function BotanicalSerenityTemplate({
               {data.clinicName || "Doğal Gülüş Diş Kliniği"}
             </h1>
             <p className="text-[10px] tracking-widest uppercase text-[#5F7161] font-medium">
-              {isEn ? "HOLISTIC & AESTHETIC DENTISTRY" : "BİYOLOJİK & ESTETİK DİŞ HEKİMLİĞİ"}
+              {isAr
+                ? "طب الأسنان التجميلي والحيوي"
+                : isRu
+                ? "ЭСТЕТИЧЕСКАЯ И БИОЛОГИЧЕСКАЯ СТОМАТОЛОГИЯ"
+                : isEn
+                ? "HOLISTIC & AESTHETIC DENTISTRY"
+                : "BİYOLOJİK & ESTETİK DİŞ HEKİMLİĞİ"}
             </p>
           </div>
         </div>
 
         <div className="text-right">
           <span className="text-[9px] font-mono tracking-wider uppercase text-[#5F7161] block font-bold">
-            {isEn ? "1-PAGE SUMMARY" : "1 SAYFALIK ÖZET PLAN"}
+            {isAr
+              ? "ملخص صفحة واحدة"
+              : isRu
+              ? "СВОДКА НА 1 СТРАНИЦЕ"
+              : isEn
+              ? "1-PAGE SUMMARY"
+              : "1 SAYFALIK ÖZET PLAN"}
           </span>
           <h2
             className="text-lg font-bold uppercase text-[#4A584C]"
             style={{ fontFamily: palette.headingFont }}
           >
-            {isEn ? "TREATMENT PLAN" : "TEDAVİ PLANI"}
+            {isAr
+              ? "خطة العلاج"
+              : isRu
+              ? "ПЛАН ЛЕЧЕНИЯ"
+              : isEn
+              ? "TREATMENT PLAN"
+              : "TEDAVİ PLANI"}
           </h2>
-          <span className="text-[10px] font-mono text-slate-500 block">{data.date}</span>
+          <span className="text-[10px] font-mono text-slate-500 block">{data.dateStr || data.date}</span>
         </div>
       </div>
 

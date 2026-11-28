@@ -16,10 +16,16 @@ import {
   type PdfDiscountItem,
   SAMPLE_CLINIC_HIGHLIGHTS,
   SAMPLE_CLINIC_HIGHLIGHTS_EN,
+  SAMPLE_CLINIC_HIGHLIGHTS_AR,
+  SAMPLE_CLINIC_HIGHLIGHTS_RU,
   SAMPLE_DOCTOR_STATS,
   SAMPLE_DOCTOR_STATS_EN,
+  SAMPLE_DOCTOR_STATS_AR,
+  SAMPLE_DOCTOR_STATS_RU,
   SAMPLE_LAB_STATS,
   SAMPLE_LAB_STATS_EN,
+  SAMPLE_LAB_STATS_AR,
+  SAMPLE_LAB_STATS_RU,
 } from "@/ui/pdf-templates";
 
 function getMediaUrl(key?: string | null): string | null {
@@ -113,7 +119,22 @@ export async function GET(
       ? `${origin}/p/${shareToken}?viz=1`
       : `${origin}/app/plans/${id}`;
 
-    const isEn = plan.locale === "en" || clinicSettings?.locale === "en";
+    const queryLocale = searchParams.get("locale")?.trim().toLowerCase();
+    const rawLoc = String(
+      (queryLocale && ["tr", "en", "ar", "ru"].includes(queryLocale) ? queryLocale : "") ||
+      (clinicSettings?.locale && clinicSettings.locale !== "tr" ? clinicSettings.locale : "") ||
+      (plan.locale && plan.locale !== "tr" ? plan.locale : "") ||
+      clinicSettings?.locale ||
+      plan.locale ||
+      "tr"
+    )
+      .trim()
+      .toLowerCase();
+    const resolvedLocale: "tr" | "en" | "ar" | "ru" =
+      rawLoc === "en" || rawLoc === "ar" || rawLoc === "ru" ? rawLoc : "tr";
+    const isEn = resolvedLocale === "en";
+    const isAr = resolvedLocale === "ar";
+    const isRu = resolvedLocale === "ru";
 
     // Plan seanslarını (visits) hazırla
     const rawVisits: any[] = Array.isArray(plan.visits) ? plan.visits : [];
@@ -124,7 +145,9 @@ export async function GET(
       }
     });
     const defaultVisitId = rawVisits[0]?.id ? String(rawVisits[0].id) : undefined;
-    const defaultVisitTitle = rawVisits[0]?.title || (isEn ? "1st Visit" : "1. Seans");
+    const defaultVisitTitle =
+      rawVisits[0]?.title ||
+      (isAr ? "الزيارة الأولى" : isRu ? "1-й Визит" : isEn ? "1st Visit" : "1. Seans");
 
     // Items mapping
     const rawItems = plan.items || [];
@@ -277,6 +300,10 @@ export async function GET(
     const highlights =
       clinicSettings?.highlights && clinicSettings.highlights.length >= 4
         ? clinicSettings.highlights
+        : isAr
+        ? SAMPLE_CLINIC_HIGHLIGHTS_AR
+        : isRu
+        ? SAMPLE_CLINIC_HIGHLIGHTS_RU
         : isEn
         ? SAMPLE_CLINIC_HIGHLIGHTS_EN
         : SAMPLE_CLINIC_HIGHLIGHTS;
@@ -284,6 +311,10 @@ export async function GET(
     const doctorStats =
       clinicSettings?.doctor?.stats && clinicSettings.doctor.stats.length >= 3
         ? clinicSettings.doctor.stats
+        : isAr
+        ? SAMPLE_DOCTOR_STATS_AR
+        : isRu
+        ? SAMPLE_DOCTOR_STATS_RU
         : isEn
         ? SAMPLE_DOCTOR_STATS_EN
         : SAMPLE_DOCTOR_STATS;
@@ -291,6 +322,10 @@ export async function GET(
     const labStats =
       clinicSettings?.lab?.stats && clinicSettings.lab.stats.length >= 4
         ? clinicSettings.lab.stats
+        : isAr
+        ? SAMPLE_LAB_STATS_AR
+        : isRu
+        ? SAMPLE_LAB_STATS_RU
         : isEn
         ? SAMPLE_LAB_STATS_EN
         : SAMPLE_LAB_STATS;
@@ -333,10 +368,10 @@ export async function GET(
       patientName: plan.patient?.name || (isEn ? "Valued Patient" : "Sayın Hastamız"),
       planNo: `#TP-${id.slice(0, 8).toUpperCase()}`,
       dateStr: new Date(plan.created_at || Date.now()).toLocaleDateString(
-        isEn ? "en-US" : "tr-TR",
+        isAr ? "ar-SA" : isRu ? "ru-RU" : isEn ? "en-US" : "tr-TR",
         { day: "numeric", month: "long", year: "numeric" }
       ),
-      locale: isEn ? "en" : "tr",
+      locale: resolvedLocale,
       currency: (plan.currency || clinicSettings?.currency || "TRY") as "TRY" | "EUR" | "USD",
       welcomeText: clinicSettings?.welcome_body || clinicSettings?.welcomeBody || "",
       welcomeBody: clinicSettings?.welcome_body || clinicSettings?.welcomeBody || "",
@@ -368,14 +403,16 @@ export async function GET(
     );
 
     const html = `<!DOCTYPE html>
-<html lang="${pdfPlanData.locale}">
+<html lang="${pdfPlanData.locale}" ${isAr ? 'dir="rtl"' : ""}>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${pdfPlanData.clinicName} - ${pdfPlanData.patientName} - ${isEn ? "Treatment Presentation" : "Hasta Tedavi Sunumu"}</title>
+  <title>${pdfPlanData.clinicName} - ${pdfPlanData.patientName} - ${
+    isAr ? "خطة العلاج" : isRu ? "План лечения" : isEn ? "Treatment Presentation" : "Hasta Tedavi Sunumu"
+  }</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Dancing+Script:wght@500;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @page {
@@ -391,7 +428,7 @@ export async function GET(
       margin: 0;
       padding: 0;
       background: #0f172a;
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-family: ${isAr ? "'Cairo', " : ""}'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
       width: 100%;
       min-height: 100%;
     }
@@ -465,13 +502,19 @@ export async function GET(
       <span class="text-xs font-bold">${pdfPlanData.clinicName}</span>
       <span class="text-xs text-slate-400">• ${templateMeta.name}</span>
       <span class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-bold">
-        ${wantsSummary ? "1 Sayfa Özet" : "24 Sayfa Kitapçık"}
+        ${
+          wantsSummary
+            ? isAr ? "ملخص صفحة واحدة" : isRu ? "1-страничный обзор" : isEn ? "1-Page Summary" : "1 Sayfa Özet"
+            : isAr ? "كتيب من 24 صفحة" : isRu ? "24-страничный буклет" : isEn ? "24-Page Booklet" : "24 Sayfa Kitapçık"
+        }
       </span>
     </div>
     <div class="h-4 w-px bg-slate-700"></div>
     <button onclick="window.print()" class="cursor-pointer bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 active:scale-95">
       <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <span>${isEn ? "Save as PDF / Print" : "PDF Olarak Kaydet / Yazdır"}</span>
+      <span>${
+        isAr ? "حفظ كـ PDF / طباعة" : isRu ? "Сохранить как PDF / Печать" : isEn ? "Save as PDF / Print" : "PDF Olarak Kaydet / Yazdır"
+      }</span>
     </button>
   </div>
   ` : ""}

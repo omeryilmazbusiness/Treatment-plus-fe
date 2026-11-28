@@ -150,6 +150,8 @@ function Intro({
           options={[
             { value: "tr" as Locale, label: "Türkçe" },
             { value: "en" as Locale, label: "English" },
+            { value: "ar" as Locale, label: "Arabic" },
+            { value: "ru" as Locale, label: "Russia" },
           ]}
         />
       </div>

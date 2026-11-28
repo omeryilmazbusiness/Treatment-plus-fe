@@ -10,6 +10,8 @@ export function Booklet24Page20Awards({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
@@ -19,15 +21,47 @@ export function Booklet24Page20Awards({
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "OUR RECOGNITIONS" : "AKREDİTASYONLARIMIZ"}
-        title={isEn ? "AWARDS" : "ÖDÜLLERİMİZ"}
+        eyebrow={
+          isAr
+            ? "اعتماداتنا الدولية"
+            : isRu
+            ? "НАШИ ДОСТИЖЕНИЯ"
+            : isEn
+            ? "OUR RECOGNITIONS"
+            : "AKREDİTASYONLARIMIZ"
+        }
+        title={
+          isAr
+            ? "الجوائز"
+            : isRu
+            ? "НАГРАДЫ"
+            : isEn
+            ? "AWARDS"
+            : "ÖDÜLLERİMİZ"
+        }
         themeColor={themeColor}
       />
 
       {/* 2. Açıklama Metni (temizlenmiş page_20.jpg üzerinde y: 340..715 aralığında yer alır) */}
       <div className="flex-1 px-[76px] pt-[18px] select-none z-10 space-y-5 text-[15px] leading-[1.58] text-[#222222] text-justify">
         <p>
-          {isEn ? (
+          {isAr ? (
+            <>
+              في عيادتنا،{" "}
+              <span className="font-bold text-black">
+                التميز ليس مجرد وعد — بل هو معيار مثبت.
+              </span>{" "}
+              تقديراً لرعايتنا الفائقة للمرضى وخبرتنا في طب الأسنان، حصلنا على جوائز دولية مرموقة تميزنا في مجال السياحة العلاجية.
+            </>
+          ) : isRu ? (
+            <>
+              В нашей клинике{" "}
+              <span className="font-bold text-black">
+                совершенство — это не просто обещание, а доказанный стандарт.
+              </span>{" "}
+              Благодаря высокому уровню заботы о пациентах и профессионализму мы удостоены престижных международных наград.
+            </>
+          ) : isEn ? (
             <>
               {"At our clinic, "}
               <span className="font-bold text-black">
@@ -47,7 +81,29 @@ export function Booklet24Page20Awards({
         </p>
 
         <p>
-          {isEn ? (
+          {isAr ? (
+            <>
+              إن التزامنا بالجودة مدعوم{" "}
+              <span className="font-bold text-black">
+                بشهادات اعتماد دولية،
+              </span>{" "}
+              مما يضمن أن كل علاج يلبي أعلى معايير السلامة والتعقيم والدقة.{" "}
+              <span className="font-bold text-black">
+                نحن نلتزم ببروتوكولات صارمة ونستخدم فقط المواد المعتمدة من الدرجة الأولى.
+              </span>
+            </>
+          ) : isRu ? (
+            <>
+              Наша приверженность качеству подтверждена{" "}
+              <span className="font-bold text-black">
+                международными сертификатами аккредитации,
+              </span>{" "}
+              гарантирующими высочайшие стандарты безопасности, стерильности и точности.{" "}
+              <span className="font-bold text-black">
+                Мы следуем строгим протоколам и используем только сертифицированные материалы премиум-класса.
+              </span>
+            </>
+          ) : isEn ? (
             <>
               Our commitment to quality is backed by{" "}
               <span className="font-bold text-black">

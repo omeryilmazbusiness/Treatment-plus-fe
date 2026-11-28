@@ -10,6 +10,8 @@ export function Booklet24Page18DentalLab({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
@@ -19,8 +21,24 @@ export function Booklet24Page18DentalLab({
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "OUR IN-HOUSE" : "KLİNİK BÜNYESİNDE"}
-        title={isEn ? "DENTAL LAB" : "LABORATUVAR"}
+        eyebrow={
+          isAr
+            ? "داخل العيادة"
+            : isRu
+            ? "СОБСТВЕННАЯ"
+            : isEn
+            ? "OUR IN-HOUSE"
+            : "KLİNİK BÜNYESİNDE"
+        }
+        title={
+          isAr
+            ? "مختبر الأسنان"
+            : isRu
+            ? "ЛАБОРАТОРИЯ"
+            : isEn
+            ? "DENTAL LAB"
+            : "LABORATUVAR"
+        }
         themeColor={themeColor}
       />
 

@@ -10,19 +10,39 @@ export function Booklet24Page19LabStats({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   const stat1 = data.labStats?.[0] || {
     value: "15",
-    label: isEn ? "dental\ntechnicians" : "dental\nteknisyen",
+    label: isAr
+      ? "فني أسنان\nمتخصص"
+      : isRu
+      ? "зубных\nтехников"
+      : isEn
+      ? "dental\ntechnicians"
+      : "dental\nteknisyen",
   };
   const stat2 = data.labStats?.[1] || {
     value: "27k",
-    label: isEn ? "units\nmanufactured" : "üretilen\nrestorasyon",
+    label: isAr
+      ? "وحدة\nمصنعة"
+      : isRu
+      ? "изготовленных\nреставраций"
+      : isEn
+      ? "units\nmanufactured"
+      : "üretilen\nrestorasyon",
   };
   const stat3 = data.labStats?.[2] || {
     value: "36h",
-    label: isEn ? "turnaround\ntime" : "teslimat\nsüresi",
+    label: isAr
+      ? "سرعة\nالتسليم"
+      : isRu
+      ? "время\nизготовления"
+      : isEn
+      ? "turnaround\ntime"
+      : "teslimat\nsüresi",
   };
 
   return (
@@ -37,7 +57,23 @@ export function Booklet24Page19LabStats({
       <div className="flex-1 px-[82px] pt-[18px] pb-[72px] select-none z-10 flex flex-col justify-between">
         <div className="space-y-5 text-[15px] leading-[1.58] text-[#222222] text-justify">
           <p>
-            {isEn ? (
+            {isAr ? (
+              <>
+                تمتلك عيادتنا{" "}
+                <span className="font-bold text-black">
+                  مختبر أسنان داخلي مجهز بالكامل،
+                </span>{" "}
+                مما يتيح لنا الإشراف على كل خطوة من خطوات تصنيع التركيبات بدقة أعلى وتسليم أسرع وتجربة سلسة لمرضانا.
+              </>
+            ) : isRu ? (
+              <>
+                Наша клиника располагает{" "}
+                <span className="font-bold text-black">
+                  собственной полностью оснащенной зуботехнической лабораторией,
+                </span>{" "}
+                что позволяет контролировать каждый этап создания реставраций, обеспечивая высочайшую точность и сжатые сроки.
+              </>
+            ) : isEn ? (
               <>
                 Our clinic has its{" "}
                 <span className="font-bold text-black">
@@ -57,7 +93,21 @@ export function Booklet24Page19LabStats({
           </p>
 
           <p>
-            {isEn ? (
+            {isAr ? (
+              <>
+                بفضل المسح الرقمي وتقنية الخراطة المتقدمة CAD/CAM، نصنع تيجاناً وجسوراً وعدسات{" "}
+                <span className="font-bold text-black">
+                  تتطابق تماماً وتبدو طبيعية للغاية.
+                </span>
+              </>
+            ) : isRu ? (
+              <>
+                Благодаря цифровому 3D-сканированию и передовому фрезерованию CAD/CAM мы создаем коронки, мосты и виниры, которые{" "}
+                <span className="font-bold text-black">
+                  идеально прилегают и выглядят совершенно естественно.
+                </span>
+              </>
+            ) : isEn ? (
               <>
                 With digital scanning and advanced milling technology, we can create crowns, bridges, and veneers that{" "}
                 <span className="font-bold text-black">
@@ -76,7 +126,21 @@ export function Booklet24Page19LabStats({
           </p>
 
           <p>
-            {isEn ? (
+            {isAr ? (
+              <>
+                كما يتيح لنا وجود المختبر داخل العيادة إجراء التعديلات بشكل فوري،{" "}
+                <span className="font-bold text-black">
+                  لضمان تلبية كل تفصيل لأعلى معايير الجودة لدينا.
+                </span>
+              </>
+            ) : isRu ? (
+              <>
+                Наличие собственной лаборатории позволяет вносить корректировки в реальном времени на примерках,{" "}
+                <span className="font-bold text-black">
+                  гарантируя соответствие каждой детали нашим высоким стандартам.
+                </span>
+              </>
+            ) : isEn ? (
               <>
                 Having an in-house lab also means we can make real-time adjustments,{" "}
                 <span className="font-bold text-black">

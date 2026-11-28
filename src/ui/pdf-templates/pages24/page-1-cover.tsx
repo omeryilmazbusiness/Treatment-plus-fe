@@ -345,94 +345,64 @@ export function WiseCoverArtwork({
   }
 
   if (templateId === "liquid-art") {
-    // 4. SOFT: Pastel pembe, mavi, sarı, lavanta yumuşak dalgalar, beyaz bulutlar ve minik yıldızlar
+    // SOFT: Krem zemin, mat pudra gülü / mauve / adaçayı dalgaları, ince çizgi çerçeve — sade ve zarif
     return (
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none z-0"
         viewBox="0 0 794 1123"
         preserveAspectRatio="none"
       >
-        <rect width="794" height="1123" fill="#FFFDF9" />
+        <rect width="794" height="1123" fill="#FBF7F4" />
 
-        {/* Üst Sol & Üst Sağ Pastel Dalgalar */}
+        {/* Üst dalgalar */}
         <path
           d="M0,0 L460,0 C400,130 230,130 150,240 C95,315 45,355 0,380 Z"
-          fill="#FBCFE8"
-          opacity="0.82"
+          fill="#EBD5D3"
+          opacity="0.9"
         />
-        <path
-          d="M0,0 L310,0 C255,95 140,115 0,240 Z"
-          fill="#F9A8D4"
-          opacity="0.55"
-        />
+        <path d="M0,0 L310,0 C255,95 140,115 0,240 Z" fill="#DDBFC0" opacity="0.6" />
         <path
           d="M360,0 L794,0 L794,395 C690,350 675,235 565,175 C465,120 420,60 360,0 Z"
-          fill="#BAE6FD"
+          fill="#D3DFE0"
           opacity="0.85"
         />
-        <path
-          d="M530,0 L794,0 L794,250 C695,215 620,120 530,0 Z"
-          fill="#7DD3FC"
-          opacity="0.55"
-        />
-        {/* Üst Pastel Sarı & Lavanta Geçiş Dalgaları */}
-        <path
-          d="M170,0 L540,0 C475,95 280,105 170,0 Z"
-          fill="#FEF08A"
-          opacity="0.7"
-        />
+        <path d="M530,0 L794,0 L794,250 C695,215 620,120 530,0 Z" fill="#BFCFD2" opacity="0.55" />
 
-        {/* Alt Sol & Alt Sağ Pastel Dalgalar */}
+        {/* Alt dalgalar */}
         <path
           d="M0,710 C65,765 110,875 215,935 C320,995 390,1055 445,1123 L0,1123 Z"
-          fill="#DDD6FE"
-          opacity="0.85"
+          fill="#D8CBD3"
+          opacity="0.8"
         />
-        <path
-          d="M0,845 C95,890 175,980 285,1123 L0,1123 Z"
-          fill="#BAE6FD"
-          opacity="0.75"
-        />
+        <path d="M0,845 C95,890 175,980 285,1123 L0,1123 Z" fill="#C9D6D8" opacity="0.7" />
         <path
           d="M794,700 C720,765 695,880 580,950 C475,1015 395,1045 335,1123 L794,1123 Z"
-          fill="#FBCFE8"
-          opacity="0.82"
+          fill="#EBD5D3"
+          opacity="0.85"
         />
-        <path
-          d="M794,860 C690,910 615,1010 495,1123 L794,1123 Z"
-          fill="#FEF08A"
-          opacity="0.75"
+        <path d="M794,860 C690,910 615,1010 495,1123 L794,1123 Z" fill="#DDBFC0" opacity="0.55" />
+
+        {/* İnce çizgi çerçeve */}
+        <rect
+          x="44"
+          y="44"
+          width="706"
+          height="1035"
+          fill="none"
+          stroke="#B5838D"
+          strokeWidth="1.2"
+          opacity="0.5"
         />
-
-        {/* Pofuduk Beyaz Bulutlar (Görseldeki SOFT kapağı bulut konumları) */}
-        {/* Sol Üst Bulut */}
-        <g fill="#FFFFFF" transform="translate(38, 65)">
-          <circle cx="42" cy="52" r="28" />
-          <circle cx="78" cy="40" r="36" />
-          <circle cx="118" cy="54" r="26" />
-          <rect x="40" y="48" width="80" height="30" rx="15" />
-        </g>
-        {/* Sağ Üst Bulut */}
-        <g fill="#FFFFFF" transform="translate(555, 195)">
-          <circle cx="48" cy="56" r="32" />
-          <circle cx="90" cy="42" r="42" />
-          <circle cx="136" cy="58" r="30" />
-          <rect x="45" y="52" width="94" height="36" rx="18" />
-        </g>
-        {/* Sağ Alt Bulut */}
-        <g fill="#FFFFFF" transform="translate(545, 920)">
-          <circle cx="46" cy="54" r="30" />
-          <circle cx="86" cy="40" r="38" />
-          <circle cx="128" cy="56" r="28" />
-          <rect x="44" y="50" width="86" height="34" rx="17" />
-        </g>
-
-        {/* Sevimli Yıldız / Işıltı Motifleri */}
-        <g fill="#FFFFFF">
-          <path d="M235,62 L240,76 L254,81 L240,86 L235,100 L230,86 L216,81 L230,76 Z" />
-          <path d="M685,95 L689,106 L700,110 L689,114 L685,125 L681,114 L670,110 L681,106 Z" />
-          <path d="M115,895 L120,908 L133,913 L120,918 L115,931 L110,918 L97,913 L110,908 Z" />
-        </g>
+        <rect
+          x="54"
+          y="54"
+          width="686"
+          height="1015"
+          fill="none"
+          stroke="#B5838D"
+          strokeWidth="0.6"
+          opacity="0.35"
+        />
       </svg>
     );
   }
@@ -561,7 +531,11 @@ export function Booklet24Page1Cover({
   const dateStr = data.dateStr || data.date || "November 2026";
   const planTitle =
     data.planTitle ||
-    (data.locale === "en"
+    (data.locale === "ar"
+      ? "خطة العلاج الشاملة"
+      : data.locale === "ru"
+      ? "КОМПЛЕКСНЫЙ ПЛАН ЛЕЧЕНИЯ"
+      : data.locale === "en"
       ? "COMPREHENSIVE TREATMENT PLAN"
       : "KİŞİYE ÖZEL TEDAVİ PLANI");
 
@@ -619,13 +593,13 @@ export function Booklet24Page1Cover({
       useDarkShadow: false,
     },
     "liquid-art": {
-      logoColor: "#EC4899",
-      titlePrimaryColor: "#4A356B",
-      titleSecondaryColor: "#DB2777",
-      sloganColor: "#6B538C",
-      cardBg: "rgba(74, 53, 107, 0.92)",
-      cardBorder: "rgba(244, 114, 182, 0.55)",
-      cardAccent: "#F9A8D4",
+      logoColor: "#B5838D",
+      titlePrimaryColor: "#4A3441",
+      titleSecondaryColor: "#9C6F7E",
+      sloganColor: "#7A6070",
+      cardBg: "rgba(90, 66, 80, 0.93)",
+      cardBorder: "rgba(181, 131, 141, 0.55)",
+      cardAccent: "#EBD0D0",
       cardText: "#FFFFFF",
       useDarkShadow: false,
     },
@@ -760,7 +734,17 @@ export function Booklet24Page1Cover({
           <div className="text-right">
             <span className="text-[9.5px] uppercase tracking-wider text-white/70 block">
               {data.proposalNo || data.planNo
-                ? `PLAN #${data.proposalNo || data.planNo}`
+                ? `${
+                    data.locale === "ar"
+                      ? "الخطة"
+                      : data.locale === "ru"
+                      ? "ПЛАН"
+                      : "PLAN"
+                  } #${data.proposalNo || data.planNo}`
+                : data.locale === "ar"
+                ? "سري"
+                : data.locale === "ru"
+                ? "КОНФИДЕНЦИАЛЬНО"
                 : "CONFIDENTIAL"}
             </span>
             <span

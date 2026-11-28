@@ -70,6 +70,76 @@ export const SAMPLE_TREATMENT_ITEMS_EN = [
   },
 ];
 
+export const SAMPLE_TREATMENT_ITEMS_AR = [
+  {
+    name: "بروتوكول زراعة الأسنان الجراحي All-on-4 (تيتانيوم الدرجة 4)",
+    description: "زراعة 4 غرسات جراحية مائلة وتركيب دعامات متعددة الوحدات",
+    toothNumber: "12, 14, 22, 24",
+    quantity: 4,
+    amount: 3200,
+    session: "الزيارة الأولى",
+  },
+  {
+    name: "جسر هجين مؤقت ثابت في نفس اليوم",
+    description: "تسليم جسر مؤقت مثبت بالبراغي (تحميل فوري) خلال 24 ساعة",
+    toothNumber: "الفك العلوي",
+    quantity: 1,
+    amount: 1100,
+    session: "الزيارة الأولى",
+  },
+  {
+    name: "جسر زركونيا دائم متجانس (Prettau)",
+    description: "جسر تجميلي كامل الفك من الزركونيا المتجانسة (14 وحدة)",
+    toothNumber: "الفك العلوي (14 وحدة)",
+    quantity: 14,
+    amount: 5600,
+    session: "الزيارة الثانية",
+  },
+  {
+    name: "دعامات تيتانيوم مخصصة CAD/CAM وضبط الإطباق",
+    description: "التحكم الرقمي في العزم وفحص التطابق السلبي وتوازن الإطباق",
+    toothNumber: "الفك بالكامل",
+    quantity: 1,
+    amount: 750,
+    session: "الزيارة الثانية",
+  },
+];
+
+export const SAMPLE_TREATMENT_ITEMS_RU = [
+  {
+    name: "Хирургический протокол имплантации All-on-4 (Титан Grade 4)",
+    description: "Установка 4 угловых дентальных имплантатов и мультиюнит-абатментов",
+    toothNumber: "12, 14, 22, 24",
+    quantity: 4,
+    amount: 3200,
+    session: "1-й Визит",
+  },
+  {
+    name: "Несъемный временный гибридный мост в день операции",
+    description: "Винтовая фиксация временного протеза в течение 24 часов (немедленная нагрузка)",
+    toothNumber: "Верхняя челюсть",
+    quantity: 1,
+    amount: 1100,
+    session: "1-й Визит",
+  },
+  {
+    name: "Постоянный монолитный циркониевый мост (Prettau)",
+    description: "Полный эстетический мост из монолитного циркония на 14 единиц с винтовой фиксацией",
+    toothNumber: "Верхняя челюсть (14 ед.)",
+    quantity: 14,
+    amount: 5600,
+    session: "2-й Визит",
+  },
+  {
+    name: "Индивидуальные титановые абатменты CAD/CAM и выверка окклюзии",
+    description: "Цифровой контроль торка, тест пассивной посадки и балансировка прикуса",
+    toothNumber: "Вся дуга",
+    quantity: 1,
+    amount: 750,
+    session: "2-й Визит",
+  },
+];
+
 export const SAMPLE_CLINIC_HIGHLIGHTS: StatItem[] = [
   { value: "15+", label: "Yıllık Deneyim", description: "Ağız ve çene cerrahisinde uzmanlık" },
   { value: "5", label: "Modern Şube", description: "Tam donanımlı teknolojik klinikler" },
@@ -88,6 +158,24 @@ export const SAMPLE_CLINIC_HIGHLIGHTS_EN: StatItem[] = [
   { value: "98.6%", label: "Satisfaction Rate", description: "Independently audited patient satisfaction" },
 ];
 
+export const SAMPLE_CLINIC_HIGHLIGHTS_AR: StatItem[] = [
+  { value: "15+", label: "سنوات الخبرة", description: "التميز في جراحة الفم والفكين" },
+  { value: "5", label: "فروع حديثة", description: "مرافق مجهزة بالكامل بأحدث التقنيات" },
+  { value: "60+", label: "طبيب متخصص", description: "مجلس طبي متعدد التخصصات" },
+  { value: "84+", label: "وحدة أسنان", description: "تعقيم متكامل وراحة قصوى" },
+  { value: "150,000+", label: "مريض سعيد", description: "مرضى من 42 دولة حول العالم" },
+  { value: "98.6%", label: "نسبة الرضا", description: "تقييم مستقل لرضا المرضى" },
+];
+
+export const SAMPLE_CLINIC_HIGHLIGHTS_RU: StatItem[] = [
+  { value: "15+", label: "Лет опыта", description: "Мастерство челюстно-лицевой хирургии" },
+  { value: "5", label: "Клиник", description: "Полностью оснащенные современные центры" },
+  { value: "60+", label: "Врачей", description: "Мультидисциплинарный консилиум" },
+  { value: "84+", label: "Установки", description: "Интегрированная стерилизация и комфорт" },
+  { value: "150,000+", label: "Пациентов", description: "Пациенты из 42 стран мира" },
+  { value: "98.6%", label: "Довольных", description: "Независимый рейтинг удовлетворенности" },
+];
+
 export const SAMPLE_DOCTOR_STATS: StatItem[] = [
   { value: "15.000+", label: "Başarılı İmplant", description: "Belgelenmiş cerrahi vaka" },
   { value: "ITI Fellow", label: "Basel İsviçre", description: "Uluslararası İmplantoloji Konseyi" },
@@ -98,6 +186,18 @@ export const SAMPLE_DOCTOR_STATS_EN: StatItem[] = [
   { value: "15,000+", label: "Implants Placed", description: "Documented surgical cases" },
   { value: "ITI Fellow", label: "Basel Switzerland", description: "International Team for Implantology" },
   { value: "DSD Master", label: "Smile Designer", description: "Digital aesthetic prosthetics" },
+];
+
+export const SAMPLE_DOCTOR_STATS_AR: StatItem[] = [
+  { value: "15,000+", label: "زراعة ناجحة", description: "حالات جراحية موثقة" },
+  { value: "ITI Fellow", label: "بازل سويسرا", description: "الفريق الدولي لزراعة الأسنان" },
+  { value: "DSD Master", label: "تصميم الابتسامة", description: "أخصائي التركيبات التجميلية الرقمية" },
+];
+
+export const SAMPLE_DOCTOR_STATS_RU: StatItem[] = [
+  { value: "15,000+", label: "Имплантатов", description: "Документированные операции" },
+  { value: "ITI Fellow", label: "Базель, Швейцария", description: "Международный совет имплантологов" },
+  { value: "DSD Master", label: "Дизайн улыбки", description: "Цифровая эстетическая ортопедия" },
 ];
 
 export const SAMPLE_TOOTH_DIAGNOSES: ToothFinding[] = [
@@ -136,33 +236,82 @@ export const SAMPLE_LAB_STATS_EN: StatItem[] = [
   { value: "100%", label: "Certified Materials", description: "Swiss & German zirconia blocks" },
 ];
 
+export const SAMPLE_LAB_STATS_AR: StatItem[] = [
+  { value: "15+", label: "فني أسنان خبير", description: "تخصص في تقنية CAD/CAM" },
+  { value: "27,000+", label: "وحدة مصنعة", description: "دقة روبوتية خماسية المحاور" },
+  { value: "36 ساعة", label: "تسليم سريع", description: "مختبر رقمي داخلي في العيادة" },
+  { value: "100%", label: "مواد معتمدة", description: "بلوكات زركونيا سويسرية وألمانية" },
+];
+
+export const SAMPLE_LAB_STATS_RU: StatItem[] = [
+  { value: "15+", label: "Зубных техников", description: "Специализация CAD/CAM" },
+  { value: "27,000+", label: "Реставраций", description: "5-осевая роботизированная точность" },
+  { value: "36 часов", label: "Срок изготовления", description: "Собственная цифровая лаборатория" },
+  { value: "100%", label: "Сертификация", description: "Швейцарские и немецкие блоки циркония" },
+];
+
 export function getSamplePdfData(overrides?: Partial<PdfPlanData>): PdfPlanData {
-  const isEn = overrides?.locale === "en";
-  const currency = overrides?.currency || (isEn ? "EUR" : "TRY");
-  const items = isEn ? SAMPLE_TREATMENT_ITEMS_EN : SAMPLE_TREATMENT_ITEMS;
+  const loc = overrides?.locale || "tr";
+  const isEn = loc === "en";
+  const isAr = loc === "ar";
+  const isRu = loc === "ru";
+  const currency = overrides?.currency || (loc !== "tr" ? "EUR" : "TRY");
+  const items = isAr
+    ? SAMPLE_TREATMENT_ITEMS_AR
+    : isRu
+    ? SAMPLE_TREATMENT_ITEMS_RU
+    : isEn
+    ? SAMPLE_TREATMENT_ITEMS_EN
+    : SAMPLE_TREATMENT_ITEMS;
   const grandTotal = items.reduce((sum, item) => sum + item.amount, 0);
 
   const visits: PlanVisit[] = [
     {
       id: "v1",
-      title: isEn ? "1st Visit: Surgical & Provisional Phase" : "1. Seans: Cerrahi ve Geçici Diş Aşaması",
-      phaseLabel: isEn ? "Day 1 - 3" : "1. - 3. Gün",
-      duration: isEn ? "3 Days Stay" : "3 Günlük Süreç",
-      healingPeriod: isEn ? "3 Months Osseointegration" : "3 Aylık Kemik Kaynaşma Dönemi",
-      items: items.filter((it) => it.session?.includes("1")),
-      subtotal: items.filter((it) => it.session?.includes("1")).reduce((s, it) => s + it.amount, 0),
-      note: isEn
+      title: isAr
+        ? "الزيارة الأولى: المرحلة الجراحية والأسنان المؤقتة"
+        : isRu
+        ? "1-й Визит: Хирургический этап и временный протез"
+        : isEn
+        ? "1st Visit: Surgical & Provisional Phase"
+        : "1. Seans: Cerrahi ve Geçici Diş Aşaması",
+      phaseLabel: isAr ? "اليوم 1 - 3" : isRu ? "День 1 - 3" : isEn ? "Day 1 - 3" : "1. - 3. Gün",
+      duration: isAr ? "إقامة 3 أيام" : isRu ? "3 дня пребывания" : isEn ? "3 Days Stay" : "3 Günlük Süreç",
+      healingPeriod: isAr
+        ? "3 أشهر لاندماج العظام"
+        : isRu
+        ? "3 месяца остеоинтеграции"
+        : isEn
+        ? "3 Months Osseointegration"
+        : "3 Aylık Kemik Kaynaşma Dönemi",
+      items: items.slice(0, 2),
+      subtotal: items.slice(0, 2).reduce((s, it) => s + it.amount, 0),
+      note: isAr
+        ? "وضع الغرسات الجراحية المائلة بدقة وتركيب الجسر التجميلي المؤقت الثابت خلال 24 ساعة."
+        : isRu
+        ? "Точная установка угловых имплантатов и фиксация эстетического временного моста в течение 24 часов."
+        : isEn
         ? "Caries removal, surgical placement of angled implants, and delivery of screw-retained aesthetic provisional bridge."
         : "Cerrahi implantların hassas yerleşimi, dikişlerin uygulanması ve 24 saat içinde sabit estetik geçici dişlerin montajı.",
     },
     {
       id: "v2",
-      title: isEn ? "2nd Visit: Permanent Prosthetic Delivery" : "2. Seans: Kalıcı Zirkonyum Teslim Aşaması",
-      phaseLabel: isEn ? "After 3 Months" : "3 Ay Sonra",
-      duration: isEn ? "5 Days Stay" : "5 Günlük Süreç",
-      items: items.filter((it) => it.session?.includes("2")),
-      subtotal: items.filter((it) => it.session?.includes("2")).reduce((s, it) => s + it.amount, 0),
-      note: isEn
+      title: isAr
+        ? "الزيارة الثانية: تسليم تركيبة الزركونيا الدائمة"
+        : isRu
+        ? "2-й Визит: Установка постоянного циркониевого протеза"
+        : isEn
+        ? "2nd Visit: Permanent Prosthetic Delivery"
+        : "2. Seans: Kalıcı Zirkonyum Teslim Aşaması",
+      phaseLabel: isAr ? "بعد 3 أشهر" : isRu ? "Через 3 месяца" : isEn ? "After 3 Months" : "3 Ay Sonra",
+      duration: isAr ? "إقامة 5 أيام" : isRu ? "5 дней пребывания" : isEn ? "5 Days Stay" : "5 Günlük Süreç",
+      items: items.slice(2),
+      subtotal: items.slice(2).reduce((s, it) => s + it.amount, 0),
+      note: isAr
+        ? "الطبعات الرقمية النهائية، وتجربة الإطباق، والتسليم النهائي لجسر الزركونيا الدائم."
+        : isRu
+        ? "Финальные цифровые слепки, регистрация прикуса, примерка и окончательная фиксация монолитного моста."
+        : isEn
         ? "Final digital impressions, dynamic bite registration, try-in, and final torque delivery of permanent monolithic bridge."
         : "Kemikleşme kontrolü, mikron hassasiyetinde dijital ölçü, estetik prova ve kalıcı monolitik zirkonyum köprünün teslimi.",
     },
@@ -173,46 +322,122 @@ export function getSamplePdfData(overrides?: Partial<PdfPlanData>): PdfPlanData 
     palette: "navy",
     paletteKey: "navy",
     clinicName: "Wise Dental Oral & Maxillofacial Center",
-    slogan: isEn ? "Where Precision Meets Aesthetic Perfection" : "Gülüşünüzün Mükemmelliği İçin Uzman Dokunuş",
+    slogan: isAr
+      ? "حيث تلتقي الدقة بالكمال الجمالي"
+      : isRu
+      ? "Где точность встречается с эстетическим совершенством"
+      : isEn
+      ? "Where Precision Meets Aesthetic Perfection"
+      : "Gülüşünüzün Mükemmelliği İçin Uzman Dokunuş",
     logoUrl: "",
     phone: "+90 (212) 555 01 23",
     email: "info@wisedentalclinic.com",
     website: "www.wisedentalclinic.com",
-    address: isEn ? "Bagdat Avenue No: 142/A Kadikoy, Istanbul" : "Bağdat Caddesi No: 142/A Kadıköy, İstanbul",
+    address: isAr
+      ? "شارع بغداد رقم 142/A كاديكوي، إسطنبول"
+      : isRu
+      ? "Багдад авеню 142/A, Кадыкёй, Стамбул"
+      : isEn
+      ? "Bagdat Avenue No: 142/A Kadikoy, Istanbul"
+      : "Bağdat Caddesi No: 142/A Kadıköy, İstanbul",
     doctorName: "Dr. Dt. Selin Arslan",
-    doctorTitle: isEn ? "Chief Oral Surgeon & Implantologist" : "Ağız, Diş ve Çene Cerrahisi Uzmanı",
-    doctorBio: isEn
+    doctorTitle: isAr
+      ? "كبير جراحي الفم وزراعة الأسنان"
+      : isRu
+      ? "Главный челюстно-лицевой хирург и имплантолог"
+      : isEn
+      ? "Chief Oral Surgeon & Implantologist"
+      : "Ağız, Diş ve Çene Cerrahisi Uzmanı",
+    doctorBio: isAr
+      ? "تخرجت بمرتبة الشرف من كلية طب الأسنان بجامعة مرمرة، تلتها زمالة متقدمة في الجراحة وزراعة الأسنان في مركز ITI في بازل، سويسرا. بخبرة جراحية تزيد عن 15 عاماً، أجرت الدكتورة أرسلان أكثر من 15,000 عملية زراعة ناجحة."
+      : isRu
+      ? "С отличием окончила стоматологический факультет Университета Мармара, прошла стажировку по хирургии и имплантологии в центре ITI в Базеле, Швейцария. За 15+ лет практики успешно установила более 15 000 имплантатов."
+      : isEn
       ? "Graduated with honors from Marmara University Faculty of Dentistry, followed by advanced surgical and implantology fellowship at ITI Center in Basel, Switzerland. With over 15 years of surgical excellence, Dr. Arslan has successfully placed more than 15,000 implants with a 99.2% success rate."
       : "Marmara Üniversitesi Diş Hekimliği Fakültesi'nden dereceyle mezun olduktan sonra İsviçre Basel ITI Merkezi'nde ileri cerrahi ve implantoloji ihtisasını tamamlamıştır. 15 yılı aşkın cerrahi tecrübesiyle 15.000'den fazla başarılı implant operasyonu gerçekleştirmiştir.",
-    doctorStats: isEn ? SAMPLE_DOCTOR_STATS_EN : SAMPLE_DOCTOR_STATS,
-    aboutText: isEn
+    doctorStats: isAr
+      ? SAMPLE_DOCTOR_STATS_AR
+      : isRu
+      ? SAMPLE_DOCTOR_STATS_RU
+      : isEn
+      ? SAMPLE_DOCTOR_STATS_EN
+      : SAMPLE_DOCTOR_STATS,
+    aboutText: isAr
+      ? "مركز وايز لطب الأسنان هو مركز دولي متطور لجراحة الفم والفكين، وتصميم الابتسامة التجميلية، وزراعة الأسنان المتقدمة باستخدام التصوير ثلاثي الأبعاد وأنظمة CAD/CAM الروبوتية."
+      : isRu
+      ? "Wise Dental — современный международный центр челюстно-лицевой хирургии, эстетического дизайна улыбки и имплантологии, оснащенный 3D КЛКТ-томографией и 5-осевыми системами CAD/CAM."
+      : isEn
       ? "Wise Dental is a state-of-the-art international center for oral and maxillofacial surgery, aesthetic smile design, and advanced implantology. Our facility combines 3D CBCT tomography, robotic 5-axis CAD/CAM milling, and hospital-grade sterilization to provide world-class dental care."
       : "Wise Dental, ileri implant cerrahisi, dijital gülüş tasarımı ve estetik diş hekimliğinde uluslararası standartlarda hizmet sunan öncü bir merkezdir. Kliniğimiz, 3D Konik Işınlı Tomografi, 5 eksenli robotik CAD/CAM kazıma merkezi ve A sınıfı sterilizasyon altyapısıyla donatılmıştır.",
-    highlights: isEn ? SAMPLE_CLINIC_HIGHLIGHTS_EN : SAMPLE_CLINIC_HIGHLIGHTS,
-    diagnoses: isEn ? SAMPLE_TOOTH_DIAGNOSES_EN : SAMPLE_TOOTH_DIAGNOSES,
+    highlights: isAr
+      ? SAMPLE_CLINIC_HIGHLIGHTS_AR
+      : isRu
+      ? SAMPLE_CLINIC_HIGHLIGHTS_RU
+      : isEn
+      ? SAMPLE_CLINIC_HIGHLIGHTS_EN
+      : SAMPLE_CLINIC_HIGHLIGHTS,
+    diagnoses: isEn || isAr || isRu ? SAMPLE_TOOTH_DIAGNOSES_EN : SAMPLE_TOOTH_DIAGNOSES,
     visits,
-    labStats: isEn ? SAMPLE_LAB_STATS_EN : SAMPLE_LAB_STATS,
+    labStats: isAr
+      ? SAMPLE_LAB_STATS_AR
+      : isRu
+      ? SAMPLE_LAB_STATS_RU
+      : isEn
+      ? SAMPLE_LAB_STATS_EN
+      : SAMPLE_LAB_STATS,
     hotelDetails: {
-      name: isEn ? "Radisson Blu Bosphorus 5-Star Residence" : "Radisson Blu Bosphorus 5 Yıldızlı Rezidans",
-      text: isEn
+      name: isAr
+        ? "فندق راديسون بلو البوسفور 5 نجوم"
+        : isRu
+        ? "Резиденция Radisson Blu Bosphorus 5*"
+        : isEn
+        ? "Radisson Blu Bosphorus 5-Star Residence"
+        : "Radisson Blu Bosphorus 5 Yıldızlı Rezidans",
+      text: isAr
+        ? "إقامة فاخرة بإطلالة بانورامية مع إفطار مجاني وخدمة كونسيرج مخصصة على بعد 5 دقائق من العيادة."
+        : isRu
+        ? "Проживание в люксе с панорамным видом, завтраком и персональным консьержем в 5 минутах от нашей клиники."
+        : isEn
         ? "Luxury suite accommodation with panoramic views, complimentary breakfast, and dedicated clinic concierge located 5 minutes from our facility."
         : "Kliniğimize 5 dakika mesafede, Boğaz manzaralı lüks süit konaklama, açık büfe kahvaltı ve kliniğe özel 7/24 misafir danışmanı hizmeti.",
     },
     patientName: "Kemal Yılmaz",
     planNo: "TP-2026-0842",
-    dateStr: isEn ? "November 25, 2026" : "25 Kasım 2026",
-    locale: isEn ? "en" : "tr",
+    dateStr: isAr
+      ? "25 نوفمبر 2026"
+      : isRu
+      ? "25 ноября 2026 г."
+      : isEn
+      ? "November 25, 2026"
+      : "25 Kasım 2026",
+    locale: loc,
     currency,
-    welcomeText: isEn
+    welcomeText: isAr
+      ? "عزيزي المريض، شكراً لاختيارك عيادتنا. لقد أجرينا تحليلاً سريرياً شاملاً وصممنا خارطة طريق العلاج المخصصة هذه لاستعادة الوظيفة الكاملة والجمال الطبيعي لابتسامتك."
+      : isRu
+      ? "Уважаемый пациент, благодарим вас за выбор нашей клиники. Мы провели тщательный клинический анализ и разработали этот персональный план лечения для восстановления функции и естественной красоты вашей улыбки."
+      : isEn
       ? "Dear Kemal Yılmaz, thank you for choosing our clinic. We have conducted a thorough clinical analysis and designed this personalized comprehensive treatment roadmap to restore both the full masticatory function and the natural beauty of your smile."
       : "Sayın Kemal Yılmaz, kliniğimizi tercih ettiğiniz için teşekkür ederiz. Ağız ve diş sağlığınızı en üst düzeye çıkarmak ve estetik gülüş tasarımınızı hayata geçirmek amacıyla tüm klinik verileriniz incelenmiş ve size özel kapsamlı tedavi yol haritanız hazırlanmıştır.",
-    welcomeBody: isEn
+    welcomeBody: isAr
+      ? "عزيزي المريض، شكراً لاختيارك عيادتنا. لقد أجرينا تحليلاً سريرياً شاملاً وصممنا خارطة طريق العلاج المخصصة هذه لاستعادة الوظيفة الكاملة والجمال الطبيعي لابتسامتك."
+      : isRu
+      ? "Уважаемый пациент, благодарим вас за выбор нашей клиники. Мы провели тщательный клинический анализ и разработали этот персональный план лечения для восстановления функции и естественной красоты вашей улыбки."
+      : isEn
       ? "Dear Kemal Yılmaz, thank you for choosing our clinic. We have conducted a thorough clinical analysis and designed this personalized comprehensive treatment roadmap to restore both the full masticatory function and the natural beauty of your smile."
       : "Sayın Kemal Yılmaz, kliniğimizi tercih ettiğiniz için teşekkür ederiz. Ağız ve diş sağlığınızı en üst düzeye çıkarmak ve estetik gülüş tasarımınızı hayata geçirmek amacıyla tüm klinik verileriniz incelenmiş ve size özel kapsamlı tedavi yol haritanız hazırlanmıştır.",
-    kvkkText: isEn
+    kvkkText: isAr
+      ? "تم إعداد خطة العلاج هذه بعد فحص سريري وإشعاعي شامل. جميع الإجراءات تتبع بروتوكولات السلامة الصحية الدولية. الأسعار صالحة لمدة 30 يوماً."
+      : isRu
+      ? "Данный план лечения составлен на основе комплексного клинического и рентгенологического обследования. Все процедуры соответствуют международным протоколам безопасности. Цены действительны 30 дней."
+      : isEn
       ? "This treatment plan is prepared following comprehensive clinical and radiological examination. All procedures adhere to international healthcare safety protocols. Prices are valid for 30 calendar days."
       : "İşbu kapsamlı tedavi planı ve fiyatlandırma, hekim muayenesi ve radyolojik inceleme sonrası hazırlanmıştır. Sunulan tedavi protokolü ve maliyetler 30 takvim günü boyunca geçerlidir.",
-    legalText: isEn
+    legalText: isAr
+      ? "تم إعداد خطة العلاج هذه بعد فحص سريري وإشعاعي شامل. جميع الإجراءات تتبع بروتوكولات السلامة الصحية الدولية. الأسعار صالحة لمدة 30 يوماً."
+      : isRu
+      ? "Данный план лечения составлен на основе комплексного клинического и рентгенологического обследования. Все процедуры соответствуют международным протоколам безопасности. Цены действительны 30 дней."
+      : isEn
       ? "This treatment plan is prepared following comprehensive clinical and radiological examination. All procedures adhere to international healthcare safety protocols. Prices are valid for 30 calendar days."
       : "İşbu kapsamlı tedavi planı ve fiyatlandırma, hekim muayenesi ve radyolojik inceleme sonrası hazırlanmıştır. Sunulan tedavi protokolü ve maliyetler 30 takvim günü boyunca geçerlidir.",
     showMotifs: true,

@@ -12,6 +12,7 @@ export type TemplateId =
   | "prestige-minimal";
 
 export type PaletteKey = "navy" | "forest" | "rose" | "slate";
+export type PdfLocale = "tr" | "en" | "ar" | "ru";
 
 export interface PdfPalette {
   key: PaletteKey;
@@ -134,7 +135,7 @@ export interface PdfPlanData {
   dateStr?: string;
   date?: string;
   currency: "TRY" | "EUR" | "USD";
-  locale: "tr" | "en";
+  locale: PdfLocale;
   palette: PaletteKey;
   paletteKey?: PaletteKey;
   templateId: TemplateId;

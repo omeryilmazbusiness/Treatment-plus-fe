@@ -13,6 +13,8 @@ export function Booklet24Page8Situation({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   // Eğer daha önce yapay SVG kaydedilmişse veya röntgen yüklenmemişse gerçek klinik OPG röntgenini kullan
@@ -29,8 +31,24 @@ export function Booklet24Page8Situation({
     >
       {/* 1. Eğimli Başlık Bandı (80.1mm) */}
       <WiseHeader
-        eyebrow={isEn ? "YOUR CURRENT" : "MEVCUT AĞIZ"}
-        title={isEn ? "SITUATION" : "DURUMUNUZ"}
+        eyebrow={
+          isAr
+            ? "حالة الفم"
+            : isRu
+            ? "ТЕКУЩЕЕ"
+            : isEn
+            ? "YOUR CURRENT"
+            : "MEVCUT AĞIZ"
+        }
+        title={
+          isAr
+            ? "الحالية"
+            : isRu
+            ? "СОСТОЯНИЕ"
+            : isEn
+            ? "SITUATION"
+            : "DURUMUNUZ"
+        }
         themeColor={themeColor}
       />
 

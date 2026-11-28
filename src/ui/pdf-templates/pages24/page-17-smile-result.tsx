@@ -10,6 +10,8 @@ export function Booklet24Page17SmileResult({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
   const photoUrl = data.patientPhotoUrl || "/pdf-assets/wise/page_17.jpg";
 
@@ -26,10 +28,20 @@ export function Booklet24Page17SmileResult({
       {/* Sol Alt Başlık Vurgusu (temizlenmiş page_17.jpg üzerinde orijinal konumunda) */}
       <div className="px-[54px] pb-[64px] z-10 select-none text-white drop-shadow-md">
         <h2 className="text-[31px] font-extrabold italic tracking-tight leading-none mb-1.5">
-          {isEn ? "The result" : "Tedavi Sonucu"}
+          {isAr
+            ? "النتيجة"
+            : isRu
+            ? "Результат"
+            : isEn
+            ? "The result"
+            : "Tedavi Sonucu"}
         </h2>
         <p className="text-[15.5px] italic font-light text-white/95 leading-snug max-w-[240px]">
-          {isEn
+          {isAr
+            ? "تجميل شامل للابتسامة\nبتيجان الزركونيا"
+            : isRu
+            ? "Полное преображение улыбки\nциркониевыми коронками"
+            : isEn
             ? "Total smile makeover\nwith zirconia crowns"
             : "Zirkonyum kronlarla\ntam gülüş tasarımı"}
         </p>

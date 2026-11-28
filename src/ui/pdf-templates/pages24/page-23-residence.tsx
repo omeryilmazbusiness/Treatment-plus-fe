@@ -10,6 +10,8 @@ export function Booklet24Page23Residence({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
@@ -30,7 +32,23 @@ export function Booklet24Page23Residence({
         ) : (
           <>
             <p>
-              {isEn ? (
+              {isAr ? (
+                <>
+                  يجب أن تكون رحلتكم نحو ابتسامة أكثر إشراقاً مريحة مثل إقامتكم تماماً. لذلك تعاقدنا مع فندق يجمع بين{" "}
+                  <span className="font-bold text-black">
+                    الراحة والسهولة والأناقة،
+                  </span>{" "}
+                  لضمان أن تكون رحلتكم العلاجية بمثابة إجازة مريحة وممتعة.
+                </>
+              ) : isRu ? (
+                <>
+                  Ваш путь к сияющей улыбке должен быть таким же комфортным, как и ваше проживание. Именно поэтому мы сотрудничаем с отелем, сочетающим{" "}
+                  <span className="font-bold text-black">
+                    комфорт, удобство и элегантность,
+                  </span>{" "}
+                  превращая вашу поездку на лечение в приятный отдых.
+                </>
+              ) : isEn ? (
                 <>
                   {"Your journey to a brighter smile should be as effortless as your stay. That's why we've partnered with a hotel that blends "}
                   <span className="font-bold text-black">
@@ -50,7 +68,23 @@ export function Booklet24Page23Residence({
             </p>
 
             <p>
-              {isEn ? (
+              {isAr ? (
+                <>
+                  يقع الفندق{" "}
+                  <span className="font-bold text-black">
+                    على بعد دقائق قليلة فقط من عيادتنا،
+                  </span>{" "}
+                  ويوفر توازناً مثالياً بين الاسترخاء وسهولة الوصول، مما يتيح لكم التركيز على علاجكم والاستمتاع بأرقى مستويات الضيافة.
+                </>
+              ) : isRu ? (
+                <>
+                  Расположенный{" "}
+                  <span className="font-bold text-black">
+                    всего в нескольких минутах от нашей клиники,
+                  </span>{" "}
+                  отель обеспечивает идеальный баланс отдыха и доступности, позволяя вам сосредоточиться на лечении.
+                </>
+              ) : isEn ? (
                 <>
                   Located{" "}
                   <span className="font-bold text-black">
@@ -69,7 +103,21 @@ export function Booklet24Page23Residence({
             </p>
 
             <p>
-              {isEn ? (
+              {isAr ? (
+                <>
+                  من الغرف الفاخرة إلى خدمات النقل الخاصة VIP، تم تصميم كل تفصيل{" "}
+                  <span className="font-bold text-black">
+                    لجعل فترة تعافيكم سلسة وإقامتكم لا تُنسى.
+                  </span>
+                </>
+              ) : isRu ? (
+                <>
+                  От роскошных номеров до индивидуального VIP-трансфера — каждая деталь продумана так, чтобы{" "}
+                  <span className="font-bold text-black">
+                    сделать ваше восстановление легким, а пребывание — незабываемым.
+                  </span>
+                </>
+              ) : isEn ? (
                 <>
                   From luxurious rooms to personalized services, every detail is designed to{" "}
                   <span className="font-bold text-black">

@@ -12,6 +12,8 @@ export function ModernGeometricTemplate({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const curr = data.currency || "TRY";
 
   const totalCalculated = (data.items || []).reduce((sum, it) => sum + (it.isPackage ? 0 : it.amount || 0), 0);
@@ -48,24 +50,42 @@ export function ModernGeometricTemplate({
               {data.clinicName || "Modern Dental Clinic"}
             </h1>
             <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-[#00A3FF]">
-              {isEn ? "ADVANCED CLINICAL DENTISTRY" : "DİJİTAL DİŞ HEKİMLİĞİ & İMPLANTOLOJİ"}
+              {isAr
+                ? "طب الأسنان الرقمي وزراعة الأسنان"
+                : isRu
+                ? "ЦИФРОВАЯ СТОМАТОЛОГИЯ И ИМПЛАНТОЛОГИЯ"
+                : isEn
+                ? "ADVANCED CLINICAL DENTISTRY"
+                : "DİJİTAL DİŞ HEKİMLİĞİ & İMPLANTOLOJİ"}
             </p>
           </div>
         </div>
 
         <div className="text-center">
           <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-[#00A3FF] block">
-            {isEn ? "1-PAGE SUMMARY" : "1 SAYFALIK ÖZET PLAN"}
+            {isAr
+              ? "ملخص صفحة واحدة"
+              : isRu
+              ? "СВОДКА НА 1 СТРАНИЦЕ"
+              : isEn
+              ? "1-PAGE SUMMARY"
+              : "1 SAYFALIK ÖZET PLAN"}
           </span>
           <h2 className="text-base font-black tracking-wider uppercase text-white">
-            {isEn ? "TREATMENT PLAN" : "TEDAVİ PLANI"}
+            {isAr
+              ? "خطة العلاج"
+              : isRu
+              ? "ПЛАН ЛЕЧЕНИЯ"
+              : isEn
+              ? "TREATMENT PLAN"
+              : "TEDAVİ PLANI"}
           </h2>
         </div>
 
         <div className="text-right text-[10px] font-mono space-y-0.5">
           <span className="text-white font-bold block">{data.patientName}</span>
           <span className="text-slate-300 block">{data.planNo || "#MG-2026-001"}</span>
-          <span className="text-slate-400 block">{data.date}</span>
+          <span className="text-slate-400 block">{data.dateStr || data.date}</span>
         </div>
       </div>
 
@@ -76,27 +96,29 @@ export function ModernGeometricTemplate({
           <div className="grid grid-cols-4 gap-3 text-xs">
             <div>
               <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-slate-500 block">
-                {isEn ? "PATIENT" : "HASTA"}
+                {isAr ? "المريض" : isRu ? "ПАЦИЕНТ" : isEn ? "PATIENT" : "HASTA"}
               </span>
               <span className="font-bold text-slate-900 truncate block mt-0.5">{data.patientName}</span>
             </div>
             <div>
               <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-slate-500 block">
-                {isEn ? "DOCTOR" : "HEKİM"}
+                {isAr ? "الطبيب" : isRu ? "ВРАЧ" : isEn ? "DOCTOR" : "HEKİM"}
               </span>
               <span className="font-bold text-slate-800 truncate block mt-0.5">{data.doctorName || "Dr. Selin Yılmaz"}</span>
             </div>
             <div>
               <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-slate-500 block">
-                {isEn ? "DATE" : "TARİH"}
+                {isAr ? "التاريخ" : isRu ? "ДАТА" : isEn ? "DATE" : "TARİH"}
               </span>
-              <span className="font-mono font-medium text-slate-700 block mt-0.5">{data.date}</span>
+              <span className="font-mono font-medium text-slate-700 block mt-0.5">{data.dateStr || data.date}</span>
             </div>
             <div>
               <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-slate-500 block">
-                {isEn ? "VALIDITY" : "GEÇERLİLİK"}
+                {isAr ? "الصلاحية" : isRu ? "СРОК" : isEn ? "VALIDITY" : "GEÇERLİLİK"}
               </span>
-              <span className="font-mono font-medium text-slate-700 block mt-0.5">{isEn ? "30 Days" : "30 Gün"}</span>
+              <span className="font-mono font-medium text-slate-700 block mt-0.5">
+                {isAr ? "30 يوماً" : isRu ? "30 дней" : isEn ? "30 Days" : "30 Gün"}
+              </span>
             </div>
           </div>
         </div>
@@ -106,20 +128,30 @@ export function ModernGeometricTemplate({
           <div className="bg-[#0B2570] text-white px-4 py-2 flex items-center justify-between text-xs font-bold">
             <span className="flex items-center gap-1.5">
               <Activity className="size-3.5 text-[#00A3FF]" />
-              <span>{isEn ? "PLANNED PROCEDURES & PHASES" : "PLANLANAN PROSEDÜRLER & AŞAMALAR"}</span>
+              <span>
+                {isAr
+                  ? "الإجراءات والمراحل المخططة"
+                  : isRu
+                  ? "ЗАПЛАНИРОВАННЫЕ ПРОЦЕДУРЫ И ЭТАПЫ"
+                  : isEn
+                  ? "PLANNED PROCEDURES & PHASES"
+                  : "PLANLANAN PROSEDÜRLER & AŞAMALAR"}
+              </span>
             </span>
-            <span className="font-mono text-[#00A3FF]">{(data.items || []).length} {isEn ? "Items" : "Kalem"}</span>
+            <span className="font-mono text-[#00A3FF]">
+              {(data.items || []).length} {isAr ? "عنصر" : isRu ? "Поз." : isEn ? "Items" : "Kalem"}
+            </span>
           </div>
 
           <div className="flex-1 overflow-hidden">
             <table className="w-full text-xs">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] uppercase font-bold">
                 <tr>
-                  <th className="py-2 px-3 text-left">{isEn ? "Treatment" : "İşlem / Tedavi"}</th>
-                  <th className="py-2 px-2 text-center">{isEn ? "Tooth" : "Diş No"}</th>
-                  <th className="py-2 px-2 text-center">{isEn ? "Qty" : "Adet"}</th>
-                  <th className="py-2 px-3 text-right">{isEn ? "Unit Price" : "Birim"}</th>
-                  <th className="py-2 px-3 text-right">{isEn ? "Total" : "Tutar"}</th>
+                  <th className="py-2 px-3 text-left">{isAr ? "العلاج" : isRu ? "Процедура" : isEn ? "Treatment" : "İşlem / Tedavi"}</th>
+                  <th className="py-2 px-2 text-center">{isAr ? "السن" : isRu ? "Зуб" : isEn ? "Tooth" : "Diş No"}</th>
+                  <th className="py-2 px-2 text-center">{isAr ? "العدد" : isRu ? "Кол-во" : isEn ? "Qty" : "Adet"}</th>
+                  <th className="py-2 px-3 text-right">{isAr ? "سعر الوحدة" : isRu ? "Цена" : isEn ? "Unit Price" : "Birim"}</th>
+                  <th className="py-2 px-3 text-right">{isAr ? "الإجمالي" : isRu ? "Сумма" : isEn ? "Total" : "Tutar"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -158,12 +190,12 @@ export function ModernGeometricTemplate({
             <div className="text-right space-y-0.5">
               {discount > 0 && (
                 <div className="text-[11px] text-slate-500 font-mono">
-                  <span>{isEn ? "Subtotal:" : "Ara Toplam:"} </span>
+                  <span>{isAr ? "المجموع الفرعي:" : isRu ? "Подытог:" : isEn ? "Subtotal:" : "Ara Toplam:"} </span>
                   <span className="line-through">{formatCurrency(subtotal, curr, data.locale)}</span>
                 </div>
               )}
               <div className="text-lg font-black font-mono text-[#0B2570]">
-                <span>{isEn ? "Total: " : "Net Tutar: "}</span>
+                <span>{isAr ? "الإجمالي: " : isRu ? "Итого: " : isEn ? "Total: " : "Net Tutar: "}</span>
                 <span className="text-emerald-700">{formatCurrency(grandTotal, curr, data.locale)}</span>
               </div>
             </div>

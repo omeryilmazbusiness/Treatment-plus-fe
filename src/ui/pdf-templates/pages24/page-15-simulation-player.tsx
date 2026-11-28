@@ -10,6 +10,8 @@ export function Booklet24Page15SimulationPlayer({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   // Hastanın sistemdeki mevcut 3D tedavi simülasyonuna doğrudan giden bağlantı
@@ -61,7 +63,11 @@ export function Booklet24Page15SimulationPlayer({
             style={{ backgroundColor: "#F47B00" }}
           >
             <span className="w-2 h-2 size-2 rounded-full bg-white" />
-            {isEn
+            {isAr
+              ? "محاكاة العلاج التفاعلية ثلاثية الأبعاد"
+              : isRu
+              ? "ИНТЕРАКТИВНАЯ 3D-СИМУЛЯЦИЯ ЛЕЧЕНИЯ"
+              : isEn
               ? "INTERACTIVE 3D TREATMENT SIMULATION"
               : "İNTERAKTİF 3D TEDAVİ SİMÜLASYONU"}
           </span>
@@ -70,13 +76,21 @@ export function Booklet24Page15SimulationPlayer({
             className="mt-4 text-[28px] font-black tracking-tight uppercase leading-tight"
             style={{ color: themeColor }}
           >
-            {isEn
+            {isAr
+              ? "استكشف محاكاة أسنانك ثلاثية الأبعاد"
+              : isRu
+              ? "Изучите вашу 3D-симуляцию лечения"
+              : isEn
               ? "Explore Your 3D Dental Simulation"
               : "3D Tedavi Simülasyonunuzu İnceleyin"}
           </h2>
 
           <p className="mt-2.5 text-[13.5px] leading-relaxed text-slate-600">
-            {isEn
+            {isAr
+              ? `تم إعدادها خصيصاً لـ ${data.patientName || "مريضنا العزيز"}. امسح رمز QR أدناه بكاميرا هاتفك الذكي للتفاعل مع نموذج أسنانك ثلاثي الأبعاد وخطة العلاج خطوة بخطوة.`
+              : isRu
+              ? `Подготовлено специально для ${data.patientName || "нашего пациента"}. Отсканируйте QR-код ниже камерой смартфона, чтобы открыть интерактивную 3D-модель и пошаговый план лечения.`
+              : isEn
               ? `Prepared exclusively for ${data.patientName || "our valued patient"}. Scan the QR code below with your smartphone camera to interact with your 3D dental model and step-by-step surgical treatment plan.`
               : `Sayın ${data.patientName || "Hastamız"} için özel olarak hazırlanmıştır. Telefonunuzun kamerasıyla aşağıdaki karekodu okutarak sistemdeki 3D ağız ve tedavi simülasyonunuza doğrudan ulaşabilirsiniz.`}
           </p>
@@ -130,7 +144,14 @@ export function Booklet24Page15SimulationPlayer({
               className="rounded-lg px-3 py-1 text-[11px] font-extrabold text-white"
               style={{ backgroundColor: themeColor }}
             >
-              {data.patientName || (isEn ? "Valued Patient" : "Sayın Hastamız")}
+              {data.patientName ||
+                (isAr
+                  ? "مريضنا العزيز"
+                  : isRu
+                  ? "Уважаемый пациент"
+                  : isEn
+                  ? "Valued Patient"
+                  : "Sayın Hastamız")}
             </span>
             {data.planNo && (
               <span className="rounded-lg bg-slate-100 px-3 py-1 font-mono text-[11px] font-bold text-slate-700">
@@ -139,12 +160,20 @@ export function Booklet24Page15SimulationPlayer({
             )}
             {totalVisits > 0 && (
               <span className="rounded-lg bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700">
-                {totalVisits} {isEn ? "Visits" : "Seans"}
+                {totalVisits}{" "}
+                {isAr ? "زيارات" : isRu ? "Визита" : isEn ? "Visits" : "Seans"}
               </span>
             )}
             {totalProcedures > 0 && (
               <span className="rounded-lg bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700">
-                {totalProcedures} {isEn ? "Procedures" : "Planlanan İşlem"}
+                {totalProcedures}{" "}
+                {isAr
+                  ? "إجراءات"
+                  : isRu
+                  ? "Процедур"
+                  : isEn
+                  ? "Procedures"
+                  : "Planlanan İşlem"}
               </span>
             )}
           </div>
@@ -160,7 +189,11 @@ export function Booklet24Page15SimulationPlayer({
               <polygon points="5 3 20 12 5 21 5 3" />
             </svg>
             <span>
-              {isEn
+              {isAr
+                ? "امسح الرمز أو اضغط لفتح المحاكاة ثلاثية الأبعاد"
+                : isRu
+                ? "Отсканируйте или нажмите для запуска 3D"
+                : isEn
                 ? "Scan or Click to Open 3D Simulation"
                 : "Karekodu Okutun veya 3D Simülasyonu Açın"}
             </span>
@@ -177,10 +210,20 @@ export function Booklet24Page15SimulationPlayer({
               1
             </div>
             <p className="mt-1.5 text-[11px] font-bold text-slate-800">
-              {isEn ? "Open Phone Camera" : "Kameranızı Açın"}
+              {isAr
+                ? "افتح الكاميرا"
+                : isRu
+                ? "Откройте камеру"
+                : isEn
+                ? "Open Phone Camera"
+                : "Kameranızı Açın"}
             </p>
             <p className="mt-0.5 text-[10px] text-slate-500">
-              {isEn
+              {isAr
+                ? "وجه كاميرا الهاتف نحو رمز QR"
+                : isRu
+                ? "Наведите камеру на QR-код"
+                : isEn
                 ? "Point your camera at the QR code"
                 : "Telefon kameranızı karekoda tutun"}
             </p>
@@ -194,10 +237,20 @@ export function Booklet24Page15SimulationPlayer({
               2
             </div>
             <p className="mt-1.5 text-[11px] font-bold text-slate-800">
-              {isEn ? "Tap Notification" : "Bağlantıya Dokunun"}
+              {isAr
+                ? "اضغط على الرابط"
+                : isRu
+                ? "Перейдите по ссылке"
+                : isEn
+                ? "Tap Notification"
+                : "Bağlantıya Dokunun"}
             </p>
             <p className="mt-0.5 text-[10px] text-slate-500">
-              {isEn
+              {isAr
+                ? "لا يتطلب تطبيقاً أو كلمة مرور"
+                : isRu
+                ? "Без пароля и установки приложений"
+                : isEn
                 ? "No app or password required"
                 : "Şifre veya uygulama gerekmez"}
             </p>
@@ -211,10 +264,20 @@ export function Booklet24Page15SimulationPlayer({
               3
             </div>
             <p className="mt-1.5 text-[11px] font-bold text-slate-800">
-              {isEn ? "Explore in 3D" : "3D Olarak İnceleyin"}
+              {isAr
+                ? "استكشف بزاوية 360°"
+                : isRu
+                ? "Изучайте в 3D"
+                : isEn
+                ? "Explore in 3D"
+                : "3D Olarak İnceleyin"}
             </p>
             <p className="mt-0.5 text-[10px] text-slate-500">
-              {isEn
+              {isAr
+                ? "قم بتدوير وفحص كل سن ثلاثي الأبعاد"
+                : isRu
+                ? "Вращайте челюсть на 360°"
+                : isEn
                 ? "Rotate and inspect every tooth"
                 : "Çene modelini 360° döndürüp inceleyin"}
             </p>

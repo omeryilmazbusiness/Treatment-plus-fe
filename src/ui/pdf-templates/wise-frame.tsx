@@ -67,13 +67,13 @@ export function getTemplateVisuals(
     case "liquid-art": // SOFT
       return {
         templateId,
-        primaryColor: "#5B4B8A",
-        bandBg: "#F3E8FF",
-        bandBgSecondary: "#E0F2FE",
-        accentColor: "#F472B6",
-        bandTitleColor: "#3B2854",
-        bandEyebrowColor: "#7E57C2",
-        footerTextColor: "#3B2854",
+        primaryColor: "#6B4F5E",
+        bandBg: "#EBD9D6",
+        bandBgSecondary: "#DCE4E4",
+        accentColor: "#B5838D",
+        bandTitleColor: "#4A3441",
+        bandEyebrowColor: "#8E6A78",
+        footerTextColor: "#4A3441",
       };
 
     case "botanical-serenity": // NATURE
@@ -122,7 +122,7 @@ export function resolveVisualsFromTheme(
       return getTemplateVisuals("royal-gold");
     case "#1C1917":
       return getTemplateVisuals("noir-gold");
-    case "#5B4B8A":
+    case "#6B4F5E":
       return getTemplateVisuals("liquid-art");
     case "#3A5A40":
       return getTemplateVisuals("botanical-serenity");
@@ -384,7 +384,7 @@ function BandDecorations({
   }
 
   if (templateId === "liquid-art") {
-    // SOFT: Pastel pembe, gök mavisi, lavanta ve sarı dalgalar + pofuduk beyaz bulutlar ve yıldızlar
+    // SOFT: Sakin, olgun pudra gülü / mauve / ince adaçayı tonları; yalnızca zarif eğriler ve ince çizgiler
     return (
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none"
@@ -393,69 +393,40 @@ function BandDecorations({
       >
         <defs>
           <linearGradient id={`sft-bg-${position}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FBCFE8" />
-            <stop offset="38%" stopColor="#EDE9FE" />
-            <stop offset="72%" stopColor="#BAE6FD" />
-            <stop offset="100%" stopColor="#FEF08A" />
+            <stop offset="0%" stopColor="#F1E2DF" />
+            <stop offset="55%" stopColor="#E8D5D3" />
+            <stop offset="100%" stopColor="#DCE4E4" />
           </linearGradient>
         </defs>
         <rect width="800" height="260" fill={`url(#sft-bg-${position})`} />
-        {/* Yumuşak Pastel Dalga Katmanları */}
-        <path
-          d="M0,0 L360,0 C310,95 210,140 0,190 Z"
-          fill="#F9A8D4"
-          opacity="0.38"
-        />
-        <path
-          d="M420,0 L800,0 L800,175 C660,165 550,90 420,0 Z"
-          fill="#7DD3FC"
-          opacity="0.42"
-        />
-        <path
-          d="M180,260 C310,160 470,150 640,260 Z"
-          fill="#C4B5FD"
-          opacity="0.35"
-        />
-        {/* Beyaz Bulutlar & Minik Yıldızlar */}
+        {/* Yumuşak, mat dalga katmanları */}
+        <path d="M0,0 L380,0 C320,100 200,150 0,200 Z" fill="#D9BDBD" opacity="0.35" />
+        <path d="M440,0 L800,0 L800,180 C670,170 550,95 440,0 Z" fill="#C9D6D8" opacity="0.5" />
+        <path d="M160,260 C300,175 480,165 660,260 Z" fill="#C7B3BE" opacity="0.28" />
+        {/* İnce zarif süs çizgisi */}
         {isTop && (
-          <>
-            <g fill="#FFFFFF" opacity="0.92" transform="translate(605, 22)">
-              <circle cx="38" cy="42" r="22" />
-              <circle cx="66" cy="34" r="28" />
-              <circle cx="96" cy="44" r="20" />
-              <rect x="36" y="40" width="62" height="24" rx="12" />
-            </g>
-            {/* Parlayan Minik Yıldızlar */}
-            <path
-              d="M555,36 L559,46 L569,50 L559,54 L555,64 L551,54 L541,50 L551,46 Z"
-              fill="#FFFFFF"
-            />
-            <path
-              d="M748,82 L751,89 L758,92 L751,95 L748,102 L745,95 L738,92 L745,89 Z"
-              fill="#FFFFFF"
-            />
-          </>
-        )}
-        {!isTop && (
-          <g fill="#FFFFFF" opacity="0.85" transform="translate(90, 125)">
-            <circle cx="32" cy="36" r="18" />
-            <circle cx="54" cy="28" r="23" />
-            <circle cx="78" cy="37" r="16" />
-            <rect x="30" y="34" width="50" height="19" rx="9" />
+          <g fill="none" stroke="#B5838D" strokeWidth="1.2" opacity="0.55">
+            <path d="M600,40 C650,10 720,10 770,40" />
+            <path d="M620,56 C660,34 710,34 750,56" />
           </g>
         )}
-        {/* Pastel Kenar Şeridi */}
         {position === "header" && (
-          <line x1="0" y1="254" x2="800" y2="147" stroke="#F472B6" strokeWidth="4.5" opacity="0.75" />
+          <>
+            <line x1="0" y1="254" x2="800" y2="147" stroke="#B5838D" strokeWidth="3" opacity="0.8" />
+            <line x1="0" y1="244" x2="800" y2="137" stroke="#B5838D" strokeWidth="1" opacity="0.45" />
+          </>
         )}
         {position === "top-wedge" && (
-          <line x1="0" y1="253" x2="800" y2="70" stroke="#7DD3FC" strokeWidth="5" />
+          <line x1="0" y1="253" x2="800" y2="70" stroke="#B5838D" strokeWidth="3.5" opacity="0.8" />
         )}
         {position === "footer-odd" && (
-          <line x1="0" y1="176" x2="800" y2="3" stroke="#C4B5FD" strokeWidth="5" />
+          <>
+            <line x1="0" y1="176" x2="800" y2="3" stroke="#B5838D" strokeWidth="3.5" opacity="0.8" />
+            <line x1="0" y1="186" x2="800" y2="13" stroke="#B5838D" strokeWidth="1" opacity="0.45" />
+          </>
         )}
         {position === "footer-even" && (
-          <line x1="412" y1="258" x2="800" y2="2" stroke="#F472B6" strokeWidth="6" />
+          <line x1="412" y1="258" x2="800" y2="2" stroke="#B5838D" strokeWidth="4.5" opacity="0.8" />
         )}
       </svg>
     );

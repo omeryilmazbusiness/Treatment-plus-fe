@@ -7,8 +7,10 @@ import type { PdfPlanData } from "./types";
  */
 export async function exportPlanElementToPdf(
   element: HTMLElement,
-  documentTitle = "Tedavi-Plani.pdf"
+  documentTitle = "Tedavi-Plani.pdf",
+  locale: "tr" | "en" | "ar" | "ru" = "tr"
 ): Promise<void> {
+  const isAr = locale === "ar";
   return new Promise((resolve) => {
     // 1. Gizli iframe oluştur
     const iframe = document.createElement("iframe");
@@ -40,14 +42,14 @@ export async function exportPlanElementToPdf(
     doc.open();
     doc.write(`
       <!DOCTYPE html>
-      <html lang="tr">
+      <html lang="${locale}" ${isAr ? 'dir="rtl"' : ""}>
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <title>${documentTitle}</title>
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-          <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Dancing+Script:wght@500;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
           ${styleTags}
           <style>
             @page {
@@ -64,7 +66,7 @@ export async function exportPlanElementToPdf(
               margin: 0 !important;
               padding: 0 !important;
               background: #ffffff !important;
-              font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+              font-family: ${isAr ? "'Cairo', " : ""}'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
             }
             .a4-document-root {
               width: 210mm !important;

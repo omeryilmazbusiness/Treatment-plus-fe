@@ -10,6 +10,8 @@ export function Booklet24Page11AllOn4({
   palette: PdfPalette;
 }) {
   const isEn = data.locale === "en";
+  const isAr = data.locale === "ar";
+  const isRu = data.locale === "ru";
   const themeColor = getThemeColor(palette, "#0b2938");
 
   return (
@@ -29,12 +31,32 @@ export function Booklet24Page11AllOn4({
           className="text-[24px] font-extrabold italic text-right mb-6"
           style={{ color: themeColor }}
         >
-          The All-on-4© System
+          {isAr
+            ? "نظام All-on-4©"
+            : isRu
+            ? "Система All-on-4©"
+            : "The All-on-4© System"}
         </h2>
 
         <div className="space-y-5 text-[15px] leading-[1.6] text-[#222222] text-justify">
           <p>
-            {isEn ? (
+            {isAr ? (
+              <>
+                تم تصميم تقنية All-on-4© خصيصاً بواسطة Nobel Biocare لاستخدام نوع فريد من الغرسات التي يمكنها{" "}
+                <span className="font-bold text-black">
+                  تحمل قوى العض والمضغ على الفور.
+                </span>{" "}
+                فهي لا تبدو طبيعية تماماً فحسب، بل تمنحكم ابتسامة جميلة وواثقة.
+              </>
+            ) : isRu ? (
+              <>
+                Методика All-on-4© была специально разработана компанией Nobel Biocare для использования имплантатов, способных{" "}
+                <span className="font-bold text-black">
+                  немедленно воспринимать жевательную нагрузку.
+                </span>{" "}
+                Они выглядят и ощущаются совершенно естественно, даря вам красивую и уверенную улыбку.
+              </>
+            ) : isEn ? (
               <>
                 The All-on-4© technique has been specifically designed by Nobel Biocare to utilise a unique type of implant which can{" "}
                 <span className="font-bold text-black">
@@ -54,7 +76,21 @@ export function Booklet24Page11AllOn4({
           </p>
 
           <p>
-            {isEn ? (
+            {isAr ? (
+              <>
+                يمكن تحميل غرسات All-on-4© التي يتم وضعها بزوايا مدروسة فوراً بتركيبات مؤقتة ثابتة في نفس اليوم،{" "}
+                <span className="font-bold text-black">
+                  لتتمكنوا من ممارسة حياتكم وتناول الطعام براحة تامة.
+                </span>
+              </>
+            ) : isRu ? (
+              <>
+                На имплантаты All-on-4© в тот же день фиксируется несъемный временный протез, благодаря чему{" "}
+                <span className="font-bold text-black">
+                  вы можете комфортно жить, улыбаться и питаться без перерыва.
+                </span>
+              </>
+            ) : isEn ? (
               <>
                 All-on-4© implants, inserted at the front of a healthy jaw bone, can be loaded immediately with a temporary fixed dentures and{" "}
                 <span className="font-bold text-black">

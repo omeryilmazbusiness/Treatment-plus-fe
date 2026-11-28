@@ -344,6 +344,8 @@ const PALETTES: { key: Palette; label: string; accent: string; base: string }[] 
 const LOCALES: { code: Locale; label: string }[] = [
   { code: "tr", label: "Türkçe" },
   { code: "en", label: "English" },
+  { code: "ar", label: "Arabic" },
+  { code: "ru", label: "Russia" },
 ];
 
 export function Segmented<T extends string>({
